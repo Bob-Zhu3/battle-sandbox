@@ -61,3 +61,17 @@ export function battleFromDeployment(commands: readonly PlacementCommand[]) {
   }
   return createBattle(placements);
 }
+
+export function twentyVsTwenty(): PlacementCommand[] {
+  const red: ArenaPoint[] = [];
+  const blue: ArenaPoint[] = [];
+  for (let rank = 0; rank < 4; rank++) {
+    for (let row = 0; row < 5; row++) {
+      const x = 328 - rank * 32 - Math.abs(row - 2);
+      const y = 180 + (row - 2) * 46 + (rank % 2) * 5;
+      red.push({ x, y });
+      blue.push({ x: ARENA.width - x, y });
+    }
+  }
+  return [{ type: "place-warriors", positions: red }, { type: "place-warriors", positions: blue }];
+}

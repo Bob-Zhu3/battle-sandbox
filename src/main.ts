@@ -1,25 +1,36 @@
 import { battleOutcome, stepBattle, TICKS_PER_SECOND, WARRIOR } from "./simulation.ts";
-import { battleFromDeployment, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
+import { battleFromDeployment, twentyVsTwenty, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
 import { attachDeploymentBrush } from "./brush-input.ts";
-import { drawArena } from "./renderer.ts";
+import { drawLandscape } from "./landscape.ts";
+import { drawArena, drawWarriorToken } from "./renderer.ts";
 
 function element<T extends HTMLElement = HTMLElement>(id: string): T {
   const found = document.getElementById(id);
-  if (!found) throw new Error(`Missing interface element: ${id}`);
+  if (!found) throw new Error("Missing interface element: " + id);
   return found as T;
 }
 
+function contextFor(canvas: HTMLCanvasElement) {
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This browser could not open a 2D canvas.");
+  return context;
+}
+
 const canvas = element<HTMLCanvasElement>("arena");
-const context = canvas.getContext("2d");
-if (!context) throw new Error("This browser could not open a 2D canvas.");
-const ctx = context;
+const landscape = element<HTMLCanvasElement>("landscape");
+const ctx = contextFor(canvas);
+const ground = contextFor(landscape);
 const play = element<HTMLButtonElement>("play");
 const replay = element<HTMLButtonElement>("replay");
 const edit = element<HTMLButtonElement>("edit");
 const undo = element<HTMLButtonElement>("undo");
 const clear = element<HTMLButtonElement>("clear");
+const demo = element<HTMLButtonElement>("demo");
+const demoLabel = element("demo-label");
 const hint = element("deploy-hint");
-const rules = element("rules");
+const emptyGuide = element("empty-guide");
+const brushTool = element("brush-tool");
+const keyAction = element("key-action");
 const playLabel = element("play-label");
 const playIcon = element("play-icon");
 const stateLabel = element("match-state");
@@ -28,8 +39,8 @@ const result = element("result");
 const resultTitle = element("result-title");
 const resultDetail = element("result-detail");
 const health = {
-  red: { value: element("red-hp"), max: element("red-max"), count: element("red-count"), bar: element("red-bar") },
-  blue: { value: element("blue-hp"), max: element("blue-max"), count: element("blue-count"), bar: element("blue-bar") },
+  red: { score: element("red-score"), hp: element("red-hp"), max: element("red-max"), count: element("red-count"), bar: element("red-bar") },
+  blue: { score: element("blue-score"), hp: element("blue-hp"), max: element("blue-max"), count: element("blue-count"), bar: element("blue-bar") },
 };
 
 const millisecondsPerTick = 1000 / TICKS_PER_SECOND;
@@ -42,6 +53,8 @@ const labels = {
 type Playback = keyof typeof labels;
 
 const formation: PlacementCommand[] = [];
+const demoFormation = twentyVsTwenty();
+let watchingDemo = false;
 let draft: readonly ArenaPoint[] = [];
 let mode: Playback = "deploy";
 let battle = battleFromDeployment(formation);
@@ -49,6 +62,10 @@ let previous = battle;
 let remainder = 0;
 let lastTime = 0;
 let frameId = 0;
+
+function updateGuide() {
+  emptyGuide.hidden = mode !== "deploy" || battle.warriors.length > 0 || draft.length > 0;
+}
 
 function updateScore() {
   tickLabel.textContent = String(battle.tick).padStart(3, "0");
@@ -61,37 +78,43 @@ function updateScore() {
   }
   for (const side of ["red", "blue"] as const) {
     const { units, alive, hp } = totals[side];
-    const maxHp = units * WARRIOR.maxHp;
+    const max = units * WARRIOR.maxHp;
     const display = health[side];
-    display.count.textContent = mode === "deploy" ? `${units} Warrior${units === 1 ? "" : "s"}` : `${alive} / ${units} alive`;
-    display.value.textContent = String(hp);
-    display.max.textContent = String(maxHp);
-    display.bar.style.transform = `scaleX(${maxHp ? hp / maxHp : 0})`;
+    if (display.count.textContent !== String(alive)) display.count.textContent = String(alive);
+    if (display.max.textContent !== String(max)) display.max.textContent = String(max);
+    if (display.hp.textContent !== String(hp)) display.hp.textContent = String(hp);
+    display.score.title = alive + " of " + units + " " + side + " Warriors alive · " + hp + "/" + max + " HP";
+    display.bar.style.transform = "scaleX(" + (max ? hp / max : 0) + ")";
   }
   if (mode === "deploy") {
-    play.disabled = !totals.red.units || !totals.blue.units;
-    undo.disabled = clear.disabled = formation.length === 0;
-    if (totals.red.units && !totals.blue.units) hint.textContent = "Place a blue Warrior on the right to start.";
-    else if (totals.blue.units && !totals.red.units) hint.textContent = "Place a red Warrior on the left to start.";
-    else hint.textContent = "Click to place one Warrior. Drag to place a line.";
+    const red = totals.red.units, blue = totals.blue.units;
+    play.disabled = !red || !blue;
+    undo.disabled = clear.disabled = !formation.length;
+    hint.hidden = Boolean(red) === Boolean(blue);
+    hint.textContent = red ? "Place a blue Warrior on the right to start." : "Place a red Warrior on the left to start.";
   }
+  updateGuide();
 }
 
 function setMode(next: Playback) {
   mode = next;
   stateLabel.textContent = labels[mode].status;
-  stateLabel.dataset.mode = mode;
-  playLabel.textContent = labels[mode].button;
+  playLabel.textContent = keyAction.textContent = labels[mode].button;
   playIcon.classList.toggle("pause", mode === "running");
   const deploying = mode === "deploy";
   canvas.dataset.deploying = String(deploying);
+  canvas.setAttribute("aria-label", deploying
+    ? "Battlefield. Draw red Warriors on the left and blue Warriors on the right."
+    : "Battlefield. The pennants show how many Warriors remain on each side.");
   play.disabled = false;
-  undo.hidden = clear.hidden = !deploying;
-  edit.hidden = deploying;
+  undo.hidden = clear.hidden = brushTool.hidden = !deploying;
+  edit.hidden = deploying || watchingDemo;
   replay.hidden = mode !== "running" && mode !== "paused";
-  hint.hidden = !deploying;
-  rules.hidden = deploying;
+  demo.hidden = !deploying && !watchingDemo;
+  demoLabel.textContent = watchingDemo ? "Back to field" : "20 vs 20 demo";
+  if (!deploying) hint.hidden = true;
   result.hidden = mode !== "finished";
+  updateGuide();
 }
 
 function paint(blend = 1) {
@@ -99,9 +122,14 @@ function paint(blend = 1) {
 }
 
 function resizeArena() {
-  const pixelRatio = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.round(canvas.clientWidth * pixelRatio));
-  canvas.height = Math.max(1, Math.round(canvas.clientHeight * pixelRatio));
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+  const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+  for (const layer of [landscape, canvas]) {
+    layer.width = width;
+    layer.height = height;
+  }
+  drawLandscape(ground);
   paint(mode === "running" ? remainder / millisecondsPerTick : 1);
 }
 
@@ -116,8 +144,8 @@ function frame(time: number) {
     const outcome = battleOutcome(battle);
     if (outcome !== null) {
       const isDraw = outcome === "draw";
-      resultTitle.textContent = isDraw ? "Draw" : `${outcome === "red" ? "Red" : "Blue"} wins`;
-      resultDetail.textContent = isDraw ? `Both teams fell on tick ${battle.tick}.` : `Battle ended on tick ${battle.tick}.`;
+      resultTitle.textContent = isDraw ? "Draw" : (outcome === "red" ? "Red wins" : "Blue wins");
+      resultDetail.textContent = (isDraw ? "Both armies fell on tick " : "Battle ended on tick ") + battle.tick + ".";
       setMode("finished");
       break;
     }
@@ -130,7 +158,7 @@ function frame(time: number) {
 function loadFormation(next: "deploy" | "running") {
   cancelAnimationFrame(frameId);
   cancelStroke();
-  battle = battleFromDeployment(formation);
+  battle = battleFromDeployment(watchingDemo ? demoFormation : formation);
   previous = battle;
   remainder = 0;
   setMode(next);
@@ -156,6 +184,7 @@ const cancelStroke = attachDeploymentBrush(canvas, {
   canDraw: () => mode === "deploy",
   preview(points) {
     draft = points;
+    updateGuide();
     paint();
   },
   commit(command) {
@@ -174,6 +203,11 @@ play.addEventListener("click", () => {
     loadFormation("running");
   }
 });
+demo.addEventListener("click", () => {
+  watchingDemo = !watchingDemo;
+  loadFormation(watchingDemo ? "running" : "deploy");
+  canvas.focus({ preventScroll: true });
+});
 replay.addEventListener("click", () => loadFormation("running"));
 edit.addEventListener("click", () => loadFormation("deploy"));
 undo.addEventListener("click", () => {
@@ -184,6 +218,12 @@ clear.addEventListener("click", () => {
   formation.length = 0;
   loadFormation("deploy");
 });
+document.addEventListener("keydown", (event) => {
+  if (event.code !== "Space" || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.target instanceof HTMLButtonElement && event.target !== play) return;
+  event.preventDefault();
+  if (!play.disabled) play.click();
+});
 window.addEventListener("blur", cancelStroke);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
@@ -192,10 +232,9 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-element("tick-rate").textContent = String(TICKS_PER_SECOND);
-element("damage").textContent = String(WARRIOR.damage);
-element("cooldown").textContent = String(WARRIOR.cooldownTicks);
-setMode("deploy");
-updateScore();
+drawWarriorToken(contextFor(element<HTMLCanvasElement>("brush-icon")), 36, 36, 31, "red");
+brushTool.title = "Warrior · " + WARRIOR.maxHp + " HP · " + WARRIOR.damage + " damage per hit";
+watchingDemo = new URLSearchParams(location.search).get("demo") === "20v20";
 resizeArena();
+loadFormation(watchingDemo ? "running" : "deploy");
 new ResizeObserver(resizeArena).observe(canvas);

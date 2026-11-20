@@ -2,65 +2,62 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f7f8f5" />
-    <title>Battlefield · Battle Sandbox</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#d3e6a6" />
+    <title>Battle Sandbox</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="masthead">
-        <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Battle Sandbox</div>
-        <span class="rate"><span class="clock-icon" aria-hidden="true"></span><span id="tick-rate">60</span> ticks / sec</span>
+    <main class="game">
+      <canvas id="landscape" class="field-layer" aria-hidden="true"></canvas>
+      <canvas id="arena" class="field-layer" width="960" height="360" tabindex="-1" aria-label="Battlefield. Draw red Warriors on the left and blue Warriors on the right." aria-describedby="deploy-hint">
+        The pennants show how many Warriors are alive on each team.
+      </canvas>
+
+      <header class="top-hud">
+        <h1 class="wordmark" aria-label="Battle Sandbox"><span>Battle</span><span>Sandbox</span></h1>
+        <div class="score" role="group" aria-label="Warriors on the field">
+          <div id="red-score" class="pennant red">
+            <span class="pennant-name">Red</span><strong id="red-count">0</strong>
+            <span class="life-line" aria-hidden="true"><i id="red-bar"></i></span>
+            <span class="sr-only"><span id="red-hp">0</span> of <span id="red-max">0</span> HP</span>
+          </div>
+          <span class="versus" aria-hidden="true">vs</span>
+          <div id="blue-score" class="pennant blue">
+            <span class="pennant-name">Blue</span><strong id="blue-count">0</strong>
+            <span class="life-line" aria-hidden="true"><i id="blue-bar"></i></span>
+            <span class="sr-only"><span id="blue-hp">0</span> of <span id="blue-max">0</span> HP</span>
+          </div>
+        </div>
+        <button id="demo" class="demo-button" type="button">
+          <span class="flag-icon" aria-hidden="true"></span><span id="demo-label">20 vs 20 demo</span>
+        </button>
       </header>
 
-      <div class="match-heading">
-        <h1>Battlefield</h1>
-        <div class="tick-counter">Tick <span id="tick">000</span></div>
+      <div id="empty-guide" class="empty-guide">
+        <h2>Draw your armies</h2>
+        <p>Click or drag. Red on the left, blue on the right.</p>
+      </div>
+      <div id="result" class="result" role="status" hidden>
+        <strong id="result-title"></strong><span id="result-detail"></span>
       </div>
 
-      <section class="arena-panel" aria-label="Battle arena">
-        <div class="scoreboard">
-          <div class="fighter red">
-            <div class="fighter-heading"><span class="fighter-label">Red team</span><span id="red-count" class="unit-count">0 Warriors</span></div>
-            <div class="health-row">
-              <span class="health-track" aria-hidden="true"><span id="red-bar"></span></span>
-              <span class="health-number"><b id="red-hp">0</b> / <span id="red-max">0</span> HP</span>
-            </div>
-          </div>
-          <span class="match-state" id="match-state" role="status">Deployment</span>
-          <div class="fighter blue">
-            <div class="fighter-heading"><span class="fighter-label">Blue team</span><span id="blue-count" class="unit-count">0 Warriors</span></div>
-            <div class="health-row">
-              <span class="health-track" aria-hidden="true"><span id="blue-bar"></span></span>
-              <span class="health-number"><b id="blue-hp">0</b> / <span id="blue-max">0</span> HP</span>
-            </div>
+      <footer class="bottom-hud">
+        <div class="match-readout"><strong id="match-state" role="status">Deployment</strong><span>Tick <b id="tick">000</b></span></div>
+        <div class="tools">
+          <p id="deploy-hint" class="hint" hidden></p>
+          <div class="tool-strip" role="group" aria-label="Battle controls">
+            <span id="brush-tool" class="brush-tool"><canvas id="brush-icon" width="72" height="72" aria-hidden="true"></canvas>Warrior</span>
+            <button id="undo" class="tool" type="button" aria-label="Undo stroke" title="Undo the last stroke" disabled><i aria-hidden="true">↶</i>Undo</button>
+            <button id="clear" class="tool" type="button" disabled><i class="eraser" aria-hidden="true"></i>Clear</button>
+            <button id="edit" class="tool" type="button" hidden>Edit formation</button>
+            <button id="replay" class="tool" type="button" hidden><i aria-hidden="true">↻</i>Replay</button>
+            <button id="play" class="play" type="button" disabled><i id="play-icon" class="play-icon" aria-hidden="true"></i><span id="play-label">Start</span></button>
           </div>
         </div>
-
-        <div class="field">
-          <canvas id="arena" width="960" height="360" aria-label="Battlefield. Deploy red Warriors on the left half and blue Warriors on the right half." aria-describedby="deploy-hint">
-            The scoreboard shows the number of Warriors and health for each team.
-          </canvas>
-          <div id="result" class="result" role="status" hidden>
-            <strong id="result-title"></strong>
-            <span id="result-detail"></span>
-          </div>
-        </div>
-
-        <div class="control-bar">
-          <div class="buttons">
-            <button id="play" type="button" class="primary" disabled><span id="play-icon" class="play-icon" aria-hidden="true"></span><span id="play-label">Start</span></button>
-            <button id="replay" type="button" class="secondary" hidden>Replay</button>
-            <button id="edit" type="button" class="secondary" hidden>Edit formation</button>
-            <button id="undo" type="button" class="secondary" disabled>Undo stroke</button>
-            <button id="clear" type="button" class="secondary" disabled>Clear</button>
-          </div>
-          <p id="deploy-hint" class="deploy-hint">Click or drag on each half to deploy.</p>
-          <div id="rules" class="rules" hidden><span>Hit <b id="damage">10</b> HP</span><span>Cooldown <b id="cooldown">30</b> ticks</span></div>
-        </div>
-      </section>
+        <span class="key-hint"><kbd>Space</kbd><span id="key-action">Start</span></span>
+      </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
