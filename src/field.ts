@@ -1,4 +1,5 @@
 import { drawLandscape } from "./landscape.ts";
+import { maxHealth } from "./transformations.ts";
 import { createRoster } from "./roster.ts";
 import { UNIT_DEFINITIONS, UNIT_KINDS } from "./units.ts";
 import { ARMIES, BASE_HP, TEAMS, MATCHES, type MatchMode, type Team } from "./battlefield.ts";
@@ -65,7 +66,7 @@ export function createField(mode?: MatchMode) {
       const army = world.units.filter(u => u.team === display.side);
       const living = army.filter(u => u.hp > 0);
       const hp = living.reduce((sum, u) => sum + u.hp, 0);
-      const max = army.reduce((sum, u) => sum + UNIT_DEFINITIONS[u.kind].maxHp, 0);
+      const max = army.reduce((sum, u) => sum + maxHealth(u), 0);
       display.score.hidden = !visible.includes(display.side) || (!mode && !living.length);
       display.count.textContent = String(living.length);
       display.hp.textContent = String(hp); display.max.textContent = String(max);

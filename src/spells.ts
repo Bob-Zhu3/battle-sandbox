@@ -33,13 +33,13 @@ export function applyMagic(active: readonly FieldSpell[], units: Unit[], targets
   for (const spell of active) {
     if (spell.kind === "meteor") {
       for (const target of targets) {
-        if (target.team !== spell.team && target.hp > 0 && insideSpell(spell, target, target.kind === "base" ? BASE_RADIUS : 0))
+        if (target.team !== spell.team && target.hp > 0 && (target.kind === "base" || !target.tunnel) && insideSpell(spell, target, target.kind === "base" ? BASE_RADIUS : 0))
           hit(target, target.kind === "base" ? 6 : 17, spell.team);
       }
       continue;
     }
     for (const unit of units) {
-      if (unit.hp <= 0 || !insideSpell(spell, unit)) continue;
+      if (unit.hp <= 0 || unit.tunnel || !insideSpell(spell, unit)) continue;
       const friendly = unit.team === spell.team;
       if (spell.kind === "rain") {
         if (friendly) delete unit.burn;

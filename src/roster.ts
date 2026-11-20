@@ -2,13 +2,13 @@ import { ARMIES, type Team } from "./battlefield.ts";
 import { drawUnitToken } from "./characters.ts";
 import { drawSpellIcon } from "./magic-art.ts";
 import { SPELLS, type SpellKind } from "./spells.ts";
-import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 
-type Brush = UnitKind | SpellKind;
+type Brush = RecruitKind | SpellKind;
 const shelves: {name: string; items: Brush[]}[] = [
-  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","engineer"]},
+  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","miner","clown","engineer"]},
   {name: "Machines", items: ["mouse","drone","workshop","post"]},
-  {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","zombie"]},
+  {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","reaper","witch","zombie"]},
   {name: "Spells", items: ["gust","meteor","rain"]},
 ];
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
@@ -36,7 +36,7 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     c.scale(2,2);
     if(isSpell(key)){c.translate(36,36);c.scale(1.95,1.95);drawSpellIcon(c,key);}
     else {
-      const myth = key === "cyclops" || key === "phoenix" || key === "frostqueen" || key === "kirin";
+      const myth = key === "cyclops" || key === "phoenix" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
       const longWeapon = key === "musketeer" || key === "lancer";
       const size = myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
       const shift = key === "phoenix" ? 4 : longWeapon || key === "cyclops" ? -4 : 0;
@@ -108,7 +108,7 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   document.addEventListener("keydown",event=>{if(event.key==="Escape" && !panel.hidden){toggle(false);opener.focus();}});
   toggle(false);renderQuick();refresh();
   return {
-    selectedKind: (): UnitKind => isSpell(selected)?"warrior":selected,
+    selectedKind: (): RecruitKind => isSpell(selected)?"warrior":selected,
     selectedSpell: (): SpellKind | undefined => isSpell(selected)?selected:undefined,
     colorBrush(color:Team){team=color;renderQuick();if(!panel.hidden)renderShelf();refresh();},
     setCasting(enabled:boolean){if(casting===enabled)return;casting=enabled;if(!enabled && isSpell(selected))choose("warrior");else refresh();},

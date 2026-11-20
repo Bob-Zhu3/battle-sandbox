@@ -78,7 +78,7 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
     effects.push({kind: "smash", team: caster.team, x: swing.x, y: swing.y, tick, radius: club.blastRadius});
     for (const target of targets) {
       const base = target.kind === "base";
-      if (target.team === caster.team || target.hp <= 0 || !within(swing, target, club.blastRadius + (base ? BASE_RADIUS : 0))) continue;
+      if (target.team === caster.team || target.hp <= 0 || (!base && target.tunnel) || !within(swing, target, club.blastRadius + (base ? BASE_RADIUS : 0))) continue;
       hit(target, base ? 10 : club.damage, caster.team);
       disable(target.id, club.stunTicks);
       if (!base) {

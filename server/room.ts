@@ -5,6 +5,7 @@ import { Battle, battleOutcome, createBattle, stepBattle, TICKS_PER_SECOND, AREN
 import { type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
 
 import { campFor, inCamp, makeBase, COUNTDOWN_TICKS, GOLD_PER_SECOND, MATCHES, STARTING_GOLD, type MatchMode } from "../src/battlefield.ts";
+import { bountyFor } from "../src/transformations.ts";
 import { UNIT_DEFINITIONS, placementKind } from "../src/units.ts";
 
 export function record(value: unknown): value is Record<string, unknown> {
@@ -83,8 +84,8 @@ export class Room {
     const placements = this.strokes.flatMap(stroke => stroke.units);
     for (const team of this.sides) this.gold[team] = STARTING_GOLD;
     for (const unit of placements) this.gold[unit.team]! -= UNIT_DEFINITIONS[unit.kind ?? "warrior"].cost;
-    this.world = createBattle(placements);
-    this.world.bases = this.sides.filter(team => this.players[team]).map(team => makeBase(this.mode, team));
+    const bases = this.sides.filter(team => this.players[team]).map(team => makeBase(this.mode, team));
+    this.world = createBattle(placements, 0, bases);
   }
 
   private resetRound() {
@@ -158,7 +159,7 @@ export class Room {
           !Number.isFinite(point.x) || !Number.isFinite(point.y)) return "Use finite arena coordinates.";
       const { x, y } = point;
       if (x < 0 || x > ARENA.width || y < 0 || y > ARENA.height) return "Keep the stroke inside the arena.";
-      if (!inCamp(this.mode, team, x, y)) return "Keep the whole stroke in your " + campFor(this.mode, team).label + ".";
+      if (kind !== "miner" && !inCamp(this.mode, team, x, y)) return "Keep the whole stroke in your " + campFor(this.mode, team).label + ".";
       const last = units.at(-1);
       if (last && Math.hypot(x - last.x, y - last.y) > BRUSH_SPACING + 0.00001) return "A squad must be one continuous stroke.";
       units.push({ x, y, team, kind, id: this.nextId + units.length });
@@ -169,7 +170,7 @@ export class Room {
     player.receipts.set(commandId, { ack, type: UNIT_DEFINITIONS[kind].command, points: units });
     if (live) {
       this.gold[team]! -= price;
-      const recruits = createBattle(units).units;
+      const recruits = createBattle(units, this.world.tick, this.world.bases).units;
       this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases, this.world.spells, this.world.effects);
     } else {
       this.strokes.push(stroke);
@@ -218,7 +219,7 @@ export class Room {
     let paid = false;
     for (const [index, unit] of this.world.units.entries()) {
       if (!unit.killedBy || unit.hp > 0 || (previous.units[index]?.hp ?? 0) <= 0) continue;
-      this.gold[unit.killedBy]! += UNIT_DEFINITIONS[unit.kind].bounty;
+      this.gold[unit.killedBy]! += bountyFor(unit);
       paid = true;
     }
     if (this.world.tick % TICKS_PER_SECOND === 0) {

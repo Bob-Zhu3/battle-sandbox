@@ -1,6 +1,7 @@
 import { FACE, INK, IRON, WOOD, cut, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import type { CharacterPose } from "./character-pose.ts";
 import type { Unit } from "./simulation.ts";
+import { clownArt, minerArt, oldHeadgear, pigArt, reaperArt, witchArt } from "./oddities-art.ts";
 import { cyclops, frostQueen, kirin, phoenix } from "./mythical-art.ts";
 import type { UnitKind } from "./units.ts";
 
@@ -100,13 +101,14 @@ function human(c: Pens, d: Dye, kind: UnitKind, p: CharacterPose, u: Unit | unde
   }
 }
 function zombie(c: Pens, d: Dye, p: CharacterPose, u: Unit|undefined, tick: number) {
-  const bite=fade(tick,u?.lastAttackTick,14), rising=fade(tick,u?.raisedTick,15);
+  const bite=fade(tick,u?.lastAttackTick,14), rising=fade(tick,u?.zombified?.tick,15);
   c.translate(0,3*rising); c.rotate(.12+p.step*.07);
   boots(c,p.step*1.3,3);
   limb(c,-4,-3,4,-4,"#647c69",2.4);
   cut(c,"M-7 -5 L1 -7 L6 -4 L6 4 L3 3 L1 6 L-2 4 L-5 7 L-7 3Z",d.coat);
   cut(c,"M-6 -9 Q-7 -15 -1 -16 L5 -15 L7 -12 L7 -8 L9 -7 L6 -4 L2 -4 L-4 -6Z","#9db481",1.35);
   cut(c,"M-6 -11 L-7 -15 L-4 -14 L-3 -17 L2 -16 L4 -17 L6 -14 L0 -14 L-3 -12Z","#4c6459",1);
+  if (u?.zombified) oldHeadgear(c,u.zombified);
   oval(c,4,-10,2,1.6,INK); oval(c,4.3,-10,.85,1,"#f3e393");
   line(c,-3,-10,-1,-7,"#677a62",1); line(c,2,-6,7,-6-bite,"#58494b",1.4);
   limb(c,3,-2,10+3*bite,-4-bite,"#9db481",2.5); line(c,10+3*bite,-4-bite,13+3*bite,-3,INK,1);
@@ -156,6 +158,11 @@ function drone(c: Pens,d: Dye,u: Unit|undefined,t: number) {
 export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?: Unit,tick=0) {
   const t=tick+(u?.id??0)*11;
   switch(kind) {
+    case "miner": minerArt(c,d,p,u,tick); break;
+    case "clown": clownArt(c,d,p,u,tick); break;
+    case "reaper": reaperArt(c,d,p,u,tick); break;
+    case "witch": witchArt(c,d,p,u,tick); break;
+    case "pig": pigArt(c,d,p,u,tick); break;
     case "cyclops": cyclops(c,d,p,u,tick); break;
     case "frostqueen": frostQueen(c,d,u,tick); break;
     case "zombie": zombie(c,d,p,u,tick); break;

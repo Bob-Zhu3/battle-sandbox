@@ -87,17 +87,18 @@ test("a stunned Cyclops releases its intended meal on the last scoop tick",()=>{
   assert.equal(get(w,2).hp,10);assert.equal(get(w,2).swallowedTick,undefined);
 });
 
-test("a swallowed human disappears once, pays its original bounty once, and never rises from infection",()=>{
+test("a swallowed human pays its original bounty once even when a Zombie bites on the same tick",()=>{
   const room=new Room();room.join();room.join();room.phase="running";
   room.world=quiet(createBattle([at(1,"cyclops","red",410),at(2,"warrior","blue",444),
     at(3,"drone","blue",412,193),at(4,"phoenix","blue",426,148),at(5,"archer","red",405,137)]));
   room.world.bases=["red","blue"].map(t=>makeBase("duel",t));
   for(const i of [2,3,4,5])get(room.world,i).hp=9;
-  get(room.world,2).infection={team:"blue",until:300};
-  for(let i=0;i<=defs.cyclops.swallowTicks;i++)room.advance();
+  for(let i=0;i<defs.cyclops.swallowTicks;i++)room.advance();
+  const meal=get(room.world,2);room.world.units.push(...createBattle([at(8,"zombie","red",meal.x+5,meal.y)]).units);
+  room.advance();
   const swallowed=get(room.world,2);
   assert.equal(swallowed.hp,0);assert.equal(swallowed.swallowedTick,room.world.tick);
-  assert.equal(swallowed.rising,undefined);assert.equal(get(room.world,1).lastSwallow.kind,"warrior");
+  assert.equal(swallowed.kind,"warrior");assert.equal(get(room.world,1).lastSwallow.kind,"warrior");
   for(const i of [3,4,5])assert.equal(get(room.world,i).swallowedTick,undefined);
   assert.equal(room.gold.red,120+defs.warrior.bounty);
   room.advance();assert.equal(room.gold.red,126);
@@ -167,35 +168,31 @@ test("Phoenix talons ignite the target; its egg does not spread fire, and friend
   assert.equal(get(world,2).burn,undefined);assert.equal(get(world,1).hp,0);
 });
 
-test("a bitten human rises with the original ID for the biter, pays once per life and restores from a saved tick",()=>{
+test("a bite turns a living human on contact, preserves its ID, and pays only for a later defeat",()=>{
   const room=new Room();room.join();room.join();room.phase="running";
   room.world=quiet(createBattle([at(1,"zombie","red",400),at(2,"musketeer","blue",426),at(3,"post","blue",570)]));
   room.world.bases=["red","blue"].map(t=>makeBase("duel",t));
-  get(room.world,1).nextAttackTick=1;get(room.world,2).hp=5;room.advance();
-  assert.equal(get(room.world,2).rising.team,"red");assert.equal(room.gold.red,120+defs.musketeer.bounty);
+  get(room.world,1).nextAttackTick=1;room.advance();
+  const turned=get(room.world,2);
+  assert.deepEqual([turned.kind,turned.team,turned.hp],["zombie","red",23]);
+  assert.deepEqual(turned.zombified,{kind:"musketeer",team:"blue",tick:1});
+  assert.equal(turned.nextAttackTick,1+defs.zombie.turnTicks);assert.equal(room.gold.red,120);
   const saved=JSON.parse(JSON.stringify(room.world));
-  for(let i=0;i<defs.zombie.riseTicks;i++)room.advance();
-  assert.deepEqual(advance(saved,defs.zombie.riseTicks),room.world);
-  const raised=get(room.world,2);assert.deepEqual([raised.kind,raised.team,raised.hp],["zombie","red",25]);
-  assert.equal(raised.killedBy,undefined);assert.equal(room.gold.red,128);
-  room.world.arrows.push(shot("bullet","blue",raised.x,raised.y,0,40));room.advance();
+  room.advance();assert.deepEqual(stepBattle(saved),room.world);
+  room.world.arrows.push(shot("bullet","blue",turned.x,turned.y,0,40));room.advance();
   assert.equal(get(room.world,2).hp,0);assert.equal(room.gold.blue,125);
+  room.advance();assert.equal(room.gold.blue,125);
 });
 
-test("a pending resurrection keeps the playground awake; losing the biting army's base cancels it",()=>{
+test("a one-HP human turns immediately and a turned human can pass the bite to the next one",()=>{
   const play=new Playground();
-  play.place("red",{type:"place-zombies",positions:[{x:400,y:180}]});
-  play.place("blue",{type:"place-warriors",positions:[{x:428,y:180}]});
-  get(play.world,2).hp=1;play.advance();const promise=get(play.world,2).rising;
-  get(play.world,1).hp=0;assert.equal(battleOutcome(play.world),null);
-  for(let i=0;i<defs.zombie.riseTicks;i++)play.advance();
-  assert.equal(get(play.world,2).raisedTick,promise.tick);assert.equal(get(play.world,2).team,"red");
-  let world=quiet(createBattle([at(2,"archer","blue",410)]));
-  world.bases=["red","blue"].map(t=>makeBase("duel",t));world.bases[0].hp=1;
-  get(world,2).hp=0;get(world,2).rising={team:"red",tick:42};
-  world.units.push(...createBattle([at(3,"warrior","blue",507)]).units);
-  get(world,3).burn={team:"red",applied:0,until:72,next:24};get(world,3).infection={team:"red",until:155};
-  world.arrows.push(shot("dart","blue",104,180,-1,5));world=stepBattle(world);
-  assert.equal(get(world,2).rising,undefined);
-  assert.equal(get(world,3).burn,undefined);assert.equal(get(world,3).infection,undefined);
+  const put=(team,type,x)=>play.place(team,{type,positions:[{x,y:180}]});
+  put("red","place-zombies",400);put("blue","place-archers",428);
+  get(play.world,2).hp=1;play.advance();
+  assert.equal(get(play.world,2).hp,1);assert.equal(get(play.world,2).kind,"zombie");
+  assert.equal(play.world.arrows[0].casterId,2);assert.equal(battleOutcome(play.world),null);
+  play.advance();assert.equal(get(play.world,2).hp,1);
+  put("blue","place-medics",450);get(play.world,1).nextAttackTick=10000;get(play.world,3).nextAttackTick=10000;
+  for(let i=0;i<defs.zombie.turnTicks+2;i++)play.advance();
+  assert.equal(get(play.world,3).kind,"zombie");assert.equal(get(play.world,3).team,"red");
 });

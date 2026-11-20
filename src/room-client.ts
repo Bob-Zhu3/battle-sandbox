@@ -6,7 +6,8 @@ import { drawArena } from "./renderer.ts";
 import { SPELLS } from "./spells.ts";
 import { connectRoom, type ConnectionState } from "./room-connection.ts";
 import type { RoomAction, Snapshot, World } from "./room-protocol.ts";
-import { UNIT_DEFINITIONS, placementKind, type UnitKind } from "./units.ts";
+import { bountyFor } from "./transformations.ts";
+import { UNIT_DEFINITIONS, placementKind, type RecruitKind } from "./units.ts";
 
 const mode: MatchMode = location.pathname.replace(/\/$/, "") === "/ffa" ? "ffa" : "duel";
 const match = MATCHES[mode];
@@ -23,7 +24,7 @@ const showIds = new URLSearchParams(location.search).get("ids") === "1";
 let latest: Snapshot | undefined, team: Team | undefined;
 let link: ConnectionState = "joining", notice = "";
 let bounty: { tick: number; amount: number } | undefined;
-let draft: readonly ArenaPoint[] = [], draftKind: UnitKind = "warrior";
+let draft: readonly ArenaPoint[] = [], draftKind: RecruitKind = "warrior";
 
 document.title = match.name + " · Battle Sandbox";
 game.dataset.room = ""; game.dataset.mode = mode;
@@ -37,11 +38,11 @@ function canDraw() {
 }
 function paint() {
   const world = latest?.world ?? empty;
-  drawArena(field.ctx, world, world, 1, !latest || latest.phase === "deploy", draft, draftKind, { mode, ownTeam: team, showIds });
+  drawArena(field.ctx, world, world, 1, !latest || latest.phase === "deploy", draft, draft.length ? draftKind : field.selectedKind(), { mode, ownTeam: team, showIds });
 }
-function problem(points: readonly ArenaPoint[], kind: UnitKind) {
+function problem(points: readonly ArenaPoint[], kind: RecruitKind) {
   if (!team || !latest) return "Joining the match…";
-  if (!points.every(point => inCamp(mode, team!, point.x, point.y))) return "Keep the whole stroke in your " + campFor(mode, team).label + ".";
+  if (kind !== "miner" && !points.every(point => inCamp(mode, team!, point.x, point.y))) return "Keep the whole stroke in your " + campFor(mode, team).label + ".";
   const price = points.length * UNIT_DEFINITIONS[kind].cost, balance = latest.gold[team] ?? 0;
   return price > balance ? "This stroke costs " + price + " gold. You have " + balance + "." : "";
 }
@@ -58,7 +59,8 @@ function updateInterface() {
   const roster = match.teams.filter(side => snap?.seats[side]?.connected || snap?.seats[side]?.reserved);
   field.canvas.dataset.deploying = String(edit);
   const spell = live && edit ? field.selectedSpell() : undefined;
-  const castingHint = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : "";
+  const miner = edit && field.selectedKind() === "miner" && !spell;
+  const castingHint = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : miner ? "Choose a tunnel exit anywhere on the field." : "";
   field.canvas.setAttribute("aria-label", castingHint || (edit ? name + " army. Draw squads in the " + camp + "." : "Shared battlefield."));
   scenario.textContent = team ? name + " · " + match.name : match.name;
   for (const color of match.teams) {
@@ -96,7 +98,7 @@ function updateInterface() {
     else if (ownCount) status = "Press Ready when your army is set.";
   }
   if (live && !reconnecting) status = !edit ? "Your base fell. The remaining armies are still fighting." : castingHint || "Recruit in your " + camp + ". Take down the enemy " + (mode === "duel" ? "base." : "bases.");
-  hint.textContent = closed ? "" : reconnecting ? "Reconnecting to your seat…" : notice || status;
+  hint.textContent = closed ? "" : reconnecting ? "Reconnecting to your seat…" : notice || (miner ? castingHint : status);
   hint.hidden = !hint.textContent;
   result.hidden = closed || snap?.phase !== "finished";
   if (!result.hidden && snap?.outcome) {
@@ -105,7 +107,7 @@ function updateInterface() {
   }
 }
 
-game.addEventListener("brushchange", () => { notice = ""; updateInterface(); });
+game.addEventListener("brushchange", () => { notice = ""; updateInterface(); paint(); });
 
 function send(action: RoomAction) { notice = ""; connection.send(action); }
 attachSpellBrush(field.canvas, field.selectedSpell, (spell, point) => {
@@ -152,7 +154,7 @@ const connection = connectRoom(mode, {
     if (!canDraw() || (previous && previous.round !== event.round)) cancelStroke();
     if (previous?.round !== event.round || previous.phase !== event.phase) { notice = ""; bounty = undefined; }
     if (team && previous?.phase === "running" && event.world.tick > previous.world.tick) {
-      const earned = event.world.units.reduce((sum, u) => sum + (u.killedBy === team && u.lastHitTick !== null && u.lastHitTick > previous.world.tick ? UNIT_DEFINITIONS[u.kind].bounty : 0), 0);
+      const earned = event.world.units.reduce((sum, u) => sum + (u.killedBy === team && u.lastHitTick !== null && u.lastHitTick > previous.world.tick ? bountyFor(u) : 0), 0);
       if (earned) bounty = { tick: event.world.tick, amount: earned };
     }
     const visible = match.teams.filter(side => event.phase === "deploy" || event.world.bases?.some(b => b.team === side));

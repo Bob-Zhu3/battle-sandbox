@@ -3,9 +3,9 @@ import type { Target, Unit } from "./simulation.ts";
 import { isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Affliction { team: Team; until: number; next: number; applied: number }
-export interface GroundEffect { kind: "blast" | "smash" | "frost"; team: Team; x: number; y: number; tick: number; radius: number }
+export interface GroundEffect { kind: "blast" | "smash" | "frost" | "miasma"; team: Team; x: number; y: number; tick: number; radius: number }
 export type Hit = (target: Target, amount: number, team: Team) => void;
-export const EFFECT_TICKS = 34;
+export const effectLifetime = (e: GroundEffect) => e.kind === "miasma" ? UNIT_DEFINITIONS.clown.cloudTicks : 34;
 const ailments = {
   burn: { period: 24, duration: 72, damage: 2 },
   poison: { period: 30, duration: 90, damage: 3 },
@@ -28,7 +28,6 @@ export function tickAfflictions(unit: Unit, tick: number, hit: Hit) {
     if (tick >= state.until || unit.hp <= 0) delete unit[kind];
     else if (state.next === tick) unit[kind] = { ...state, next: tick + rule.period };
   }
-  if (unit.infection && tick > unit.infection.until) delete unit.infection;
 }
 
 export function stun(unit: Unit, until: number) {

@@ -48,9 +48,9 @@ choose(team);
 
 game.addEventListener("brushchange", () => {
   const spell = field.selectedSpell(), hint = element("deploy-hint");
-  hint.textContent = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : "";
-  hint.hidden = !spell;
-  field.canvas.setAttribute("aria-label", spell ? hint.textContent : "Playground. Choose a color and draw troops anywhere.");
+  hint.textContent = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." : "";
+  hint.hidden = !hint.textContent;
+  field.canvas.setAttribute("aria-label", hint.textContent || "Playground. Choose a color and draw troops anywhere.");
 });
 
 function paint(blend = 1) {

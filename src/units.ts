@@ -1,4 +1,4 @@
-export const UNIT_DEFINITIONS = {
+const recruits = {
   warrior: {
     name: "Warrior", command: "place-warriors", description: "Closes with the nearest enemy and swings its sword.", cost: 12, bounty: 6, attack: "melee", radius: 11, maxHp: 30,
     speed: 90, reach: 48, damage: 10, cooldownTicks: 30,
@@ -34,14 +34,33 @@ export const UNIT_DEFINITIONS = {
     name: "Venom Scout", command: "place-venom-scouts", description: "Blows a violet dart that poisons living enemies. A Medic's finished bandage draws out the venom.",
     cost: 13, bounty: 6, attack: "arrow", radius: 9, maxHp: 19, speed: 88, reach: 115, damage: 3, cooldownTicks: 61, arrowSpeed: 276,
   },
+  miner: {
+    name: "Miner", command: "place-miners", description: "Choose any spot. A ridge of dirt travels from home, then the Miner breaks through with a pickaxe.",
+    cost: 19, bounty: 9, attack: "melee", radius: 10, maxHp: 33, speed: 81, reach: 35, damage: 7, cooldownTicks: 38,
+    tunnelSpeed: 385, digTicks: 8, emergeTicks: 9,
+  },
+  clown: {
+    name: "Clown", command: "place-clowns", description: "Lobs a striped stink balloon. The purple cloud poisons enemies who walk in. An enemy Gust blows it away.",
+    cost: 18, bounty: 9, attack: "arrow", radius: 10, maxHp: 25, speed: 74, reach: 121, damage: 3, cooldownTicks: 104, arrowSpeed: 215,
+    cloudRadius: 38, cloudTicks: 81, puffEvery: 10,
+  },
+  reaper: {
+    name: "Reaper", command: "place-reapers", description: "Hunts a nearby wounded foe. A fatal scythe stroke draws a soul into its lantern and restores health.",
+    cost: 25, bounty: 12, attack: "melee", radius: 13, maxHp: 42, speed: 92, reach: 42, damage: 10, cooldownTicks: 48,
+    huntRange: 118, harvestHp: 8,
+  },
+  witch: {
+    name: "Witch", command: "place-witches", description: "A spiral hex turns an enemy into a pig for three seconds. It butts its old allies, then returns with its remaining health.",
+    cost: 29, bounty: 14, attack: "arrow", radius: 12, maxHp: 28, speed: 69, reach: 134, damage: 6, cooldownTicks: 225, arrowSpeed: 256, hexTicks: 180,
+  },
   cyclops: {
     name: "Cyclops", command: "place-cyclopes", description: "Raises a spiked club, then smashes, stuns and scatters a crowd. Scoops up wounded humans within arm's reach.",
     cost: 33, bounty: 16, attack: "smash", radius: 20, maxHp: 96, speed: 63, reach: 55, damage: 16, cooldownTicks: 116,
     windup: 27, blastRadius: 54, stunTicks: 29, shove: 35, swallowRange: 39, swallowHp: 12, swallowTicks: 16, swallowCooldown: 150,
   },
   zombie: {
-    name: "Zombie", command: "place-zombies", description: "Bites leave a green mark. A marked human who falls gets back up as a Zombie for the biting army.",
-    cost: 10, bounty: 5, attack: "melee", radius: 10, maxHp: 25, speed: 70, reach: 33, damage: 5, cooldownTicks: 43, markTicks: 155, riseTicks: 32,
+    name: "Zombie", command: "place-zombies", description: "A bite turns an enemy human into a green Zombie for the biting army. Look for its old headgear as it spreads the bite.",
+    cost: 10, bounty: 5, attack: "melee", radius: 10, maxHp: 25, speed: 70, reach: 33, damage: 5, cooldownTicks: 43, turnTicks: 20,
   },
   frostqueen: {
     name: "Frost Queen", command: "place-frost-queens", description: "Sends an ice crystal into the front line. On impact it blooms and slows enemies under its frost.",
@@ -78,18 +97,24 @@ export const UNIT_DEFINITIONS = {
   },
 } as const;
 
+// The pig is a combat form. Only recruits have a placement command.
+export const UNIT_DEFINITIONS = { ...recruits, pig: {
+  name: "Hex Pig", radius: 9, maxHp: 30, speed: 141, reach: 30, damage: 6, cooldownTicks: 28, attack: "melee", bounty: 0, cost: 0,
+} } as const;
+export type RecruitKind = keyof typeof recruits;
 export type UnitKind = keyof typeof UNIT_DEFINITIONS;
+export const RECRUIT_KINDS = Object.keys(recruits) as RecruitKind[];
 export const UNIT_KINDS = Object.keys(UNIT_DEFINITIONS) as UnitKind[];
 export const isMachine = (kind: UnitKind) => kind === "mouse" || kind === "drone" || kind === "post" || kind === "workshop";
 export const isHuman = (kind: UnitKind) => kind === "warrior" || kind === "archer" || kind === "shieldbearer" ||
-  kind === "medic" || kind === "lancer" || kind === "bomber" || kind === "engineer" || kind === "musketeer" || kind === "scout";
+  kind === "medic" || kind === "lancer" || kind === "bomber" || kind === "engineer" || kind === "musketeer" || kind === "scout" || kind === "miner" || kind === "clown";
 export const isBuilding = (kind: UnitKind) => kind === "workshop" || kind === "post";
-export type PlacementType = (typeof UNIT_DEFINITIONS)[UnitKind]["command"];
+export type PlacementType = (typeof recruits)[RecruitKind]["command"];
 
-export function placementKind(type: PlacementType): UnitKind;
-export function placementKind(type: unknown): UnitKind | undefined;
+export function placementKind(type: PlacementType): RecruitKind;
+export function placementKind(type: unknown): RecruitKind | undefined;
 export function placementKind(type: unknown) {
   if (type === "place-giants") return "cyclops";
   if (type === "place-coopers") return "bomber";
-  return UNIT_KINDS.find(kind => UNIT_DEFINITIONS[kind].command === type);
+  return RECRUIT_KINDS.find(kind => recruits[kind].command === type);
 }

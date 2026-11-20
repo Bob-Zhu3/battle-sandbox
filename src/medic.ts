@@ -1,4 +1,5 @@
 import type { Unit, Target } from "./simulation.ts";
+import { maxHealth } from "./transformations.ts";
 import { isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 const kit = UNIT_DEFINITIONS.medic;
@@ -7,13 +8,13 @@ export function medicDuty(medic: Unit, units: readonly Unit[], enemy: Target | u
   let patient: Unit | undefined, escort: Unit | undefined;
   let patientDistance: number = kit.sight ** 2, escortDistance = Infinity;
   for (const ally of units) {
-    if (ally.team !== medic.team || ally.id === medic.id || ally.hp <= 0) continue;
+    if (ally.team !== medic.team || ally.id === medic.id || ally.hp <= 0 || ally.tunnel) continue;
     const distance = (ally.x - medic.x) ** 2 + (ally.y - medic.y) ** 2;
     if (ally.kind !== "medic" && ally.kind !== "workshop" && ally.kind !== "post" && (distance < escortDistance || (distance === escortDistance && ally.id < escort!.id))) {
       escort = ally;
       escortDistance = distance;
     }
-    if (isMachine(ally.kind) !== (medic.kind === "engineer") || ally.emberUntil !== undefined || tick < (medic.aidReadyTick ?? 0) || (ally.hp >= UNIT_DEFINITIONS[ally.kind].maxHp && !(medic.kind === "medic" && ally.poison)) || distance > kit.sight ** 2) continue;
+    if (isMachine(ally.kind) !== (medic.kind === "engineer") || ally.emberUntil !== undefined || tick < (medic.aidReadyTick ?? 0) || (ally.hp >= maxHealth(ally) && !(medic.kind === "medic" && ally.poison)) || distance > kit.sight ** 2) continue;
     if (medic.wrappingSince !== undefined && ally.id === medic.targetId) {
       patient = ally;
       break;
@@ -43,13 +44,13 @@ export function finishTreatments(units: Unit[], byId: ReadonlyMap<number, Unit>,
     }
     if (medic.hp <= 0 || medic.wrappingSince === undefined) continue;
     const patient = medic.targetId === null ? undefined : byId.get(medic.targetId);
-    if (!patient || patient.hp <= 0 || patient.emberUntil !== undefined || Math.hypot(patient.x - medic.x, patient.y - medic.y) > kit.aidReach + 0.001) {
+    if (!patient || patient.team !== medic.team || patient.tunnel || patient.hp <= 0 || patient.emberUntil !== undefined || Math.hypot(patient.x - medic.x, patient.y - medic.y) > kit.aidReach + 0.001) {
       delete medic.wrappingSince;
       continue;
     }
     if (tick - medic.wrappingSince < kit.wrapTicks) continue;
     delete medic.wrappingSince;
-    if (patient.hp >= UNIT_DEFINITIONS[patient.kind].maxHp && !(medic.kind === "medic" && patient.poison)) continue;
+    if (patient.hp >= maxHealth(patient) && !(medic.kind === "medic" && patient.poison)) continue;
     if (medic.kind === "medic") delete patient.poison;
     medic.lastHealTick = tick;
     medic.aidReadyTick = tick + kit.recoveryTicks;
@@ -57,8 +58,8 @@ export function finishTreatments(units: Unit[], byId: ReadonlyMap<number, Unit>,
   }
   for (const [id, amount] of healing) {
     const patient = byId.get(id)!;
-    if (patient.hp <= 0 || patient.emberUntil !== undefined || patient.hp >= UNIT_DEFINITIONS[patient.kind].maxHp) continue;
-    patient.hp = Math.min(UNIT_DEFINITIONS[patient.kind].maxHp, patient.hp + amount);
+    if (patient.hp <= 0 || patient.emberUntil !== undefined || patient.hp >= maxHealth(patient)) continue;
+    patient.hp = Math.min(maxHealth(patient), patient.hp + amount);
     patient.lastTreatedTick = tick;
   }
 }

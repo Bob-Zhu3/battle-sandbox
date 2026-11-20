@@ -8,7 +8,7 @@ import { UNIT_DEFINITIONS } from "./units.ts";
 // walking across one another cannot repeatedly restart the wind-up.
 export function aimTower(base: Base, units: readonly Unit[], tick: number, tickRate: number, shots: Arrow[]): Base {
   if (base.hp <= 0) return base;
-  const tracked = units.find(unit => unit.id === base.targetId && unit.hp > 0 &&
+  const tracked = units.find(unit => unit.id === base.targetId && unit.hp > 0 && !unit.tunnel &&
     unit.team !== base.team && Math.hypot(unit.x - base.x, unit.y - base.y) <= TOWER.range);
   const target = tracked ?? nearestEnemy(base, units, TOWER.range);
   if (!target) return base.targetId == null ? base : { ...base, targetId: null, acquiredTick: null };
@@ -21,7 +21,7 @@ export function aimTower(base: Base, units: readonly Unit[], tick: number, tickR
   if (tick - acquiredTick < TOWER.sightTicks || tick - (base.lastShotTick ?? -Infinity) < TOWER.cooldownTicks) return next;
   next.lastShotTick = tick;
   const speed = TOWER.boltSpeed / tickRate;
-  shots.push({ kind: "bolt", x: base.x, y: base.y, vx: speed * aimX, vy: speed * aimY,
+  shots.push({ kind: "bolt", casterId: base.id, x: base.x, y: base.y, vx: speed * aimX, vy: speed * aimY,
     damage: TOWER.damage, team: base.team, releasedTick: tick });
   return next;
 }
@@ -34,7 +34,7 @@ export function facesShot(unit: Unit, shot: Arrow) {
 export function incomingShot(unit: Unit, shots: readonly Arrow[]) {
   const guard = UNIT_DEFINITIONS.shieldbearer;
   return shots.some(shot => {
-    if (shot.kind === "bomb" || shot.kind === "ice" || shot.team === unit.team || !facesShot(unit, shot)) return false;
+    if (shot.kind === "bomb" || shot.kind === "ice" || shot.kind === "hex" || shot.kind === "balloon" || shot.team === unit.team || !facesShot(unit, shot)) return false;
     const speed = Math.hypot(shot.vx, shot.vy);
     const dx = unit.x - shot.x, dy = unit.y - shot.y;
     const ahead = (dx * shot.vx + dy * shot.vy) / speed;

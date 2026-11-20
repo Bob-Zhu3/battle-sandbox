@@ -15,6 +15,8 @@
     "demo:encounters": "node scripts/demo-encounters.mjs",
     "predemo:room": "npm run build --silent",
     "demo:room": "node scripts/demo-room.mjs",
+    "predemo:oddities": "npm run build --silent",
+    "demo:oddities": "node scripts/demo-encounters.mjs --oddities",
     "precheck:modes": "npm run build --silent",
     "check:modes": "node scripts/check-modes.mjs",
     "predemo:retry": "npm run build --silent",

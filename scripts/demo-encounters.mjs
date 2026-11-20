@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { playOddities } from "./oddities-scenes.mjs";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -8,7 +9,7 @@ import { parseArgs } from "node:util";
 import { chromium } from "playwright";
 import { createGameServer } from "../server/http.ts";
 
-const {values} = parseArgs({options:{headless:{type:"boolean"}, frames:{type:"string"}, channel:{type:"string"}}});
+const {values} = parseArgs({options:{oddities:{type:"boolean"}, headless:{type:"boolean"}, frames:{type:"string"}, channel:{type:"string"}}});
 const {http,closeRoom} = createGameServer();
 http.listen(0,"127.0.0.1");
 await once(http,"listening");
@@ -27,8 +28,8 @@ try {
   const click=button=>button.click({force:true});
   const button=(container,name)=>container.getByRole("button",{name,exact:true});
   const shelves = {
-    People:["Lancer","Musketeer","Venom Scout","Bomber"],
-    Machines:["Watchpost"], Mythical:["Storm Kirin","Cyclops","Frost Queen","Phoenix"], Spells:["Healing Rain","Gust"],
+    People:["Lancer","Musketeer","Venom Scout","Bomber","Miner","Clown","Shieldbearer","Engineer"],
+    Machines:["Watchpost"], Mythical:["Storm Kirin","Cyclops","Frost Queen","Phoenix","Reaper","Witch","Zombie"], Spells:["Healing Rain","Gust"],
   };
   async function brush(team,name) {
     await click(button(page,team+" army"));
@@ -57,52 +58,58 @@ try {
       if(!hold) await page.clock.runFor(50);
     }
   }
-  await place("Red","Watchpost",300,166);
-  await place("Blue","Lancer",515,170);await place("Blue","Watchpost",500,228);
-  await place("Blue","Venom Scout",555,212);await place("Blue","Bomber",590,180);
-  await show(700,"The Lancer lowers his spear.");
-  assert.equal(await hp("blue"),107);
-  await place("Red","Storm Kirin",407,132);
-  await show(150,"One bolt stuns all four enemies.");
-  await show(850,"One bolt stuns all four enemies.",true);
-  assert.equal(await hp("blue"),83);
-  await show(650,"The Lancer has to build up speed again.");
-  await clear();
+  if(values.oddities) await playOddities({page,place,show,clear,hp});
+  else {
+    await place("Red","Watchpost",300,166);
+    await place("Blue","Lancer",515,170);await place("Blue","Watchpost",500,228);
+    await place("Blue","Venom Scout",555,212);await place("Blue","Bomber",590,180);
+    await show(700,"The Lancer lowers his spear.");
+    assert.equal(await hp("blue"),107);
+    await place("Red","Storm Kirin",407,132);
+    await show(150,"One bolt stuns all four enemies.");
+    await show(850,"One bolt stuns all four enemies.",true);
+    assert.equal(await hp("blue"),83);
+    await show(650,"The Lancer has to build up speed again.");
+    await clear();
 
-  await place("Red","Cyclops",420,175);
-  await place("Blue","Lancer",470,175);await place("Blue","Archer",474,202);await place("Blue","Musketeer",487,150);
-  await show(450,"Watch the club come up.");
-  await show(250,"The impact throws the front line back.");
-  await show(700,"The impact throws the front line back.",true);
-  assert.equal(await hp("blue"),21);
-  await show(500,"The wounded Lancer comes back within reach.");
-  await show(200,"The Cyclops swallows him.");
-  await show(550,"The Cyclops swallows him.",true);
-  assert.equal(await page.locator("#blue-count").textContent(),"2");
-  await clear();
+    await place("Red","Cyclops",420,175);
+    await place("Blue","Lancer",470,175);await place("Blue","Archer",474,202);await place("Blue","Musketeer",487,150);
+    await show(450,"Watch the club come up.");
+    await show(250,"The impact throws the front line back.");
+    await show(700,"The impact throws the front line back.",true);
+    assert.equal(await hp("blue"),21);
+    await show(500,"The wounded Lancer comes back within reach.");
+    await show(200,"The Cyclops swallows him.");
+    await show(550,"The Cyclops swallows him.",true);
+    assert.equal(await page.locator("#blue-count").textContent(),"2");
+    await clear();
 
-  await place("Red","Frost Queen",405,180);await place("Blue","Lancer",525,171);
-  await place("Blue","Warrior",543,199);await place("Red","Phoenix",398,225);
-  await show(550,"The Queen slows the front line.");
-  await place("Red","Healing Rain",419,194);
-  await show(400,"Red crosses rise with the healing pulse.");
-  await show(600,"Red crosses rise with the healing pulse.",true);
-  await show(350,"The Phoenix leaves fire on its target.");
-  await clear();
+    await place("Red","Frost Queen",405,180);await place("Blue","Lancer",525,171);
+    await place("Blue","Warrior",543,199);await place("Red","Phoenix",398,225);
+    await show(550,"The Queen slows the front line.");
+    await place("Red","Healing Rain",419,194);
+    await show(400,"Red crosses rise with the healing pulse.");
+    await show(600,"Red crosses rise with the healing pulse.",true);
+    await show(350,"The Phoenix leaves fire on its target.");
+    await clear();
 
-  await place("Red","Phoenix",410,183);await place("Blue","Warrior",430,174);
-  await place("Blue","Warrior",432,193);await place("Blue","Musketeer",518,183);
-  await show(700,"The Phoenix falls into an ember egg.");
-  assert.equal(await hp("red"),1);
-  await show(600,"The Phoenix falls into an ember egg.",true);
-  await place("Red","Gust",406,183);
-  await show(250,"A friendly Gust hatches it early.");
-  await show(600,"A friendly Gust hatches it early.",true);
-  assert.equal(await hp("red"),16);
+    await place("Red","Phoenix",410,183);await place("Blue","Warrior",430,174);
+    await place("Blue","Warrior",432,193);await place("Blue","Musketeer",518,183);
+    await show(700,"The Phoenix falls into an ember egg.");
+    assert.equal(await hp("red"),1);
+    await show(600,"The Phoenix falls into an ember egg.",true);
+    await place("Red","Gust",406,183);
+    await show(250,"A friendly Gust hatches it early.");
+    await show(600,"A friendly Gust hatches it early.",true);
+    assert.equal(await hp("red"),16);
+  }
   assert.deepEqual(errors,[]);
   if(values.frames) {
     await writeFile(join(values.frames,"timeline.json"),JSON.stringify(frames));
-    const characters = [
+    const characters = values.oddities ? [
+      ["Amber","People","Miner","Cross-field tunnels"], ["Red","People","Clown","Poison balloons"],
+      ["Violet","Mythical","Reaper","Soul harvest"], ["Blue","Mythical","Witch","Hex Pig"],
+    ] : [
       ["Red","Mythical","Cyclops","Ground smash"], ["Blue","Mythical","Storm Kirin","Chain stun"],
       ["Violet","Mythical","Frost Queen","Frost burst"], ["Red","Mythical","Phoenix","Fire and rebirth"],
       ["Amber","People","Bomber","Blast radius"], ["Blue","People","Musketeer","Piercing shot"],
@@ -116,9 +123,9 @@ try {
     }
     const sheet=await page.evaluate(async cards=>{
       await document.fonts.load('800 22px "Barlow Condensed"');
-      const canvas=document.createElement("canvas");canvas.width=820;canvas.height=326;
+      const canvas=document.createElement("canvas");canvas.width=820;canvas.height=Math.ceil(cards.length/4)*163;
       const c=canvas.getContext("2d");
-      c.fillStyle="#fff3d7";c.fillRect(0,0,820,326);c.strokeStyle="#c8bb91";c.lineWidth=1;
+      c.fillStyle="#fff3d7";c.fillRect(0,0,820,canvas.height);c.strokeStyle="#c8bb91";c.lineWidth=1;
       c.beginPath();c.moveTo(20,164);c.lineTo(800,164);c.stroke();c.textAlign="center";
       for(const [i,card] of cards.entries()){
         const image=new Image();image.src=card.portrait;await image.decode();
@@ -131,12 +138,15 @@ try {
     },cards);
     await writeFile(join(values.frames,"portraits.png"),Buffer.from(sheet,"base64"));
   }
-  console.log("PASS: four enemies struck, the Cyclops scattered a line and swallowed a wounded Lancer, and a one-HP egg hatched at half health.");
+  if(values.oddities) console.log("PASS: tunnels, counterattacking pigs, direct Zombie conversions, poison clouds, soul harvests and mythical trails.");
+  else console.log("PASS: four enemies struck, the Cyclops scattered a line and swallowed a wounded Lancer, and a one-HP egg hatched at half health.");
   if(!values.headless) {
     await clear();
-    await place("Red","Storm Kirin",392,166);await brush("Blue","Lancer");
+    if(values.oddities){await place("Red","Zombie",397,166);await brush("Blue","Archer");}
+    else {await place("Red","Storm Kirin",392,166);await brush("Blue","Lancer");}
     await page.clock.resume();
-    console.log("Your turn. Draw Blue Lancers in front of the Storm Kirin. Close the window when finished.");
+    if(values.oddities) console.log("Your turn. Place a Blue Archer by the waiting Red Zombie. Close the window when finished.");
+    else console.log("Your turn. Draw Blue Lancers in front of the Storm Kirin. Close the window when finished.");
     await page.waitForEvent("close",{timeout:0});
   }
 } finally {

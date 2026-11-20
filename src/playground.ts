@@ -14,7 +14,7 @@ export class Playground {
   place(team: Team, command: PlacementCommand, extendStroke = false) {
     if (!command.positions.length) return;
     const kind = placementKind(command.type);
-    const recruits = createBattle(command.positions.map(point => ({ ...point, team, kind, id: this.nextId++ }))).units;
+    const recruits = createBattle(command.positions.map(point => ({ ...point, team, kind, id: this.nextId++ })), this.world.tick).units;
     const ids = recruits.map(unit => unit.id);
     const stroke = extendStroke ? this.strokes.at(-1) : undefined;
     if (stroke) stroke.push(...ids);
@@ -55,8 +55,8 @@ export class Playground {
       return;
     }
     const next = stepBattle(from);
-    const units = next.units.filter(u => u.hp > 0 || u.rising || next.tick - (u.lastHitTick ?? next.tick) < 48);
+    const units = next.units.filter(u => u.hp > 0 || next.tick - (u.lastHitTick ?? next.tick) < 48);
     this.world = new Battle(next.tick, units, next.arrows, undefined, next.spells, next.effects);
-    this.resting = !next.spells?.length && !next.effects?.length && !next.arrows.length && units.every(u => u.hp > 0 && u.targetId === null && u.pace < .001 && (u.aidReadyTick ?? 0) <= next.tick && u.emberUntil === undefined && !u.windup && !u.burstLeft && !u.burn && !u.poison && !u.infection && !u.knockback && (u.stunnedUntil ?? 0) <= next.tick);
+    this.resting = !next.spells?.length && !next.effects?.length && !next.arrows.length && units.every(u => u.hp > 0 && u.targetId === null && u.pace < .001 && (u.aidReadyTick ?? 0) <= next.tick && u.emberUntil === undefined && !u.windup && !u.burstLeft && !u.burn && !u.poison && !u.hex && !u.tunnel && !u.trail && !u.knockback && (u.stunnedUntil ?? 0) <= next.tick);
   }
 }

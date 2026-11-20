@@ -1,13 +1,13 @@
 import { PlacementStroke, pointerToArena, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
 import type { SpellKind } from "./spells.ts";
-import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 
 interface BrushCallbacks {
   canDraw(): boolean;
-  selectedKind?(): UnitKind;
-  preview?(points: readonly ArenaPoint[], kind: UnitKind): void;
+  selectedKind?(): RecruitKind;
+  preview?(points: readonly ArenaPoint[], kind: RecruitKind): void;
   commit?(command: PlacementCommand): void;
-  livePlace?(points: readonly ArenaPoint[], kind: UnitKind, first: boolean): void;
+  livePlace?(points: readonly ArenaPoint[], kind: RecruitKind, first: boolean): void;
   useLive?(): boolean;
 }
 
@@ -20,7 +20,7 @@ export function attachSpellBrush(canvas: HTMLCanvasElement, selected: () => Spel
 }
 
 export function attachDeploymentBrush(canvas: HTMLCanvasElement, callbacks: BrushCallbacks) {
-  let active: { pointerId: number; stroke: PlacementStroke; kind: UnitKind; delivered: number; live: boolean } | null = null;
+  let active: { pointerId: number; stroke: PlacementStroke; kind: RecruitKind; delivered: number; live: boolean } | null = null;
 
   function deliver() {
     if (!active) return;

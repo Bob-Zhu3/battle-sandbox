@@ -3,7 +3,8 @@ import { BASE_RADIUS } from "./battlefield.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Arrow {
-  kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom";
+  kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom" | "balloon" | "hex";
+  casterId?: number;
   piercedIds?: number[];
   landTick?: number;
   team: Team;
@@ -37,7 +38,7 @@ function contactTime(arrow: Arrow, from: Target, to: Target): number | undefined
 export function projectileContacts(shot: Arrow, previous: readonly Target[], next: readonly Target[]) {
   const hits: {target: Target; time: number}[] = [];
   for (const [i, target] of previous.entries()) {
-    if (target.hp <= 0 || target.team === shot.team || shot.piercedIds?.includes(target.id) ||
+    if (target.id === shot.casterId || target.hp <= 0 || (target.kind !== "base" && target.tunnel) || target.team === shot.team || shot.piercedIds?.includes(target.id) ||
         (shot.kind === "bolt" && target.kind === "base")) continue;
     const time = contactTime(shot, target, next[i]);
     if (time !== undefined) hits.push({target, time});

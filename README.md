@@ -1,6 +1,6 @@
 # Battle Sandbox
 
-Draw a squad into a meadow and watch it fight. Open **Roster** to choose from eighteen troops and buildings or three spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
+Draw a squad into a meadow and watch it fight. Open **Roster** to choose from twenty-two troops and buildings or three spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
 ![Four armies in a live free-for-all, with a base in each corner and recruitment controls below the field](media/free-for-all.png)
 
@@ -18,8 +18,8 @@ The playground opens in your browser. To play together on the same network, have
 | Mode | Players | Where you can draw | Objective |
 | --- | --- | --- | --- |
 | Playground (`/`) | 1 | Anywhere, with any of four army colors | Experiment as long as you like |
-| Duel (`/room`) | 2 | Red's left half or Blue's right half | Destroy the opposing base |
-| Free-for-all (`/ffa`) | 3–4 | One fixed corner per player | Be the last player with a standing base |
+| Duel (`/room`) | 2 | Your half, or anywhere for a Miner | Destroy the opposing base |
+| Free-for-all (`/ffa`) | 3–4 | Your corner, or anywhere for a Miner | Be the last player with a standing base |
 
 ### Playground
 
@@ -35,11 +35,13 @@ npm run demo:encounters
 
 A friendly Warrior standing between an Archer and its target ducks as the arrow passes its shoulder. The Archer rises to follow the shot. [Watch the Archer and Warrior](media/over-the-shoulder.mp4)
 
+Place a Zombie beside an enemy Archer. The Archer turns at the first bite, keeps its feathered cap and can infect the next human it reaches. [See the same Archer before and after the bite](media/zombie-bite.png)
+
 ### Multiplayer
 
-1. **Deploy.** Each commander starts with **120 gold** and a **160 HP base**. Draw an opening army inside your territory. A drag previews its total cost and commits the whole squad when released. **Undo** and **Clear** refund your own opening purchases.
+1. **Deploy.** Each commander starts with **120 gold** and a **160 HP base**. Draw an opening army inside your territory. A Miner can take a tunnel to any point on the field, even behind another base. The little flag marks where it will surface after the countdown. A drag previews its total cost and commits the whole squad when released. **Undo** and **Clear** refund your own opening purchases.
 2. **Ready up.** Once each player has a troop and everyone presses **Ready**, the field counts down **3, 2, 1**. Remaining gold carries into battle. A fourth free-for-all player can join before the countdown begins.
-3. **Reinforce.** Collect **4 gold per second** while your base stands. Draw reinforcements in your territory during the fight. The first troop appears on press and the others join as your brush travels. Tap to cast spells anywhere on the field, including in an opponent's camp. Defeating a troop pays its bounty on the tick it falls.
+3. **Reinforce.** Collect **4 gold per second** while your base stands. Draw reinforcements in your territory during the fight, or send a Miner outside it. The first troop appears on press and the others join as your brush travels. Tap to cast spells anywhere on the field, including in an opponent's camp. Defeating a troop pays its bounty on the tick it falls.
 4. **Take the bases.** The lookout on each base tracks a hostile troop within 160 arena units. It takes 0.3 seconds to aim, then fires a 6-damage bolt up to once every 1.2 seconds. A Shieldbearer in the firing line can absorb most of the hit. Even an empty army can rebuild while its base stands. When a base falls, its remaining troops retreat from play. The last base standing wins. If all remaining bases fall on the same tick, the match is a draw. **New round** restores every occupied base and starting purse.
 
 A free-for-all pays one bounty per defeated troop. If more than one army deals damage on the fatal tick, the largest contribution earns the reward. Ties use the fixed seat order of Red, Blue, Violet, then Amber. Troops removed when their base falls pay no bounty.
@@ -58,6 +60,8 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 | Bomber | 16 | 8 | Lobs a sparking bomb at a fixed spot. When it lands it deals 13 damage to each enemy troop within 43 arena units. |
 | Musketeer | 17 | 8 | One bullet deals 11 damage to its first enemy and 6 to the next. A front-facing shield or a base ends the shot. |
 | Venom Scout | 13 | 6 | The dart deals 3 immediately, then venom deals 3 every half second for three pulses. Machines and Zombies resist venom. |
+| Miner | 19 | 9 | Plant an exit flag anywhere. A traveling dirt ridge starts at home. The Miner can be hit when it surfaces and swings its pick after a short emergence. |
+| Clown | 18 | 9 | Tosses a striped balloon that leaves a poison cloud for 1.35 seconds. Late arrivals can inhale the poison. Enemy Gust clears the cloud, and a Medic can treat the poison. |
 | Engineer | 21 | 10 | Hammers together one Watchpost near the fight, then repairs damaged machines. |
 | Clockmouse | 8 | 4 | A squeak at a Cyclops's boots can interrupt a raised club, even on its own team. |
 | Bolt Drone | 15 | 7 | Commits to one line for a three-bolt burst. A sidestepping enemy can escape the later shots. |
@@ -67,7 +71,9 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 | Storm Kirin | 23 | 11 | Lightning travels through up to four enemies, stunning every contact for 0.35 seconds. Metal and shields carry the next jump up to 110 units. Other targets carry it up to 78. |
 | Frost Queen | 24 | 12 | Her crystal bursts on impact. Enemies inside the frost walk at 48% speed for 100 ticks. |
 | Phoenix | 22 | 11 | A talon strike sets its target on fire for three pulses of 2 damage. On its first defeat it becomes a 1 HP ember egg and hatches at half health after 1.5 seconds if protected. |
-| Zombie | 10 | 5 | A bite marks a human for 155 ticks. If they fall while marked, they rise 32 ticks later as a Zombie for the biting team, keeping their unit ID. A swallowed victim stays down. |
+| Zombie | 10 | 5 | One bite immediately turns a surviving human green and changes its team. Look for the former troop's headgear. The new Zombie keeps its ID and up to 25 remaining HP, then can spread the bite. |
+| Reaper | 25 | 12 | Its scythe seeks a living enemy at or below one-third health within 118 units, even if a healthy foe is nearer. Cutting down a living enemy draws one soul into its lantern and restores up to 8 HP. |
+| Witch | 29 | 14 | The pink spiral turns an enemy person or creature into a Hex Pig on impact. It fights its old allies for three seconds. Survivors change back with the same ID and remaining health. Bases and machines take a direct magic hit. |
 
 | Spell | Gold | What happens |
 | --- | ---: | --- |
@@ -75,7 +81,7 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 | Meteor | 20 | Marks the ground for 0.8 seconds before dealing 17 damage to enemies still inside or 6 to a base. |
 | Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies and puts out an enemy Phoenix egg. |
 
-Stars overhead mark a stun. Ice around the feet marks a slow. Violet bubbles mean poison, green bite marks mean infection, and small orange flames on a troop deal continuing burn damage. The Phoenix's cracked ember egg only counts down to its own rebirth.
+Stars overhead mark a stun. Ice around the feet marks a slow. Violet bubbles mean poison. Green skin and a torn coat show that a human has already become a Zombie. Small orange flames on an enemy mean it is taking burn damage. The Phoenix's cracked ember egg counts down to its own rebirth. A Phoenix in flight sheds sparks and a passing Frost Queen leaves small ice crystals. These trails follow their actual movement and fade when they stop.
 
 ### Reconnecting
 
@@ -87,6 +93,7 @@ A connection loss reserves your seat for 60 seconds. Reopen the match to reclaim
 | --- | --- |
 | `npm test` | Fixed-tick combat, troop interactions, towers, spells, returning to a full-roster fight, brush spacing, spending and two real WebSocket clients |
 | `npm run demo:encounters` | A charged Lancer meets chain lightning, a Cyclops smashes and swallows, and a Phoenix hatches from its ember egg. |
+| `npm run demo:oddities` | See the new troops in six short fights, then try turning an Archer in the live playground. [Watch the gameplay clip](media/tunnels-and-turncoats.mp4) |
 | `npm run check:modes` | Every roster entry, a cross-field Meteor in a desktop-and-phone duel, a reconnect after a four-target chain stun, and complete three- and four-player matches with reconnection and rematches |
 | `npm run demo:room -- --headed` | Two browser windows drawing at the same time, then recruiting during a base battle |
 | `npm run demo:retry` | Drop confirmation of a five-Warrior stroke, disconnect and return with the original five IDs and one charge |

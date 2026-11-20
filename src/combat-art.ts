@@ -1,4 +1,5 @@
-import { ARMIES } from "./battlefield.ts";
+import { balloon } from "./oddities-art.ts";
+import { drawMiasma } from "./field-effects.ts";
 import type { Unit } from "./simulation.ts";
 import type { GroundEffect } from "./conditions.ts";
 import type { Arrow } from "./arrows.ts";
@@ -6,6 +7,7 @@ import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { drawBomb } from "./roster-art.ts";
 
 export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
+  if (e.kind==="miasma") {drawMiasma(c,e,tick,sx,sy);return;}
   const age=tick-e.tick;
   if (age<0 || age>=34) return;
   const k=Math.min(sx,sy), fade=1-age/34, expand=Math.min(1,(age+2)/13);
@@ -52,13 +54,6 @@ export function drawConditions(c: Pens, u: Unit, x: number, y: number, r: number
     cut(c,"M-9 4 L-10 -2 L-6 0 L-5 -4 L-2 3 L3 4 L6 -1 L8 -4 L9 4 L5 7 L-4 7Z","#b8ecf1",1);
     line(c,-6,4,-3,5,"#ffffff",1.1);
   }
-  if (u.infection || u.rising) {
-    const side=ARMIES[(u.infection??u.rising)!.team];
-    c.save(); c.translate(-radius*.65,u.rising?2:-radius*.35);
-    if(u.rising)c.translate(0,-2*Math.sin(tick*.35));
-    cut(c,"M-3 -4 L-1 -3 L0 0 L-2 1Z M1 -4 L3 -3 L4 0 L2 1Z","#a6d96f",.9);
-    line(c,-1,3,3,3,side.hem,1.1); c.restore();
-  }
   if (u.burn && u.hp>0) {
     c.save(); c.translate(-radius*.38,3);
     c.scale(1,1+Math.sin(tick*.32+u.id)*.16);
@@ -103,15 +98,19 @@ export function drawChain(c: Pens, arc: NonNullable<Unit["arc"]>, tick: number, 
 
 export function drawSpecialShot(c: Pens, shot: Arrow, x: number, y: number, angle: number, k: number, tick: number) {
   c.save(); c.translate(x,y); c.scale(k,k);
-  if(shot.kind==="bomb") {
+  if(shot.kind==="bomb" || shot.kind==="balloon") {
     const progress=Math.max(0,Math.min(1,(tick-shot.releasedTick)/(shot.landTick!-shot.releasedTick)));
     const height=8*(1-progress)+30*Math.sin(Math.PI*progress);
-    oval(c,0,2,4.6,1.6,"#4a554841"); drawBomb(c,0,-height,.9,tick);
+    oval(c,0,2,4.6,1.6,"#4a554841"); if (shot.kind==="balloon") balloon(c,0,-height,.94); else drawBomb(c,0,-height,.9,tick);
   } else {
     c.translate(0,-8); c.rotate(angle);
     if(shot.kind==="bullet"){
       line(c,-12,0,0,0,"#ab8745",2);line(c,-8,0,0,0,"#fff1a9",1.1);
       oval(c,0,0,2.8,1.8,INK);oval(c,.4,-.2,1.85,1.05,"#f3cc78");
+    } else if(shot.kind==="hex"){
+      line(c,-10,0,-4,0,"#b287b6",1.5);
+      c.rotate(tick*.17);c.strokeStyle="#765182";c.lineWidth=1.6;c.beginPath();c.arc(0,0,3.9,.3,5.9);c.stroke();
+      cut(c,"M0 -3 L1 -1 L3 0 L1 1 L0 3 L-1 1 L-3 0 L-1 -1Z","#ffc4e2",.7);
     } else if(shot.kind==="ice"){
       cut(c,"M-10 0 L-2 -3.4 L5 0 L-2 3.4Z","#a5e6f1",1);
       line(c,-6,0,2,0,"#fff9da",1);

@@ -91,7 +91,7 @@ test("a Medic wraps a wounded person, never a machine; a hit on the final wrap t
 });
 
 test("a full roster and its battlefield effects resume identically from a wire snapshot",()=>{
-  const kinds=Object.keys(defs);
+  const kinds=Object.keys(defs).filter(kind=>defs[kind].command);
   const squads=["red","blue"].flatMap((team,side)=>kinds.map((kind,i)=>at(side*100+i+1,kind,team,
     (side?625:335)+(i%4)*17,85+Math.floor(i/4)*48)));
   let w=createBattle(squads);w.bases=["red","blue"].map(team=>makeBase("duel",team));
@@ -105,7 +105,7 @@ test("a full roster and its battlefield effects resume identically from a wire s
   for(const u of original.units) {
     const r=defs[u.kind].radius;
     assert.ok(u.x>=r && u.x<=960-r && u.y>=r && u.y<=360-r);
-    assert.ok(Number.isFinite(u.hp) && u.hp>=0 && u.hp<=defs[u.kind].maxHp);
+    assert.ok(Number.isFinite(u.hp) && u.hp>=0 && u.hp<=defs[u.hex?.kind ?? u.kind].maxHp);
   }
 });
 

@@ -83,9 +83,9 @@ async function browseRoster(url) {
   const {page,point}=await open(url);
   try {
     const catalog={
-      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Engineer"],
+      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Miner","Clown","Engineer"],
       Machines:["Clockmouse","Bolt Drone","Mouse Workshop","Watchpost"],
-      Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Zombie"],
+      Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Reaper","Witch","Zombie"],
       Spells:["Gust","Meteor","Healing Rain"],
     };
     const portraits=new Set();
@@ -109,7 +109,7 @@ async function browseRoster(url) {
         }
       }
     }
-    assert.equal(portraits.size,21);assert.equal(placed,18);
+    assert.equal(portraits.size,25);assert.equal(placed,22);
     await selectFromRoster(page,"Machines","Mouse Workshop");
     for(const width of [375,601,790,1024]) {
       await page.setViewportSize({width,height:650});
@@ -120,7 +120,7 @@ async function browseRoster(url) {
       assert.deepEqual(outside,[],"Controls outside the field at "+width+"px");
     }
     assert.equal(await page.locator("#gold-balance").textContent(),"∞");
-    console.log("Roster: every entry has a distinct portrait, all 18 pieces place, and all three spells cast in the playground.");
+    console.log("Roster: every entry has a distinct portrait, all 22 pieces place, and all three spells cast in the playground.");
   } finally {await page.context().close();}
 }
 
@@ -203,6 +203,46 @@ async function stormDuel(url) {
     assert.ok(latest.world.units.find(u=>u.kind==="kirin").arc.tick>=spark.tick);
     console.log("Chain stun: both browsers agreed on four stunned enemies, the Lancer lost a full charge, and the returning player recovered the same world.");
   } finally {await Promise.all([red,blue].map(p=>p.page.context().close()));}
+}
+
+async function turncoatDuel(url) {
+  const red=await open(url+"/room",1000,600),blue=await open(url+"/room",430,700);
+  const players=[red,blue];
+  try {
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue");
+    await red.page.mouse.click(...red.point(700,245));
+    assert.match(await red.page.locator("#deploy-hint").textContent(),/whole stroke/);
+    await selectFromRoster(red.page,"People","Miner");
+    assert.match(await red.page.locator("#deploy-hint").textContent(),/exit anywhere/);
+    await red.page.mouse.click(...red.point(700,245));await red.waitForUnits(1);
+    await selectFromRoster(red.page,"Mythical","Witch");await red.page.mouse.click(...red.point(445,132));await red.waitForUnits(2);
+    await selectFromRoster(red.page,"Mythical","Zombie");await red.page.mouse.click(...red.point(462,252));await red.waitForUnits(3);
+    await blue.page.getByRole("button",{name:"Archer",exact:true}).click();await blue.page.mouse.click(...blue.point(488,252));await blue.waitForUnits(4);
+    await selectFromRoster(blue.page,"People","Shieldbearer");await blue.page.mouse.click(...blue.point(516,132));await blue.waitForUnits(5);
+    await selectFromRoster(blue.page,"Machines","Watchpost");await blue.page.mouse.click(...blue.point(552,140));
+    await Promise.all(players.map(p=>p.waitForUnits(6)));
+    const destination=red.frames.at(-1).world.units[0].tunnel;
+    assert.deepEqual([destination.toX,destination.toY].map(Math.round),[700,245]);
+    await Promise.all(players.map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
+    await blue.page.waitForFunction(()=>document.querySelector("#red-score").title.includes("Hex Pig") && document.querySelector("#red-score").title.includes("Zombie 2"));
+    const contact=blue.frames.find(f=>f.world.units[4]?.kind==="pig");
+    assert.ok(contact.world.units[0].tunnel && contact.world.units[0].x>destination.fromX);
+    assert.equal(contact.world.units[3].zombified.kind,"archer");
+    await picture(red.page,"witch-and-zombies");
+    await blue.page.reload({waitUntil:"domcontentloaded"});
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" && document.querySelector("#red-score").title.includes("Hex Pig"));
+    assert.equal(blue.joins[0].resumeToken,blue.joins[1].resumeToken);
+    const returned=blue.frames.at(-1),limit=Date.now()+3000;
+    while(!red.frames.some(f=>f.revision===returned.revision) && Date.now()<limit)await delay(10);
+    assert.deepEqual(red.frames.find(f=>f.revision===returned.revision)?.world,returned.world);
+    await selectFromRoster(red.page,"People","Miner");await red.page.mouse.click(...red.point(738,206));
+    await Promise.all(players.map(p=>p.waitForUnits(7)));
+    assert.ok(blue.frames.at(-1).world.units[6].tunnel.toX>700);
+    await red.page.waitForFunction(()=>Number(document.querySelector("#tick").textContent)>210);
+    assert.ok(red.frames.some(f=>f.world.units[0]?.emergedTick && !f.world.units[0].tunnel));
+    assert.ok(red.frames.some(f=>f.world.units[4]?.unhexedTick && f.world.units[4].team==="blue"));
+    console.log("Cross-field Miners, an instantly zombified Archer and a counterattacking Hex Pig agreed across desktop, phone and reconnect.");
+  } finally {await Promise.all(players.map(p=>p.page.context().close()));}
 }
 
 const formations = [
@@ -292,6 +332,7 @@ try {
   await withField(browseRoster);
   await withField(magicDuel);
   await withField(stormDuel);
+  await withField(turncoatDuel);
   await withField(url=>match(url,3));
   await withField(url=>match(url,4));
   assert.deepEqual(errors,[]);
