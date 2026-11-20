@@ -64,6 +64,7 @@ export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, hea
     held = blue.frames.at(-1);
     assert.deepEqual([held.round, held.phase, held.world.tick, held.seats.red.connected, held.seats.red.reserved], [1, "deploy", 0, false, true]);
     assert.deepEqual(units(held), expected);
+    assert.equal(held.gold.red, 60);
     assert.deepEqual(attempts, [{ connection: 1, message: { round: 1, commandId: 1, action: { type: "place-warriors", positions: points } } }]);
     assert.deepEqual(dropped, { type: "placement-ack", round: 1, commandId: 1, unitIds: ids });
     assert.equal(delivered.length, 0);
@@ -101,6 +102,7 @@ export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, hea
     assert.ok(firstSquad >= 0);
     for (const frame of stream.slice(firstSquad)) {
       assert.deepEqual(units(frame), expected);
+      assert.equal(frame.gold.red, 60);
       assert.ok(frame.seats.blue.connected);
     }
   }
@@ -119,6 +121,6 @@ export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, hea
     joinedTeams: joins.map(event => event.team), droppedConfirmation: dropped, receivedConfirmations: delivered,
     observerIdsDuringDisconnect: held.world.units.map(unit => unit.id), observerConnections: blue.connections.length,
     viewports: players.map(({ team, width, height }) => ({ team, width, height })),
-    bothCanvases: paintedIds, units: units(final),
+    bothCanvases: paintedIds, units: units(final), gold: final.gold,
   } };
 }

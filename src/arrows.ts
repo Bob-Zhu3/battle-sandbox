@@ -1,4 +1,5 @@
-import type { Team, Unit } from "./simulation.ts";
+import type { Team, Target } from "./simulation.ts";
+import { BASE_RADIUS } from "./battlefield.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Arrow {
@@ -13,9 +14,9 @@ export interface Arrow {
 
 // Intersect the moving tip with a moving circle over one tick. In the circle's
 // frame of reference the circle stands still and the tip follows one segment.
-function contactTime(arrow: Arrow, from: Unit, to: Unit): number | undefined {
+function contactTime(arrow: Arrow, from: Target, to: Target): number | undefined {
   const x = arrow.x - from.x, y = arrow.y - from.y;
-  const radius = UNIT_DEFINITIONS[from.kind].radius;
+  const radius = from.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[from.kind].radius;
   const c = x * x + y * y - radius * radius;
   if (c <= 0) return 0;
 
@@ -30,8 +31,8 @@ function contactTime(arrow: Arrow, from: Unit, to: Unit): number | undefined {
   if (t <= 1) return t;
 }
 
-export function firstArrowImpact(arrow: Arrow, previous: readonly Unit[], next: readonly Unit[]): Unit | undefined {
-  let first: Unit | undefined;
+export function firstArrowImpact(arrow: Arrow, previous: readonly Target[], next: readonly Target[]): Target | undefined {
+  let first: Target | undefined;
   let earliest = Infinity;
   for (const [index, unit] of previous.entries()) {
     if (unit.team === arrow.team || unit.hp <= 0) continue;

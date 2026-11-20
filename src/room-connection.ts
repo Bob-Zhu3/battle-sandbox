@@ -1,5 +1,5 @@
-import { CLOSE, ROOM_SOCKET, type ClientMessage, type PlacementMessage, type RoomAction, type ServerMessage, type Snapshot } from "./room-protocol.ts";
-import type { Team } from "./simulation.ts";
+import { CLOSE, type ClientMessage, type PlacementMessage, type RoomAction, type ServerMessage, type Snapshot } from "./room-protocol.ts";
+import { MATCHES, type MatchMode, type Team } from "./battlefield.ts";
 
 export type ConnectionState = "joining" | "online" | "reconnecting" | "full" | "expired" | "replaced";
 interface Callbacks {
@@ -10,9 +10,8 @@ interface Callbacks {
 }
 
 interface TabSession { resumeToken?: string; team?: Team; round: number; nextId: number; pending: PlacementMessage[] }
-const storageKey = "battle-room.session.v1";
 function emptySession(): TabSession { return { round: 0, nextId: 1, pending: [] }; }
-function stored(team?: Team): TabSession {
+function stored(storageKey: string, team?: Team): TabSession {
   try {
     const raw = team ? localStorage.getItem(storageKey + "." + team) : sessionStorage.getItem(storageKey);
     const item = JSON.parse(raw ?? "null") as TabSession | null;
@@ -22,15 +21,16 @@ function stored(team?: Team): TabSession {
   return emptySession();
 }
 
-export function connectRoom(callbacks: Callbacks) {
-  let session = stored();
+export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
+  const storageKey = mode === "duel" ? "battle-room.session.v1" : "battle-ffa.session.v1";
+  let session = stored(storageKey);
   let socket: WebSocket;
   let online = false;
   let stopped = false;
   let seq = 0;
   let backoff = 350;
   let retryTimer: number | undefined;
-  const url = new URL(ROOM_SOCKET, location.href);
+  const url = new URL(MATCHES[mode].socket, location.href);
   url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
 
   function save() {
@@ -43,7 +43,7 @@ export function connectRoom(callbacks: Callbacks) {
     } catch { /* A tab session also works without shared browser storage. */ }
   }
   function clearSession(release: boolean) {
-    if (release && session.team && stored(session.team).resumeToken === session.resumeToken) {
+    if (release && session.team && stored(storageKey, session.team).resumeToken === session.resumeToken) {
       try { localStorage.removeItem(storageKey + "." + session.team); } catch { /* Storage is optional. */ }
     }
     session = emptySession();
@@ -65,7 +65,7 @@ export function connectRoom(callbacks: Callbacks) {
       if (stopped) return;
       if (session.resumeToken) transmit({ type: "join", resumeToken: session.resumeToken });
       else {
-        const remembered = [stored("red"), stored("blue")].flatMap(seat => seat.resumeToken ? [seat.resumeToken] : []);
+        const remembered = MATCHES[mode].teams.map(team => stored(storageKey, team)).flatMap(seat => seat.resumeToken ? [seat.resumeToken] : []);
         transmit({ type: "join", remembered });
       }
     });
@@ -75,7 +75,7 @@ export function connectRoom(callbacks: Callbacks) {
       switch (event.type) {
         case "joined": {
           if (session.resumeToken !== event.resumeToken) session = emptySession();
-          const previous = stored(event.team);
+          const previous = stored(storageKey, event.team);
           if (previous.resumeToken === event.resumeToken &&
               (previous.round > session.round || (previous.round === session.round && previous.nextId >= session.nextId))) session = previous;
           session.resumeToken = event.resumeToken;

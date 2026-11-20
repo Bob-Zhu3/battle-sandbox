@@ -2,12 +2,20 @@ import type { Server } from "node:net";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocketServer, WebSocket } from "ws";
-import { CLOSE, ROOM_SOCKET, SNAPSHOT_EVERY, type ServerMessage } from "../src/room-protocol.ts";
+import { CLOSE, SNAPSHOT_EVERY, type ServerMessage } from "../src/room-protocol.ts";
 import { TICKS_PER_SECOND, type Team } from "../src/simulation.ts";
 import { Room, record } from "./room.ts";
 
+import { MATCHES, type MatchMode } from "../src/battlefield.ts";
+
 export function attachRoom(server: Server, { rejoinGraceMs = 60_000 } = {}) {
-  const room = new Room();
+  const duel = attachMatch(server, "duel", rejoinGraceMs);
+  const ffa = attachMatch(server, "ffa", rejoinGraceMs);
+  return () => { duel(); ffa(); };
+}
+
+function attachMatch(server: Server, mode: MatchMode, rejoinGraceMs: number) {
+  const room = new Room(mode);
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
   const players = new Map<WebSocket, Team>();
   const expiry = new Map<Team, NodeJS.Timeout>();
@@ -24,25 +32,28 @@ export function attachRoom(server: Server, { rejoinGraceMs = 60_000 } = {}) {
     timer = undefined;
   }
 
+  const ticking = () => room.phase === "countdown" || room.phase === "running";
   function startClock() {
-    if (timer || room.phase !== "running") return;
+    if (timer || !ticking()) return;
     const start = performance.now();
+    let elapsedTicks = 0;
     timer = setInterval(() => {
       const due = Math.floor((performance.now() - start) * TICKS_PER_SECOND / 1000);
-      const through = Math.min(due, room.world.tick + 8);
-      while (room.world.tick < through && room.phase === "running") {
-        room.advance();
-        if (room.outcome !== null || room.world.tick % SNAPSHOT_EVERY === 0) publish();
+      const through = Math.min(due, elapsedTicks + 8);
+      while (elapsedTicks < through && ticking()) {
+        elapsedTicks++;
+        const changed = room.advance();
+        if (changed || (room.phase === "running" && room.world.tick % SNAPSHOT_EVERY === 0)) publish();
       }
-      if (room.phase !== "running") stopClock();
+      if (!ticking()) stopClock();
     }, 1000 / TICKS_PER_SECOND);
     timer.unref();
   }
 
   function release(team: Team) {
     expiry.delete(team);
-    stopClock();
     room.leave(team);
+    if (!ticking()) stopClock();
     publish();
   }
 
@@ -64,10 +75,10 @@ export function attachRoom(server: Server, { rejoinGraceMs = 60_000 } = {}) {
         const token = message.resumeToken;
         if (token !== undefined && typeof token !== "string") return error("Invalid seat token.");
         const remembered = message.remembered ?? [];
-        if (!Array.isArray(remembered) || remembered.length > 2 || !remembered.every(value => typeof value === "string")) return error("Invalid remembered seats.");
+        if (!Array.isArray(remembered) || remembered.length > room.sides.length || !remembered.every(value => typeof value === "string")) return error("Invalid remembered seats.");
         const joined = room.join(token, remembered);
         if (!joined) {
-          const reason = token === undefined ? "Both seats are taken." : "Your seat reservation has ended.";
+          const reason = token !== undefined ? "Your seat reservation has ended." : room.phase !== "deploy" ? "This round is already under way." : "All seats are taken.";
           error(reason);
           socket.close(token === undefined ? CLOSE.full : CLOSE.expired, reason);
           return;
@@ -83,6 +94,7 @@ export function attachRoom(server: Server, { rejoinGraceMs = 60_000 } = {}) {
         players.set(socket, team);
         send(joined);
         publish();
+        startClock();
         return;
       }
       if (!players.has(socket)) return;
@@ -115,7 +127,7 @@ export function attachRoom(server: Server, { rejoinGraceMs = 60_000 } = {}) {
   }
 
   function upgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
-    if (req.url !== ROOM_SOCKET) return;
+    if (req.url !== MATCHES[mode].socket) return;
     if (req.headers.origin) {
       try {
         if (new URL(req.headers.origin).host !== req.headers.host) { socket.destroy(); return; }

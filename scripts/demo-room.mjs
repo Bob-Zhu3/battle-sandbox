@@ -19,7 +19,7 @@ const { values } = parseArgs({ options: {
 } });
 const recoveryDemo = values.retry || values.reconnect;
 const headed = !values.headless && (recoveryDemo || values.headed || values["keep-open"] || false);
-const channel = values.channel ?? (recoveryDemo ? (existsSync(chromium.executablePath()) ? "chromium" : "chrome") : undefined);
+const channel = values.channel ?? (existsSync(chromium.executablePath()) ? undefined : "chrome");
 const output = values.output && resolve(values.output);
 if (output) await mkdir(output, { recursive: true });
 let ownedServer;
@@ -185,18 +185,32 @@ async function runBattleDemo() {
   assert.equal(blue.frames.at(-1).world.tick, 0);
   await capture(players, "Red is ready. Blue is still deploying.", 800);
   await blue.page.getByRole("button", { name: "Ready", exact: true }).click();
+  await red.page.locator("#countdown").waitFor({ state: "visible" });
+  await red.page.waitForFunction(() => Number(document.querySelector("#tick").textContent) >= 240);
+  assert.deepEqual([...new Set(red.frames.filter(f => f.phase === "countdown").map(f => f.countdown))], [3, 2, 1]);
+  const beforeRecruitment = red.frames.at(-1);
+  const reinforcements = Math.min(5, Math.floor(beforeRecruitment.gold.red / 12));
+  assert.ok(reinforcements >= 3);
+  await red.page.getByRole("button", { name: "Warrior", exact: true }).click();
+  await move(red, 460, 106);
+  await red.page.mouse.down();
+  await move(red, 460, 108 + 24 * (reinforcements - 1));
+  await red.page.mouse.up();
   for (let i = 0; output && !red.frames.some(f => f.phase === "finished") && i < 75; i++) {
     await capture(players, "Both browsers receive the server's battle", 100);
     await delay(35);
   }
-  await Promise.all(players.map(p => p.page.waitForFunction(() => document.querySelector("#match-state").textContent === "Finished", null, { timeout: 12000 })));
+  await Promise.all(players.map(p => p.page.waitForFunction(() => document.querySelector("#match-state").textContent === "Finished", null, { timeout: 25_000 })));
   await capture(players, "Both browsers receive the same final tick", 900);
   const shared = p => p.frames.filter(f => f.revision >= deployed.revision);
   assert.deepEqual(shared(red), shared(blue));
   assert.ok(shared(red).some(f => f.phase === "running" && f.world.arrows.length));
   assert.deepEqual(players.flatMap(p => p.errors), []);
   const end = red.frames.at(-1);
+  assert.equal(end.world.units.length, units.length + reinforcements);
+  assert.ok(end.world.bases.filter(base => base.hp > 0).length <= 1);
   const proof = {
+    reinforcements, bases: end.world.bases.map(({ team, hp }) => ({ team, hp })), gold: end.gold,
     viewports: players.map(({team,width,height}) => ({team,width,height})),
     gestureOverlapMs: { warrior: overlapMs[0], archer: overlapMs[1] },
     deploymentRevision: deployed.revision, units, paintedInBothCanvases: units.length,
@@ -209,10 +223,10 @@ async function runBattleDemo() {
   console.log("Verified both windows:", JSON.stringify({ ...proof, units: units.length }));
   if (values["keep-open"]) {
     await red.page.getByRole("button", { name: "New round" }).click();
-    await counts(players, 10);
-    assert.deepEqual(red.frames.at(-1).world, deployed.world);
+    await counts(players, 0);
+    assert.deepEqual(red.frames.at(-1).world, { tick: 0, units: [], arrows: [], bases: deployed.world.bases });
     assert.deepEqual(red.frames.at(-1), blue.frames.at(-1));
-    console.log("Both windows are open on the restored formation at " + url);
+    console.log("Both windows are open on a fresh round at " + url);
     await Promise.all(players.map(p => p.page.waitForEvent("close", { timeout: 0 })));
   }
 }

@@ -6,7 +6,7 @@ function warriors(frame) {
 }
 
 function checkHealth(frame, hp) {
-  assert.deepEqual(warriors(frame), [{ id: 1, team: "red", hp }, { id: 2, team: "blue", hp }]);
+  assert.deepEqual(warriors(frame).slice(0, 2), [{ id: 1, team: "red", hp }, { id: 2, team: "blue", hp }]);
 }
 
 export async function runBattleReconnect({ openPlayer, move, capture }) {
@@ -41,7 +41,7 @@ export async function runBattleReconnect({ openPlayer, move, capture }) {
   const red = await openPlayer("red", 960, 600, 8);
   const blue = await openPlayer("blue", 600, 480, 992, interceptBlue);
   const players = [red, blue];
-  const wait = { timeout: 8000, polling: 10 };
+  const wait = { timeout: 16_000, polling: 10 };
   for (const [player, x] of [[red, 325], [blue, 640]]) {
     await move(player, x, 180);
     await player.page.mouse.down();
@@ -107,12 +107,27 @@ export async function runBattleReconnect({ openPlayer, move, capture }) {
   console.log("Tick " + caughtUp.world.tick + "  Blue rejoins its team with #1 and #2 at 10 HP each.");
   await capture(players, "Blue has rejoined the same battle", 1200);
 
+  await red.page.waitForFunction(() => window.arenaLabels.join("|") === "#1 · 0 HP|#2 · 0 HP" &&
+    document.getElementById("match-state").textContent === "Live", null, wait);
+  const wipe = red.frames.find(f => f.world.tick === 150);
+  checkHealth(wipe, 0);
+  assert.equal(wipe.phase, "running");
+  assert.deepEqual(wipe.world.bases.map(base => base.hp), [160, 160]);
+  console.log("Tick 150  Both Warriors fall. Both bases stand. Red recruits five reinforcements.");
+  await move(red, 460, 132);
+  await red.page.mouse.down();
+  await red.page.waitForFunction(() => window.arenaLabels.length === 3, null, wait);
+  await move(red, 460, 230);
+  await red.page.mouse.up();
+
   await Promise.all(players.map(p => p.page.waitForFunction(() => !document.getElementById("result").hidden &&
     document.getElementById("match-state").textContent === "Finished", null, wait)));
   const shared = red.frames.filter(f => f.revision >= caughtUp.revision);
   assert.deepEqual(returned.frames, shared);
   const end = shared.at(-1);
-  assert.deepEqual([end.round, end.phase, end.world.tick, end.outcome], [deployed.round, "finished", 150, "draw"]);
+  assert.deepEqual([end.round, end.phase, end.outcome], [deployed.round, "finished", "red"]);
+  assert.deepEqual(end.world.units.map(u => u.id), [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(end.world.bases.map(b => b.hp), [160, 0]);
   checkHealth(end, 0);
   const views = {};
   for (const player of players) {
@@ -122,10 +137,14 @@ export async function runBattleReconnect({ openPlayer, move, capture }) {
       result: document.getElementById("result-title").textContent, detail: document.getElementById("result-detail").textContent,
     }));
     // Compare the labels each canvas drew at every shared tick, including death.
-    for (const frame of [firstHit, ...shared]) {
-      assert.deepEqual(paints[frame.world.tick], frame.world.units.map(u => "#" + u.id + " · " + u.hp + " HP"));
+    const byTick = new Map([firstHit, ...shared].map(frame => [frame.world.tick, frame]));
+    for (const [tick, frame] of byTick) {
+      assert.deepEqual(paints[tick], frame.world.units.map(u => "#" + u.id + " · " + u.hp + " HP"));
     }
-    assert.deepEqual(view, { team: player.team, labels: ["#1 · 0 HP", "#2 · 0 HP"], hp: [0, 0], result: "Draw", detail: "Battle ended on tick 150." });
+    assert.deepEqual(view, { team: player.team, labels: end.world.units.map(u => "#" + u.id + " · " + u.hp + " HP"),
+      hp: ["red", "blue"].map(side => end.world.units.filter(u => u.team === side).reduce((sum, u) => sum + u.hp, 0)),
+      result: "Red wins", detail: "Battle ended on tick " + end.world.tick + "." });
+    assert.equal(Number(await player.page.locator("#gold-balance").textContent()), end.gold[player.team]);
     assert.ok(await player.page.evaluate(() => {
       const top = document.getElementById("result").getBoundingClientRect().top;
       return [...document.querySelectorAll(".pennant")].every(flag => flag.getBoundingClientRect().bottom < top);
@@ -133,12 +152,12 @@ export async function runBattleReconnect({ openPlayer, move, capture }) {
     assert.deepEqual(player.errors, []);
     views[player.team] = view;
   }
-  console.log("PASS      Both windows show #1 and #2 at 0 HP and a draw on tick 150.");
-  await capture(players, "Both browsers show the same Warriors, HP and final draw", 2000);
+  console.log("PASS      Both windows agree on seven IDs, HP, gold and the fall of the Blue base on tick " + end.world.tick + ".");
+  await capture(players, "Both browsers show the same Warriors, HP and winning base", 2000);
   const checkpoint = frame => ({ tick: frame.world.tick, revision: frame.revision, units: warriors(frame) });
   return { players, proof: {
     round: deployed.round, firstHit: checkpoint(firstHit), whileDisconnected: { red: checkpoint(missedHit), blue: frozen },
     returnedTeam: returned.seat.team, caughtUp: checkpoint(caughtUp), identicalSnapshots: shared.length,
-    final: { ...checkpoint(end), outcome: end.outcome }, views,
+    final: { ...checkpoint(end), bases: end.world.bases, gold: end.gold, outcome: end.outcome }, views,
   } };
 }

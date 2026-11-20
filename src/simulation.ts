@@ -1,11 +1,11 @@
 import { firstArrowImpact, type Arrow } from "./arrows.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { ARENA, ARMIES, BASE_RADIUS, TEAMS, type Base, type Team } from "./battlefield.ts";
+export { ARENA, type Team } from "./battlefield.ts";
 
 export const TICKS_PER_SECOND = 60;
-export const ARENA = { width: 960, height: 360 } as const;
 export const WARRIOR = UNIT_DEFINITIONS.warrior;
 
-export type Team = "red" | "blue";
 export type Outcome = Team | "draw";
 
 export interface Placement {
@@ -30,6 +30,7 @@ export interface Unit extends Placement {
   attackDirection: { x: number; y: number } | null;
   // Archer peeking past cover, or Warrior hearing a friendly shaft pass behind.
   lastAttentionTick: number | null;
+  killedBy?: Team;
 }
 
 export type Warrior = Unit & { kind: "warrior" };
@@ -38,11 +39,13 @@ export class Battle {
   tick: number;
   units: Unit[];
   arrows: Arrow[];
+  bases?: Base[];
 
-  constructor(tick: number, units: Unit[], arrows: Arrow[]) {
+  constructor(tick: number, units: Unit[], arrows: Arrow[], bases?: Base[]) {
     this.tick = tick;
     this.units = units;
     this.arrows = arrows;
+    this.bases = bases;
   }
 
   // Preserve the Warrior-only view used by the original Node callers.
@@ -67,7 +70,7 @@ export function createBattle(placements: readonly Placement[]): Battle {
     return {
       ...placement, kind, x: boundCenter(placement.x, ARENA.width, radius), y: boundCenter(placement.y, ARENA.height, radius),
       hp: maxHp, nextAttackTick: 1, lastHitTick: null,
-      targetId: null, aimX: placement.team === "red" ? 1 : -1, aimY: 0,
+      targetId: null, aimX: ARMIES[placement.team].facing, aimY: 0,
       walkDistance: 0, pace: 0, lastAttackTick: null, attackDirection: null, lastAttentionTick: null,
     };
   });
@@ -81,8 +84,9 @@ export function createDuel(): Battle {
   ]);
 }
 
-function nearestEnemy(seeker: Unit, units: readonly Unit[]): Unit | undefined {
-  let closest: Unit | undefined;
+export type Target = Unit | Base;
+function nearestEnemy(seeker: Unit, units: readonly Target[]): Target | undefined {
+  let closest: Target | undefined;
   let closestDistance = Infinity;
   for (const unit of units) {
     if (unit.team === seeker.team || unit.hp <= 0) continue;
@@ -178,13 +182,22 @@ function noticeFriendlyArrow(arrow: Arrow, units: Unit[], tick: number) {
 export function stepBattle(battle: Battle): Battle {
   const tick = battle.tick + 1;
   const damage = new Map<number, number>();
+  const sources = new Map<number, Map<Team, number>>();
   const arrows: Arrow[] = [];
+  const targets: readonly Target[] = battle.bases ? [...battle.units, ...battle.bases] : battle.units;
+  function hit(target: Target, amount: number, team: Team) {
+    damage.set(target.id, (damage.get(target.id) ?? 0) + amount);
+    if (!battle.bases || target.kind === "base") return;
+    const contributors = sources.get(target.id) ?? new Map<Team, number>();
+    contributors.set(team, (contributors.get(team) ?? 0) + amount);
+    sources.set(target.id, contributors);
+  }
 
   // Movement, targeting and releases all start from the same snapshot.
   const units = battle.units.map((unit) => {
     const next = { ...unit };
     if (unit.hp <= 0) return next;
-    const target = nearestEnemy(unit, battle.units);
+    const target = nearestEnemy(unit, targets);
     next.targetId = target?.id ?? null;
     if (!target) return next;
 
@@ -196,21 +209,23 @@ export function stepBattle(battle: Battle): Battle {
       next.aimX = dx / distance;
       next.aimY = dy / distance;
     } else {
-      next.aimX = unit.team === "red" ? 1 : -1;
+      next.aimX = ARMIES[unit.team].facing;
       next.aimY = 0;
     }
-    const stopAt = definition.attack === "arrow" ? definition.reach : definition.radius + UNIT_DEFINITIONS[target.kind].radius;
+    const reach = definition.reach + (target.kind === "base" ? BASE_RADIUS : 0);
+    const targetRadius = target.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[target.kind].radius;
+    const stopAt = definition.attack === "arrow" ? reach : definition.radius + targetRadius;
     if (distance > stopAt) {
       const travel = Math.min(definition.speed / TICKS_PER_SECOND, distance - stopAt);
       next.x += (dx / distance) * travel;
       next.y += (dy / distance) * travel;
     }
-    if (distance <= definition.reach && tick >= unit.nextAttackTick) {
+    if (distance <= reach && tick >= unit.nextAttackTick) {
       next.nextAttackTick = tick + definition.cooldownTicks;
       next.lastAttackTick = tick;
       next.attackDirection = { x: next.aimX, y: next.aimY };
       if (definition.attack === "melee") {
-        damage.set(target.id, (damage.get(target.id) ?? 0) + definition.damage);
+        hit(target, definition.damage, unit.team);
       } else {
         if (shootingPastCover(next, battle.units, distance)) next.lastAttentionTick = tick;
         const step = definition.arrowSpeed / TICKS_PER_SECOND;
@@ -230,11 +245,12 @@ export function stepBattle(battle: Battle): Battle {
     if (!separateFootprints(battle.units, units, solid)) break;
   }
   // Only previously released arrows fly this tick. Each one is consumed by its first hit.
+  const movedTargets = battle.bases ? [...units, ...battle.bases] : units;
   for (const arrow of battle.arrows) {
     noticeFriendlyArrow(arrow, units, tick);
-    const hit = firstArrowImpact(arrow, battle.units, units);
-    if (hit) {
-      damage.set(hit.id, (damage.get(hit.id) ?? 0) + arrow.damage);
+    const impact = firstArrowImpact(arrow, targets, movedTargets);
+    if (impact) {
+      hit(impact, arrow.damage, arrow.team);
       continue;
     }
     const x = arrow.x + arrow.vx, y = arrow.y + arrow.vy;
@@ -250,15 +266,39 @@ export function stepBattle(battle: Battle): Battle {
     if (amount === undefined) continue;
     unit.hp = Math.max(0, unit.hp - amount);
     unit.lastHitTick = tick;
+    const contributors = sources.get(unit.id);
+    if (!unit.hp && contributors) {
+      // Greatest damage on the lethal tick takes the one bounty. Equal damage
+      // uses the fixed seat order, independent of packet and unit array order.
+      unit.killedBy = [...contributors.keys()].sort((a, b) =>
+        contributors.get(b)! - contributors.get(a)! || TEAMS.indexOf(a) - TEAMS.indexOf(b))[0];
+    }
   }
-  return new Battle(tick, units, arrows);
+  const fallen = new Set<Team>();
+  const bases = battle.bases?.map(base => {
+    const amount = damage.get(base.id);
+    if (!amount) return base;
+    const hp = Math.max(0, base.hp - amount);
+    if (!hp) fallen.add(base.team);
+    return { ...base, hp, lastHitTick: tick };
+  });
+  if (fallen.size) {
+    for (const unit of units) if (unit.hp && fallen.has(unit.team)) { unit.hp = 0; unit.lastHitTick = tick; }
+  }
+  return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases);
 }
 
 export function battleOutcome(battle: Battle): Outcome | null {
-  const redAlive = battle.units.some((unit) => unit.team === "red" && unit.hp > 0);
-  const blueAlive = battle.units.some((unit) => unit.team === "blue" && unit.hp > 0);
-  if (redAlive && blueAlive) return null;
-  if (redAlive) return battle.arrows.some(arrow => arrow.team === "blue") ? null : "red";
-  if (blueAlive) return battle.arrows.some(arrow => arrow.team === "red") ? null : "blue";
-  return "draw";
+  if (battle.bases) {
+    const standing = battle.bases.filter(base => base.hp > 0);
+    return standing.length > 1 ? null : standing[0]?.team ?? "draw";
+  }
+  let survivor: Team | undefined;
+  for (const unit of battle.units) {
+    if (unit.hp <= 0) continue;
+    if (survivor && survivor !== unit.team) return null;
+    survivor = unit.team;
+  }
+  if (!survivor) return "draw";
+  return battle.arrows.some(arrow => arrow.team !== survivor) ? null : survivor;
 }

@@ -1,15 +1,13 @@
 import { restingPose, type CharacterPose } from "./character-pose.ts";
 import type { Team } from "./simulation.ts";
 import type { UnitKind } from "./units.ts";
+import { ARMIES } from "./battlefield.ts";
 
-export const palette = {
-  red: { coat: "#d95340", hem: "#963a32", light: "#ffab79" },
-  blue: { coat: "#387fc1", hem: "#30577f", light: "#9ed5ec" },
-};
+export const palette = ARMIES;
 export const INK = "#26332f";
 const FACE = "#fff0ca", IRON = "#d0d5bd", WOOD = "#e6ac57";
 type Pens = CanvasRenderingContext2D;
-type Dye = typeof palette.red;
+type Dye = typeof palette[Team];
 
 // All cut shapes are drawn in the same small profile, facing right, with the
 // center of the footprint at (0,0). The two characters have different skeletons.
@@ -76,7 +74,7 @@ function sword(c: Pens, dye: Dye, p: CharacterPose) {
 function warrior(c: Pens, dye: Dye, p: CharacterPose) {
   feet(c, p, true);
   c.save();
-  c.translate(-2.7 * p.hurt + 2 * p.strike, -1.35 * p.lift + p.duck * 4.8);
+  c.translate(-2.7 * p.hurt + 2 * p.strike, -1.35 * p.lift + p.duck * 4.8 - p.breath);
   c.rotate(.055 * p.pace - .16 * p.hurt + .085 * p.strike);
   if (p.strike <= .45) sword(c, dye, p);
   shape(c, shapes.coat, dye.coat);
@@ -85,7 +83,7 @@ function warrior(c: Pens, dye: Dye, p: CharacterPose) {
   c.translate(-1 + p.guard * .9 - p.duck * 1.6, -3 + p.duck * 1.2 + p.hurt);
   c.rotate(p.duck * .19 + p.pitch * .13);
   shape(c, shapes.faceplate, FACE);
-  oval(c, 2.8 - 2.5 * p.duck, .55 + p.pitch * .7, 1.1, 1.45, INK);
+  oval(c, 2.8 - 2.5 * p.duck, .55 + p.pitch * .7, 1.1, 1.45 - p.blink, INK);
   shape(c, shapes.helmet, IRON);
   line(c, -5.3, -8, -2.8, -10.5, "#f4efce", 1.25);
   shape(c, shapes.brim, dye.coat);
@@ -105,7 +103,7 @@ function warrior(c: Pens, dye: Dye, p: CharacterPose) {
 function archer(c: Pens, dye: Dye, p: CharacterPose) {
   feet(c, p, false);
   c.save();
-  c.translate(p.peek * 2.2 - p.hurt * 3.2, -p.lift * 1.65 - p.peek * 2);
+  c.translate(p.peek * 2.2 - p.hurt * 3.2, -p.lift * 1.65 - p.peek * 2 - p.breath);
   c.rotate(-.08 + p.pace * .17 - p.hurt * .12);
   line(c, -6, -3, -10, -10, WOOD, 1.4);
   line(c, -6, -3, -8.2, -11, FACE, 1.4);
@@ -118,7 +116,7 @@ function archer(c: Pens, dye: Dye, p: CharacterPose) {
   shape(c, shapes.feather, WOOD, 1);
   shape(c, shapes.hood, dye.coat);
   shape(c, shapes.hoodFace, FACE, 1);
-  oval(c, 5.6 + p.peek * .4, -4.9 + p.pitch * .72, 1, 1.45, INK);
+  oval(c, 5.6 + p.peek * .4, -4.9 + p.pitch * .72, 1, 1.45 - p.blink, INK);
   c.restore();
   c.save(); c.rotate(p.pace * .24 - p.peek * .12);
   shape(c, shapes.scarf, dye.light, .95); c.restore();
@@ -150,7 +148,7 @@ function archer(c: Pens, dye: Dye, p: CharacterPose) {
   c.restore();
 }
 
-export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(team === "red" ? 1 : -1)) {
+export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(ARMIES[team].facing)) {
   c.save();
   c.translate(x, y);
   c.scale(radius / 11, radius / 11);

@@ -63,71 +63,6 @@ function flowers(ctx: CanvasRenderingContext2D, x: number, y: number, s: number)
   }
 }
 
-function campFlag(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, blue: boolean) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(blue ? -size : size, size);
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.ellipse(3, 1, 38, 9, -.04, 0, 2 * Math.PI);
-  ctx.fillStyle = "#c0d291";
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(-13, -1, 16, 3.5, .06, 0, 2 * Math.PI);
-  ctx.fillStyle = "#9fb87e";
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-3, 0);
-  ctx.lineTo(-7, -77);
-  ctx.quadraticCurveTo(-7, -79, -3, -79);
-  ctx.lineTo(2, -1);
-  ctx.closePath();
-  ctx.fillStyle = "#b18453";
-  ctx.fill();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-6, -74);
-  ctx.bezierCurveTo(8, -81, 24, -68, 42, -74);
-  ctx.lineTo(32, -59);
-  ctx.lineTo(44, -49);
-  ctx.bezierCurveTo(26, -41, 13, -57, -4, -49);
-  ctx.closePath();
-  ctx.fillStyle = blue ? "#508aca" : "#e76a50";
-  ctx.fill();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 2.4;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(28, -68);
-  ctx.quadraticCurveTo(32, -67, 36, -68);
-  ctx.lineTo(31, -61);
-  ctx.closePath();
-  ctx.fillStyle = blue ? "#37729c" : "#be4b3e";
-  ctx.fill();
-  ctx.strokeStyle = "#ffebba";
-  ctx.lineWidth = 2.8;
-  if (blue) {
-    for (const offset of [0, 7]) {
-      ctx.beginPath(); ctx.moveTo(5 + offset, -68); ctx.lineTo(1 + offset, -56); ctx.stroke();
-    }
-  } else {
-    ctx.beginPath(); ctx.moveTo(10, -69); ctx.lineTo(14, -63); ctx.lineTo(10, -57); ctx.lineTo(6, -63); ctx.closePath(); ctx.stroke();
-  }
-  ctx.beginPath();
-  ctx.arc(-5, -80, 3.3, 0, 2 * Math.PI);
-  ctx.fillStyle = "#f9cf77";
-  ctx.fill();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 1.7;
-  ctx.stroke();
-  tuft(ctx, 4, 1, .7);
-  stone(ctx, -11, 2, .6);
-  ctx.restore();
-}
-
 function meadowCorner(ctx: CanvasRenderingContext2D, x: number, y: number, sx: number, sy: number) {
   ctx.save();
   ctx.translate(x, y);
@@ -184,6 +119,4 @@ export function drawLandscape(ctx: CanvasRenderingContext2D) {
   for (const [u, v, k] of [[.032,.52,.65], [.188,.71,.55], [.885,.29,.7], [.968,.74,.9], [.91,.78,.42], [.29,.08,.48]]) {
     stone(ctx, u * w, v * h, k * s);
   }
-  campFlag(ctx, .095 * w, .558 * h, s, false);
-  campFlag(ctx, .905 * w, .558 * h, s, true);
 }

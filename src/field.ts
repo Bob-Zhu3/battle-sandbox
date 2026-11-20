@@ -1,7 +1,7 @@
 import { drawLandscape } from "./landscape.ts";
 import { drawUnitToken } from "./characters.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
-import type { Team } from "./simulation.ts";
+import { ARMIES, BASE_HP, TEAMS, MATCHES, type MatchMode, type Team } from "./battlefield.ts";
 import type { World } from "./room-protocol.ts";
 
 export function element<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -16,13 +16,29 @@ function contextFor(canvas: HTMLCanvasElement) {
   return context;
 }
 
-export function createField() {
+export function createField(mode?: MatchMode) {
   const canvas = element<HTMLCanvasElement>("arena");
   const landscape = element<HTMLCanvasElement>("landscape");
   const ctx = contextFor(canvas);
   const ground = contextFor(landscape);
   const buttons = { warrior: element<HTMLButtonElement>("brush-warrior"), archer: element<HTMLButtonElement>("brush-archer") };
   let selected: UnitKind = "warrior";
+  const sides = mode ? MATCHES[mode].teams : TEAMS;
+  const score = element("score");
+  for (const side of sides) {
+    if (mode === "duel" && side === "blue") {
+      const versus = document.createElement("span");
+      versus.className = "versus"; versus.textContent = "vs"; score.append(versus);
+    }
+    const panel = document.createElement("div");
+    panel.id = side + "-score"; panel.className = "pennant " + side;
+    panel.style.setProperty("--cloth", ARMIES[side].hem);
+    panel.innerHTML = '<span class="pennant-name">' + ARMIES[side].name + '</span><strong id="' + side + '-count">0</strong>'
+      + '<span class="life-line" aria-hidden="true"><i id="' + side + '-bar"></i></span>'
+      + '<span id="' + side + '-seat" class="seat-label" hidden></span>'
+      + '<span class="sr-only"><span id="' + side + '-hp">0</span> of <span id="' + side + '-max">0</span> HP</span>';
+    score.append(panel);
+  }
 
   function colorBrush(team: Team) {
     for (const kind of ["warrior", "archer"] as const) {
@@ -35,7 +51,10 @@ export function createField() {
   for (const kind of ["warrior", "archer"] as const) {
     const definition = UNIT_DEFINITIONS[kind];
     const button = buttons[kind];
-    button.title = definition.name + " · " + definition.maxHp + " HP · " + definition.damage + " damage · " + definition.reach + " reach · " + definition.cooldownTicks + " ticks between attacks";
+    const cost = element("cost-" + kind);
+    cost.textContent = definition.cost + "g";
+    cost.hidden = !mode;
+    button.title = definition.name + (mode ? " · " + definition.cost + " gold" : "") + " · " + definition.maxHp + " HP · " + definition.damage + " damage · " + definition.reach + " reach · " + definition.cooldownTicks + " ticks between attacks";
     button.addEventListener("click", () => {
       buttons[selected].setAttribute("aria-pressed", "false");
       selected = kind;
@@ -58,34 +77,34 @@ export function createField() {
     resize();
     new ResizeObserver(resize).observe(canvas);
   }
-  return { canvas, ctx, selectedKind: () => selected, colorBrush, watchSize };
-}
-
-const tickLabel = element("tick");
-const health = {
-  red: { score: element("red-score"), hp: element("red-hp"), max: element("red-max"), count: element("red-count"), bar: element("red-bar") },
-  blue: { score: element("blue-score"), hp: element("blue-hp"), max: element("blue-max"), count: element("blue-count"), bar: element("blue-bar") },
-};
-
-export function updateFieldScore(battle: World) {
-  tickLabel.textContent = String(battle.tick).padStart(3, "0");
-  const totals = { red: { units: 0, warrior: 0, archer: 0, hp: 0, max: 0 }, blue: { units: 0, warrior: 0, archer: 0, hp: 0, max: 0 } };
-  for (const unit of battle.units) {
-    const team = totals[unit.team];
-    team.units++;
-    if (unit.hp > 0) team[unit.kind]++;
-    team.hp += unit.hp;
-    team.max += UNIT_DEFINITIONS[unit.kind].maxHp;
+  const health = sides.map(side => ({
+    side, score: element(side + "-score"), hp: element(side + "-hp"), max: element(side + "-max"),
+    count: element(side + "-count"), bar: element(side + "-bar"),
+  }));
+  const tick = element("tick");
+  function updateScore(world: World, visible = sides) {
+    tick.textContent = String(world.tick).padStart(3, "0");
+    for (const display of health) {
+      const army = world.units.filter(u => u.team === display.side);
+      const living = army.filter(u => u.hp > 0);
+      const hp = living.reduce((sum, u) => sum + u.hp, 0);
+      const max = army.reduce((sum, u) => sum + UNIT_DEFINITIONS[u.kind].maxHp, 0);
+      const warriors = living.filter(u => u.kind === "warrior").length;
+      display.score.hidden = !visible.includes(display.side) || (!mode && !living.length);
+      display.count.textContent = String(living.length);
+      display.hp.textContent = String(hp); display.max.textContent = String(max);
+      display.score.title = living.length + " of " + army.length + " alive · Warriors " + warriors + " · Archers " + (living.length - warriors) + " · " + hp + "/" + max + " HP";
+      const base = world.bases?.find(base => base.team === display.side);
+      if (base) { display.score.dataset.baseHp = String(base.hp); display.score.title += " · Base " + base.hp + "/" + BASE_HP + " HP"; }
+      display.bar.style.transform = "scaleX(" + (base ? base.hp / BASE_HP : max ? hp / max : 0) + ")";
+    }
   }
-  for (const side of ["red", "blue"] as const) {
-    const { units, warrior, archer, hp, max } = totals[side];
-    const alive = warrior + archer;
-    const display = health[side];
-    if (display.count.textContent !== String(alive)) display.count.textContent = String(alive);
-    if (display.max.textContent !== String(max)) display.max.textContent = String(max);
-    if (display.hp.textContent !== String(hp)) display.hp.textContent = String(hp);
-    display.score.title = alive + " of " + units + " alive · Warriors " + warrior + " · Archers " + archer + " · " + hp + "/" + max + " HP";
-    display.bar.style.transform = "scaleX(" + (max ? hp / max : 0) + ")";
+
+  const balance = element("gold-balance");
+  function setGold(amount: number | undefined) {
+    balance.textContent = amount === undefined ? (mode ? "…" : "∞") : String(amount);
+    for (const kind of ["warrior", "archer"] as const) buttons[kind].disabled = amount !== undefined && amount < UNIT_DEFINITIONS[kind].cost;
   }
-  return totals;
+  setGold(undefined);
+  return { canvas, ctx, selectedKind: () => selected, colorBrush, watchSize, updateScore, setGold };
 }

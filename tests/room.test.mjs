@@ -54,7 +54,8 @@ test("receipts are scoped to a player and round, and survive Undo, a full field,
   const retry = () => assert.deepEqual(room.place("red", 1, 1, first), { ack: accepted.ack, fresh: false });
   retry();
   assert.deepEqual(room.world.units.map(u => u.id), [2]);
-  room.place("red", 1, 2, place(...Array.from({ length: TEAM_LIMIT }, () => at(200))));
+  assert.ok(room.place("red", 1, 2, { type: "place-archers", positions: Array.from({ length: TEAM_LIMIT }, () => at(200)) }).fresh);
+  assert.equal(room.gold.red, 0);
   retry();
   room.control("red", { type: "ready" });
   retry();
@@ -94,7 +95,8 @@ test("departing players release their seat and reset readiness without moving th
   room.control("red", { type: "ready" });
   room.control("blue", { type: "ready" });
   room.advance();
-  assert.equal(room.world.tick, 1);
+  assert.equal(room.phase, "countdown");
+  assert.equal(room.world.tick, 0);
   room.leave("blue");
   assert.deepEqual([room.round, room.phase, room.world.tick, room.seats.red.ready], [2,"deploy",0,false]);
   assert.deepEqual(room.world.units.map(u => [u.id, u.team, u.x]), [[2,"red",410]]);
@@ -120,7 +122,7 @@ function client(url, { resumeToken, drop } = {}) {
     if (!drop?.(event, socket)) messages.push(event);
   });
   async function wait(predicate, after = 0) {
-    const deadline = performance.now() + 4500;
+    const deadline = performance.now() + 16000;
     while (performance.now() < deadline) {
       const event = messages.slice(after).find(predicate);
       if (event) return event;
@@ -231,16 +233,22 @@ test("Blue misses a hit while disconnected, rejoins the live duel, and gets the 
   assert.ok(catchUp.world.tick >= missed.world.tick);
   assert.deepEqual(catchUp.seats.blue, { connected: true, reserved: false, ready: true });
   checkWarriors(catchUp, 10, 120);
+  const wipe = await red.wait(e => e.type === "snapshot" && e.world.tick === 150);
+  checkWarriors(wipe, 0, 150);
+  assert.equal(wipe.phase,"running");
+  assert.deepEqual(wipe.gold,{red:122,blue:122});
+  red.send(2,round,place(...[132,156,180,204,228].map(y=>at(468,y))));
   const finished = e => e.type === "snapshot" && e.phase === "finished";
   const [a, b] = await Promise.all([red.wait(finished), returned.wait(finished)]);
   assert.deepEqual(a, b);
-  assert.deepEqual([a.outcome, a.world.tick], ["draw", 150]);
-  checkWarriors(a, 0, 150);
+  assert.equal(a.outcome,"red");
+  assert.equal(a.world.bases.find(base=>base.team==="blue").hp,0);
+  assert.deepEqual(a.world.units.slice(0,2).map(u=>u.hp),[0,0]);
   const shared = e => e.type === "snapshot" && e.revision >= catchUp.revision;
   assert.deepEqual(returned.messages.filter(shared), red.messages.filter(shared));
 });
 
-test("two WebSockets receive the same deployment, authoritative battle ticks and simultaneous duel result", async (t) => {
+test("two WebSockets receive the same deployment, authoritative battle ticks and the base result", async (t) => {
   const url = await serve(t);
   const red = client(url);
   assert.equal((await red.wait(e => e.type === "joined")).team, "red");
@@ -251,9 +259,9 @@ test("two WebSockets receive the same deployment, authoritative battle ticks and
   assert.equal(code, CLOSE.full);
   const connected = await red.wait(e => e.type === "snapshot" && e.seats.blue.connected);
   const { round } = connected;
-  red.send(1, round, place(at(460)));
+  red.send(1, round, place(at(460,168),at(460,192)));
   blue.send(1, round, place(at(500)));
-  const placed = e => e.type === "snapshot" && e.phase === "deploy" && e.world.units.length === 2;
+  const placed = e => e.type === "snapshot" && e.phase === "deploy" && e.world.units.length === 3;
   const [a, b] = await Promise.all([red.wait(placed), blue.wait(placed)]);
   assert.deepEqual(a, b);
 
@@ -270,11 +278,13 @@ test("two WebSockets receive the same deployment, authoritative battle ticks and
   const ended = e => e.type === "snapshot" && e.phase === "finished";
   const [endA, endB] = await Promise.all([red.wait(ended),blue.wait(ended)]);
   assert.deepEqual(endA, endB);
-  assert.deepEqual([endA.outcome,endA.world.tick], ["draw",61]);
+  assert.equal(endA.outcome, "red");
+  assert.equal(endA.world.bases[1].hp, 0);
 
   const frames = red.messages.filter(e => e.type === "snapshot" && e.phase !== "deploy");
   assert.ok(frames.length > 10);
   let expected = createBattle(a.world.units);
+  expected.bases = structuredClone(a.world.bases);
   for (const frame of frames) {
     while (expected.tick < frame.world.tick) expected = stepBattle(expected);
     assert.deepEqual(frame.world, JSON.parse(JSON.stringify(expected)));
@@ -282,7 +292,8 @@ test("two WebSockets receive the same deployment, authoritative battle ticks and
   }
   red.send(4, round, { type: "new-round" });
   const next = await blue.wait(e => e.type === "snapshot" && e.round === round + 1);
-  assert.deepEqual(next.world, a.world);
+  assert.deepEqual(next.world, { tick: 0, units: [], arrows: [], bases: a.world.bases });
+  assert.deepEqual(next.gold, connected.gold);
   blue.send(3, round, { type: "ready" });
   await blue.wait(e => e.type === "error" && e.message.includes("round has ended"));
   blue.socket.close(CLOSE.leave, "Left room");

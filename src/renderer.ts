@@ -1,7 +1,9 @@
 import { ARENA, boundCenter, type Team } from "./simulation.ts";
 import type { World } from "./room-protocol.ts";
-import { teamAt, type ArenaPoint } from "./deployment.ts";
+import { type ArenaPoint } from "./deployment.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { drawKeep } from "./keeps.ts";
+import { ARMIES, campFor, type MatchMode } from "./battlefield.ts";
 import { characterPose, restingPose } from "./character-pose.ts";
 import { drawFallen, drawUnitToken, INK, palette } from "./characters.ts";
 
@@ -27,31 +29,7 @@ function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: n
   ctx.restore();
 }
 
-function projection(w: number, h: number, current: World, deploying: boolean) {
-  if (deploying || !current.units.length) {
-    return { sx: w / ARENA.width, sy: h / ARENA.height, ox: 0, oy: 0 };
-  }
-  // Frame the skirmish with a uniform scale so touching circles also touch on screen.
-  // Fallen units retain their last position, keeping the frame steady as ranks fall.
-  let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
-  for (const { x, y } of current.units) {
-    left = Math.min(left, x); right = Math.max(right, x);
-    top = Math.min(top, y); bottom = Math.max(bottom, y);
-  }
-  const tallPhone = w <= 720 && h > 450;
-  const topMargin = tallPhone ? 132 : Math.min(78, h * .18);
-  const bottomMargin = tallPhone ? 104 : Math.min(73, h * .17);
-  const fieldHeight = Math.max(1, h - topMargin - bottomMargin);
-  const usableWidth = w - 2 * Math.min(52, w * .065);
-  const scale = Math.min(usableWidth / Math.max(w <= 720 ? 340 : 525, right - left + 48), fieldHeight / Math.max(235, bottom - top + 48));
-  return {
-    sx: scale, sy: scale,
-    ox: w / 2 - (left + right) / 2 * scale,
-    oy: topMargin + fieldHeight / 2 - (top + bottom) / 2 * scale,
-  };
-}
-
-function drawDivider(ctx: CanvasRenderingContext2D, w: number, h: number, empty: boolean) {
+function drawDivider(ctx: CanvasRenderingContext2D, w: number, h: number, empty: boolean, mode: MatchMode) {
   ctx.save();
   ctx.strokeStyle = "#78926080";
   ctx.lineWidth = 1.5;
@@ -64,28 +42,39 @@ function drawDivider(ctx: CanvasRenderingContext2D, w: number, h: number, empty:
     ctx.moveTo(x, h * .46 + 54);
   }
   ctx.lineTo(x, h - Math.min(108, h * .22));
+  if (mode === "ffa") { ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); }
   ctx.stroke();
   ctx.restore();
 }
 
-export function drawArena(ctx: CanvasRenderingContext2D, previous: World, current: World, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior", view: { ownTeam?: Team; showIds?: boolean } = {}) {
+export function drawArena(ctx: CanvasRenderingContext2D, previous: World, current: World, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior", view: { ownTeam?: Team; showIds?: boolean; mode?: MatchMode } = {}) {
   const w = ctx.canvas.clientWidth, h = ctx.canvas.clientHeight;
   if (!w || !h) return;
   ctx.setTransform(ctx.canvas.width / w, 0, 0, ctx.canvas.height / h, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  const { sx, sy, ox, oy } = projection(w, h, current, deploying);
+  // Keep pointer input and rendering in the same arena coordinates at every viewport size.
+  const sx = w / ARENA.width, sy = h / ARENA.height;
   const scale = Math.min(sx, sy);
-  if (deploying && view.ownTeam) {
-    ctx.fillStyle = "rgba(52, 68, 51, .10)";
-    ctx.fillRect(view.ownTeam === "red" ? w / 2 : 0, 0, w / 2, h);
+  if (view.mode) {
+    if (view.ownTeam) {
+      const camp = campFor(view.mode, view.ownTeam);
+      ctx.beginPath(); ctx.rect(0, 0, w, h);
+      ctx.rect(camp.x * sx, camp.y * sy, camp.width * sx, camp.height * sy);
+      ctx.fillStyle = deploying ? "rgba(47, 62, 48, .13)" : "rgba(47, 62, 48, .045)"; ctx.fill("evenodd");
+      ctx.fillStyle = ARMIES[view.ownTeam].coat + "12";
+      ctx.fillRect(camp.x * sx, camp.y * sy, camp.width * sx, camp.height * sy);
+    }
+    drawDivider(ctx, w, h, deploying && !current.units.length && !preview.length, view.mode);
   }
-  if (deploying) drawDivider(ctx, w, h, !current.units.length && !preview.length);
 
   const tick = previous.tick + (current.tick - previous.tick) * blend;
-  const byId = new Map(current.units.map(unit => [unit.id, unit]));
-  const bodies = current.units.map((unit, i) => {
-    const from = previous.units[i];
-    return { unit, from, x: ox + (from.x + (unit.x - from.x) * blend) * sx, y: oy + (from.y + (unit.y - from.y) * blend) * sy };
+  const targets = [...current.units, ...(current.bases ?? [])];
+  const byId = new Map(targets.map(target => [target.id, target]));
+  for (const base of current.bases ?? []) drawKeep(ctx, base, base.x*sx, base.y*sy, scale, tick);
+  const prior = new Map(previous.units.map(unit => [unit.id, unit]));
+  const bodies = current.units.map(unit => {
+    const from = prior.get(unit.id) ?? unit;
+    return { unit, from, x: (from.x + (unit.x - from.x) * blend) * sx, y: (from.y + (unit.y - from.y) * blend) * sy };
   }).sort((a, b) => a.y - b.y || a.unit.id - b.unit.id);
   for (const { unit, x, y } of bodies) {
     if (unit.hp || unit.lastHitTick === null) continue;
@@ -98,7 +87,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   for (const { unit, from, x, y } of bodies) {
     if (!unit.hp) continue;
     const travel = from.walkDistance + (unit.walkDistance - from.walkDistance) * blend;
-    const pose = deploying ? restingPose(unit.team === "red" ? 1 : -1)
+    const pose = deploying ? restingPose(ARMIES[unit.team].facing)
       : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, travel);
     const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
     drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose);
@@ -115,8 +104,8 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
   for (const arrow of current.arrows) {
     const rewind = arrow.releasedTick === current.tick ? 0 : 1 - blend;
-    const x = ox + (arrow.x - arrow.vx * rewind) * sx;
-    const y = oy + (arrow.y - arrow.vy * rewind) * sy;
+    const x = (arrow.x - arrow.vx * rewind) * sx;
+    const y = (arrow.y - arrow.vy * rewind) * sy;
     const length = Math.min(1, Math.max(0, tick - arrow.releasedTick) / 3);
     if (length > 0) drawArrow(ctx, x, y - 7 * scale, Math.atan2(arrow.vy, arrow.vx), scale, arrow.team, length);
   }
@@ -129,10 +118,10 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     ctx.strokeStyle = "#f8f3df";
     ctx.fillStyle = INK;
     for (const unit of current.units) {
-      const left = !deploying && unit.team === "red";
+      const left = !deploying && ARMIES[unit.team].facing > 0;
       const offset = UNIT_DEFINITIONS[unit.kind].radius * scale + 5;
-      const x = ox + unit.x * sx + (left ? -offset : offset);
-      const y = oy + unit.y * sy;
+      const x = unit.x * sx + (left ? -offset : offset);
+      const y = unit.y * sy;
       const label = "#" + unit.id + (deploying ? "" : " · " + unit.hp + " HP");
       ctx.textAlign = left ? "right" : "left";
       ctx.strokeText(label, x, y);
@@ -145,7 +134,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   const radius = UNIT_DEFINITIONS[brush].radius;
   for (const point of preview) {
     const x = boundCenter(point.x, ARENA.width, radius), y = boundCenter(point.y, ARENA.height, radius);
-    drawUnitToken(ctx, ox + x * sx, oy + y * sy, radius * scale, teamAt(point.x), brush);
+    drawUnitToken(ctx, x * sx, y * sy, radius * scale, view.ownTeam ?? "red", brush);
   }
   ctx.restore();
 }

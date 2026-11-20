@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { BRUSH_SPACING, teamAt } from "../src/deployment.ts";
-import { battleOutcome, createBattle, stepBattle, ARENA, type Outcome, type Placement, type Team } from "../src/simulation.ts";
-import { TEAM_LIMIT, type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
+import { BRUSH_SPACING } from "../src/deployment.ts";
+import { Battle, battleOutcome, createBattle, stepBattle, TICKS_PER_SECOND, ARENA, type Outcome, type Placement, type Team } from "../src/simulation.ts";
+import { type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
+
+import { campFor, inCamp, makeBase, COUNTDOWN_TICKS, GOLD_PER_SECOND, MATCHES, STARTING_GOLD, type MatchMode } from "../src/battlefield.ts";
+import { UNIT_DEFINITIONS } from "../src/units.ts";
 
 export function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -14,63 +17,93 @@ interface Player { token: string; receipts: Map<number, Receipt> }
 export class Room {
   round = 1;
   phase: RoomPhase = "deploy";
-  seats: Record<Team, Seat> = {
-    red: { connected: false, reserved: false, ready: false },
-    blue: { connected: false, reserved: false, ready: false },
-  };
+  countdownTicks = 0;
+  readonly mode: MatchMode;
+  readonly sides: readonly Team[];
+  readonly seats: Partial<Record<Team, Seat>> = {};
+  readonly gold: Partial<Record<Team, number>> = {};
   world = createBattle([]);
   outcome: Outcome | null = null;
   private players: Partial<Record<Team, Player>> = {};
   private strokes: Stroke[] = [];
   private nextId = 1;
 
+  constructor(mode: MatchMode = "duel") {
+    this.mode = mode;
+    this.sides = MATCHES[mode].teams;
+    for (const team of this.sides) {
+      this.seats[team] = { connected: false, reserved: false, ready: false };
+      this.gold[team] = STARTING_GOLD;
+    }
+  }
+
+  private startWhenReady() {
+    const roster = this.sides.filter(team => this.players[team]);
+    if (this.phase === "deploy" && roster.length >= MATCHES[this.mode].minimum &&
+        roster.every(team => this.seats[team]!.connected && this.seats[team]!.ready)) {
+      this.countdownTicks = COUNTDOWN_TICKS;
+      this.phase = "countdown";
+    }
+  }
+
   join(resumeToken?: string, remembered: readonly string[] = []): Joined | undefined {
-    const sides = ["red", "blue"] as const;
+    const sides = this.sides;
     // A fresh tab can reclaim a remembered, disconnected seat without displacing a live tab.
     const team = resumeToken !== undefined ? sides.find(side => this.players[side]?.token === resumeToken)
-      : sides.find(side => this.seats[side].reserved && remembered.some(token => this.players[side]?.token === token))
-        ?? sides.find(side => !this.players[side]);
+      : sides.find(side => this.seats[side]!.reserved && remembered.some(token => this.players[side]?.token === token))
+        ?? (this.phase === "deploy" ? sides.find(side => !this.players[side]) : undefined);
     if (!team) return;
+    const isNew = !this.players[team];
     const player = this.players[team] ??= { token: randomUUID(), receipts: new Map() };
-    this.seats[team].connected = true;
-    this.seats[team].reserved = false;
+    this.seats[team]!.connected = true;
+    this.seats[team]!.reserved = false;
+    if (isNew) this.rebuild();
+    this.startWhenReady();
     return { type: "joined", team, resumeToken: player.token };
   }
 
   disconnect(team: Team) {
-    this.seats[team].connected = false;
-    this.seats[team].reserved = true;
+    this.seats[team]!.connected = false;
+    this.seats[team]!.reserved = true;
   }
 
   leave(team: Team) {
     delete this.players[team];
-    this.seats[team].connected = this.seats[team].reserved = false;
-    this.strokes = this.strokes.filter(stroke => stroke.team !== team);
-    if (!this.players.red && !this.players.blue) this.nextId = 1;
+    this.seats[team]!.connected = this.seats[team]!.reserved = false;
+    const occupied = this.sides.some(side => this.players[side]);
+    // Once combat starts, a departing player leaves their base and army on the field.
+    if (occupied && (this.phase === "running" || this.phase === "finished")) return;
+    this.strokes = occupied ? this.strokes.filter(stroke => stroke.team !== team) : [];
+    if (!occupied) this.nextId = 1;
     this.resetRound();
   }
 
   private rebuild() {
-    this.world = createBattle(this.strokes.flatMap(stroke => stroke.units));
+    const placements = this.strokes.flatMap(stroke => stroke.units);
+    for (const team of this.sides) this.gold[team] = STARTING_GOLD;
+    for (const unit of placements) this.gold[unit.team]! -= UNIT_DEFINITIONS[unit.kind ?? "warrior"].cost;
+    this.world = createBattle(placements);
+    this.world.bases = this.sides.filter(team => this.players[team]).map(team => makeBase(this.mode, team));
   }
 
   private resetRound() {
     this.round++;
+    this.countdownTicks = 0;
     this.phase = "deploy";
     this.outcome = null;
-    this.seats.red.ready = this.seats.blue.ready = false;
+    for (const team of this.sides) this.seats[team]!.ready = false;
     for (const player of Object.values(this.players)) player.receipts.clear();
     this.rebuild();
   }
 
   private editProblem(team: Team) {
     if (this.phase !== "deploy") return "Deployment has ended.";
-    if (this.seats[team].ready) return "Your formation is already ready.";
+    if (this.seats[team]!.ready) return "Your formation is already ready.";
   }
 
   place(team: Team, round: number, commandId: number, action: unknown): string | { ack: PlacementAck; fresh: boolean } {
     const player = this.players[team];
-    if (!player || !this.seats[team].connected) return "Your seat is not connected.";
+    if (!player || !this.seats[team]!.connected) return "Your seat is not connected.";
     if (round !== this.round) return "That round has ended.";
     if (!Number.isSafeInteger(commandId) || commandId < 1) return "Invalid placement command ID.";
     if (!record(action) || (action.type !== "place-warriors" && action.type !== "place-archers")) return "Unknown placement command.";
@@ -88,17 +121,23 @@ export class Room {
       return { ack: saved.ack, fresh: false };
     }
 
-    const problem = this.editProblem(team);
-    if (problem) return problem;
-    const ownCount = this.world.units.filter(unit => unit.team === team).length;
-    if (points.length + ownCount > TEAM_LIMIT) return "Each team can place up to " + TEAM_LIMIT + " units.";
+    const live = this.phase === "running";
+    if (live) {
+      if (!this.world.bases?.some(base => base.team === team && base.hp > 0)) return "Your base has fallen.";
+    } else {
+      const problem = this.editProblem(team);
+      if (problem) return problem;
+    }
+    const price = points.length * UNIT_DEFINITIONS[kind].cost;
+    const remaining = this.gold[team]!;
+    if (price > remaining) return "This stroke costs " + price + " gold. You have " + remaining + ".";
     const units: Placement[] = [];
     for (const point of points) {
       if (!record(point) || typeof point.x !== "number" || typeof point.y !== "number" ||
           !Number.isFinite(point.x) || !Number.isFinite(point.y)) return "Use finite arena coordinates.";
       const { x, y } = point;
       if (x < 0 || x > ARENA.width || y < 0 || y > ARENA.height) return "Keep the stroke inside the arena.";
-      if (teamAt(x) !== team) return "Keep the whole stroke on your " + (team === "red" ? "left" : "right") + " half.";
+      if (!inCamp(this.mode, team, x, y)) return "Keep the whole stroke in your " + campFor(this.mode, team).label + ".";
       const last = units.at(-1);
       if (last && Math.hypot(x - last.x, y - last.y) > BRUSH_SPACING + 0.00001) return "A squad must be one continuous stroke.";
       units.push({ x, y, team, kind, id: this.nextId + units.length });
@@ -106,16 +145,23 @@ export class Room {
     const stroke = { team, units };
     const ack: PlacementAck = { type: "placement-ack", round, commandId, unitIds: units.map(unit => unit.id) };
     this.nextId += units.length;
-    this.strokes.push(stroke);
     player.receipts.set(commandId, { ack, stroke });
-    this.rebuild();
+    if (live) {
+      this.gold[team]! -= price;
+      const recruits = createBattle(units).units;
+      this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases);
+    } else {
+      this.strokes.push(stroke);
+      this.rebuild();
+    }
     return { ack, fresh: true };
   }
 
   control(team: Team, action: unknown): string | undefined {
-    if (!this.seats[team].connected) return "Your seat is not connected.";
+    if (!this.seats[team]?.connected) return "Your seat is not connected.";
     if (!record(action)) return "Unknown room command.";
     if (action.type === "new-round" && this.phase === "finished") {
+      this.strokes = [];
       this.resetRound();
       return;
     }
@@ -125,8 +171,8 @@ export class Room {
     switch (action.type) {
       case "ready":
         if (!hasSquad) return "Place a squad before pressing Ready.";
-        this.seats[team].ready = true;
-        if (this.seats.red.ready && this.seats.blue.ready) this.phase = "running";
+        this.seats[team]!.ready = true;
+        this.startWhenReady();
         return;
       case "undo":
       case "clear":
@@ -139,15 +185,33 @@ export class Room {
     }
   }
 
-  advance() {
-    if (this.phase !== "running") return;
-    this.world = stepBattle(this.world);
+  advance(): boolean {
+    if (this.phase === "countdown") {
+      this.countdownTicks--;
+      if (!this.countdownTicks) this.phase = "running";
+      return this.countdownTicks % TICKS_PER_SECOND === 0;
+    }
+    if (this.phase !== "running") return false;
+    const previous = this.world;
+    this.world = stepBattle(previous);
+    let paid = false;
+    for (const [index, unit] of this.world.units.entries()) {
+      if (!unit.killedBy || unit.hp > 0 || previous.units[index].hp <= 0) continue;
+      this.gold[unit.killedBy]! += UNIT_DEFINITIONS[unit.kind].bounty;
+      paid = true;
+    }
+    if (this.world.tick % TICKS_PER_SECOND === 0) {
+      for (const base of this.world.bases!) if (base.hp > 0) this.gold[base.team]! += GOLD_PER_SECOND;
+      paid = true;
+    }
     this.outcome = battleOutcome(this.world);
     if (this.outcome !== null) this.phase = "finished";
+    return paid || this.outcome !== null;
   }
 
   snapshot(revision: number): Snapshot {
-    const seats = { red: { ...this.seats.red }, blue: { ...this.seats.blue } };
-    return { type: "snapshot", round: this.round, revision, phase: this.phase, seats, world: this.world, outcome: this.outcome };
+    const seats: Snapshot["seats"] = {};
+    for (const team of this.sides) seats[team] = { ...this.seats[team]! };
+    return { type: "snapshot", mode: this.mode, countdown: Math.ceil(this.countdownTicks / TICKS_PER_SECOND), round: this.round, revision, phase: this.phase, seats, gold: { ...this.gold }, world: this.world, outcome: this.outcome };
   }
 }
