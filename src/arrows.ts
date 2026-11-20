@@ -3,6 +3,8 @@ import { BASE_RADIUS } from "./battlefield.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Arrow {
+  kind?: "bolt" | "barrel" | "dart"; // Ordinary bow shots carry no tag.
+  returned?: boolean; // A Giant can return a barrel once.
   team: Team;
   x: number;
   y: number;
@@ -16,7 +18,7 @@ export interface Arrow {
 // frame of reference the circle stands still and the tip follows one segment.
 function contactTime(arrow: Arrow, from: Target, to: Target): number | undefined {
   const x = arrow.x - from.x, y = arrow.y - from.y;
-  const radius = from.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[from.kind].radius;
+  const radius = (from.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[from.kind].radius) + (arrow.kind === "barrel" ? 5 : 0);
   const c = x * x + y * y - radius * radius;
   if (c <= 0) return 0;
 
@@ -35,7 +37,7 @@ export function firstArrowImpact(arrow: Arrow, previous: readonly Target[], next
   let first: Target | undefined;
   let earliest = Infinity;
   for (const [index, unit] of previous.entries()) {
-    if (unit.team === arrow.team || unit.hp <= 0) continue;
+    if (unit.team === arrow.team || unit.hp <= 0 || (arrow.kind === "bolt" && unit.kind === "base")) continue;
     const time = contactTime(arrow, unit, next[index]);
     if (time === undefined) continue;
     if (!first || time < earliest || (time === earliest && unit.id < first.id)) {

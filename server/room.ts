@@ -1,17 +1,18 @@
 import { randomUUID } from "node:crypto";
-import { BRUSH_SPACING } from "../src/deployment.ts";
+import { SPELLS, spellKind } from "../src/spells.ts";
+import { BRUSH_SPACING, type ArenaPoint } from "../src/deployment.ts";
 import { Battle, battleOutcome, createBattle, stepBattle, TICKS_PER_SECOND, ARENA, type Outcome, type Placement, type Team } from "../src/simulation.ts";
 import { type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
 
 import { campFor, inCamp, makeBase, COUNTDOWN_TICKS, GOLD_PER_SECOND, MATCHES, STARTING_GOLD, type MatchMode } from "../src/battlefield.ts";
-import { UNIT_DEFINITIONS } from "../src/units.ts";
+import { UNIT_DEFINITIONS, placementKind } from "../src/units.ts";
 
 export function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 interface Stroke { team: Team; units: Placement[] }
-interface Receipt { ack: PlacementAck; stroke: Stroke }
+interface Receipt { ack: PlacementAck; type: string; points: readonly ArenaPoint[] }
 interface Player { token: string; receipts: Map<number, Receipt> }
 
 export class Room {
@@ -106,15 +107,16 @@ export class Room {
     if (!player || !this.seats[team]!.connected) return "Your seat is not connected.";
     if (round !== this.round) return "That round has ended.";
     if (!Number.isSafeInteger(commandId) || commandId < 1) return "Invalid placement command ID.";
-    if (!record(action) || (action.type !== "place-warriors" && action.type !== "place-archers")) return "Unknown placement command.";
-    const kind = action.type === "place-warriors" ? "warrior" : "archer";
+    if (!record(action)) return "Unknown placement command.";
+    const kind = placementKind(action.type);
+    const spell = spellKind(action.type);
+    if (!kind && !spell) return "Unknown placement command.";
     const points = action.positions;
     if (!Array.isArray(points) || !points.length) return "A stroke needs at least one position.";
 
     const saved = player.receipts.get(commandId);
     if (saved) {
-      const { units } = saved.stroke;
-      if (units[0].kind !== kind || units.length !== points.length || !units.every((unit, i) => {
+      if (saved.type !== action.type || saved.points.length !== points.length || !saved.points.every((unit, i) => {
         const point = points[i];
         return record(point) && unit.x === point.x && unit.y === point.y;
       })) return "That placement ID already belongs to a different stroke.";
@@ -128,6 +130,25 @@ export class Room {
       const problem = this.editProblem(team);
       if (problem) return problem;
     }
+    if (spell) {
+      if (!live) return "Spells unlock when battle begins.";
+      if (points.length !== 1) return "Choose one spot for the spell.";
+      const point = points[0];
+      if (!record(point) || typeof point.x !== "number" || typeof point.y !== "number" ||
+          !Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.y < 0 ||
+          point.x > ARENA.width || point.y > ARENA.height) return "Choose a spot inside the arena.";
+      const price = SPELLS[spell].cost;
+      if (price > this.gold[team]!) return "This spell costs " + price + " gold. You have " + this.gold[team] + ".";
+      const { x, y } = point;
+      const id = this.nextId++;
+      const cast = { id, kind: spell, team, x, y, startTick: this.world.tick };
+      const ack: PlacementAck = { type: "placement-ack", round, commandId, unitIds: [], spellId: id };
+      this.gold[team]! -= price;
+      this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, this.world.bases, [...(this.world.spells ?? []), cast]);
+      player.receipts.set(commandId, { ack, type: SPELLS[spell].command, points: [{x, y}] });
+      return { ack, fresh: true };
+    }
+    if (!kind) return "Unknown placement command.";
     const price = points.length * UNIT_DEFINITIONS[kind].cost;
     const remaining = this.gold[team]!;
     if (price > remaining) return "This stroke costs " + price + " gold. You have " + remaining + ".";
@@ -145,11 +166,11 @@ export class Room {
     const stroke = { team, units };
     const ack: PlacementAck = { type: "placement-ack", round, commandId, unitIds: units.map(unit => unit.id) };
     this.nextId += units.length;
-    player.receipts.set(commandId, { ack, stroke });
+    player.receipts.set(commandId, { ack, type: UNIT_DEFINITIONS[kind].command, points: units });
     if (live) {
       this.gold[team]! -= price;
       const recruits = createBattle(units).units;
-      this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases);
+      this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases, this.world.spells);
     } else {
       this.strokes.push(stroke);
       this.rebuild();
@@ -196,7 +217,7 @@ export class Room {
     this.world = stepBattle(previous);
     let paid = false;
     for (const [index, unit] of this.world.units.entries()) {
-      if (!unit.killedBy || unit.hp > 0 || previous.units[index].hp <= 0) continue;
+      if (!unit.killedBy || unit.hp > 0 || (previous.units[index]?.hp ?? 0) <= 0) continue;
       this.gold[unit.killedBy]! += UNIT_DEFINITIONS[unit.kind].bounty;
       paid = true;
     }

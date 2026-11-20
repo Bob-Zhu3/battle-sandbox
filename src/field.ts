@@ -1,6 +1,6 @@
 import { drawLandscape } from "./landscape.ts";
-import { drawUnitToken } from "./characters.ts";
-import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { createRoster } from "./roster.ts";
+import { UNIT_DEFINITIONS, UNIT_KINDS } from "./units.ts";
 import { ARMIES, BASE_HP, TEAMS, MATCHES, type MatchMode, type Team } from "./battlefield.ts";
 import type { World } from "./room-protocol.ts";
 
@@ -21,8 +21,7 @@ export function createField(mode?: MatchMode) {
   const landscape = element<HTMLCanvasElement>("landscape");
   const ctx = contextFor(canvas);
   const ground = contextFor(landscape);
-  const buttons = { warrior: element<HTMLButtonElement>("brush-warrior"), archer: element<HTMLButtonElement>("brush-archer") };
-  let selected: UnitKind = "warrior";
+  const roster = createRoster(element("brush-tool"), !!mode);
   const sides = mode ? MATCHES[mode].teams : TEAMS;
   const score = element("score");
   for (const side of sides) {
@@ -38,28 +37,6 @@ export function createField(mode?: MatchMode) {
       + '<span id="' + side + '-seat" class="seat-label" hidden></span>'
       + '<span class="sr-only"><span id="' + side + '-hp">0</span> of <span id="' + side + '-max">0</span> HP</span>';
     score.append(panel);
-  }
-
-  function colorBrush(team: Team) {
-    for (const kind of ["warrior", "archer"] as const) {
-      const icon = contextFor(element<HTMLCanvasElement>("icon-" + kind));
-      icon.clearRect(0, 0, 72, 72);
-      drawUnitToken(icon, 36, 42, 22, team, kind);
-    }
-  }
-  colorBrush("red");
-  for (const kind of ["warrior", "archer"] as const) {
-    const definition = UNIT_DEFINITIONS[kind];
-    const button = buttons[kind];
-    const cost = element("cost-" + kind);
-    cost.textContent = definition.cost + "g";
-    cost.hidden = !mode;
-    button.title = definition.name + (mode ? " · " + definition.cost + " gold" : "") + " · " + definition.maxHp + " HP · " + definition.damage + " damage · " + definition.reach + " reach · " + definition.cooldownTicks + " ticks between attacks";
-    button.addEventListener("click", () => {
-      buttons[selected].setAttribute("aria-pressed", "false");
-      selected = kind;
-      button.setAttribute("aria-pressed", "true");
-    });
   }
 
   function watchSize(paint: () => void) {
@@ -89,11 +66,13 @@ export function createField(mode?: MatchMode) {
       const living = army.filter(u => u.hp > 0);
       const hp = living.reduce((sum, u) => sum + u.hp, 0);
       const max = army.reduce((sum, u) => sum + UNIT_DEFINITIONS[u.kind].maxHp, 0);
-      const warriors = living.filter(u => u.kind === "warrior").length;
       display.score.hidden = !visible.includes(display.side) || (!mode && !living.length);
       display.count.textContent = String(living.length);
       display.hp.textContent = String(hp); display.max.textContent = String(max);
-      display.score.title = living.length + " of " + army.length + " alive · Warriors " + warriors + " · Archers " + (living.length - warriors) + " · " + hp + "/" + max + " HP";
+      const counts = new Map<string, number>();
+      for (const unit of living) counts.set(unit.kind, (counts.get(unit.kind) ?? 0) + 1);
+      const roster = UNIT_KINDS.filter(kind => counts.has(kind)).map(kind => UNIT_DEFINITIONS[kind].name + " " + counts.get(kind));
+      display.score.title = [living.length + " of " + army.length + " alive", ...roster, hp + "/" + max + " HP"].join(" · ");
       const base = world.bases?.find(base => base.team === display.side);
       if (base) { display.score.dataset.baseHp = String(base.hp); display.score.title += " · Base " + base.hp + "/" + BASE_HP + " HP"; }
       display.bar.style.transform = "scaleX(" + (base ? base.hp / BASE_HP : max ? hp / max : 0) + ")";
@@ -103,8 +82,8 @@ export function createField(mode?: MatchMode) {
   const balance = element("gold-balance");
   function setGold(amount: number | undefined) {
     balance.textContent = amount === undefined ? (mode ? "…" : "∞") : String(amount);
-    for (const kind of ["warrior", "archer"] as const) buttons[kind].disabled = amount !== undefined && amount < UNIT_DEFINITIONS[kind].cost;
+    roster.setBudget(amount);
   }
   setGold(undefined);
-  return { canvas, ctx, selectedKind: () => selected, colorBrush, watchSize, updateScore, setGold };
+  return { canvas, ctx, ...roster, watchSize, updateScore, setGold };
 }

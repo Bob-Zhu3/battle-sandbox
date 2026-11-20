@@ -59,7 +59,7 @@ export function characterPose(unit: Unit, target: Target | undefined, tick: numb
     pose.guard = near;
     pose.strike = (1 - smooth((attackAge - 2) / 10));
     pose.duck = smooth((attentionAge + 1) / 4) * (1 - smooth((attentionAge - 8) / 11));
-  } else {
+  } else if (kind === "archer" || kind === "cooper" || kind === "drone") {
     pose.loose = 1 - smooth((attackAge - 2) / 10);
     pose.peek = smooth((attentionAge - 2) / 7) * (1 - smooth((attentionAge - 18) / 11));
   }

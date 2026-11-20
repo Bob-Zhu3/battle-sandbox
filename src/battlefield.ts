@@ -42,10 +42,17 @@ export const GOLD_PER_SECOND = 4;
 export const BASE_HP = 160;
 export const BASE_RADIUS = 22;
 
-export interface Base { kind: "base"; id: number; team: Team; x: number; y: number; hp: number; lastHitTick: number | null }
+export const TOWER = { range: 160, sightTicks: 18, cooldownTicks: 72, damage: 6, boltSpeed: 300 } as const;
+
+export interface Base {
+  kind: "base"; id: number; team: Team; x: number; y: number; hp: number;
+  lastHitTick: number | null; targetId: number | null; acquiredTick: number | null;
+  lastShotTick: number | null; aimX: number; aimY: number;
+}
 export function makeBase(mode: MatchMode, team: Team): Base {
   const camp = campFor(mode, team);
   return { kind: "base", id: -1 - TEAMS.indexOf(team), team,
     x: ARMIES[team].facing > 0 ? 104 : ARENA.width - 104,
-    y: camp.y + camp.height / 2, hp: BASE_HP, lastHitTick: null };
+    y: camp.y + camp.height / 2, hp: BASE_HP, lastHitTick: null, targetId: null, acquiredTick: null,
+    lastShotTick: null, aimX: ARMIES[team].facing, aimY: 0 };
 }

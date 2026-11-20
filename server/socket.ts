@@ -4,6 +4,8 @@ import type { Duplex } from "node:stream";
 import { WebSocketServer, WebSocket } from "ws";
 import { CLOSE, SNAPSHOT_EVERY, type ServerMessage } from "../src/room-protocol.ts";
 import { TICKS_PER_SECOND, type Team } from "../src/simulation.ts";
+import { spellKind } from "../src/spells.ts";
+import { placementKind } from "../src/units.ts";
 import { Room, record } from "./room.ts";
 
 import { MATCHES, type MatchMode } from "../src/battlefield.ts";
@@ -99,7 +101,7 @@ function attachMatch(server: Server, mode: MatchMode, rejoinGraceMs: number) {
       }
       if (!players.has(socket)) return;
       const { action, commandId, round, seq } = message;
-      if (record(action) && (action.type === "place-warriors" || action.type === "place-archers")) {
+      if (record(action) && (placementKind(action.type) || spellKind(action.type))) {
         if (typeof round !== "number" || typeof commandId !== "number") return error("A placement needs its round and command ID.");
         const result = room.place(team, round, commandId, action);
         if (typeof result === "string") return send({ type: "error", message: result, round, commandId });

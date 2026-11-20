@@ -1,10 +1,12 @@
 import { ARENA, createBattle, type Placement, type Team } from "./simulation.ts";
 
+import { placementKind, type PlacementType } from "./units.ts";
+
 export const BRUSH_SPACING = 24;
 export type ArenaPoint = Pick<Placement, "x" | "y">;
 
 export interface PlacementCommand {
-  type: "place-warriors" | "place-archers";
+  type: PlacementType;
   positions: readonly ArenaPoint[];
 }
 
@@ -55,7 +57,7 @@ export class PlacementStroke {
 export function battleFromDeployment(commands: readonly PlacementCommand[]) {
   const placements: Placement[] = [];
   for (const command of commands) {
-    const kind = command.type === "place-archers" ? "archer" : "warrior";
+    const kind = placementKind(command.type);
     for (const point of command.positions) {
       placements.push({ id: placements.length + 1, kind, team: teamAt(point.x), ...point });
     }

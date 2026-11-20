@@ -1,5 +1,6 @@
 import { PlacementStroke, pointerToArena, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
-import type { UnitKind } from "./units.ts";
+import type { SpellKind } from "./spells.ts";
+import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
 interface BrushCallbacks {
   canDraw(): boolean;
@@ -8,6 +9,14 @@ interface BrushCallbacks {
   commit?(command: PlacementCommand): void;
   livePlace?(points: readonly ArenaPoint[], kind: UnitKind, first: boolean): void;
   useLive?(): boolean;
+}
+
+export function attachSpellBrush(canvas: HTMLCanvasElement, selected: () => SpellKind | undefined, cast: (spell: SpellKind, point: ArenaPoint) => void) {
+  canvas.addEventListener("pointerdown", event => {
+    const spell = selected();
+    if (!spell || !event.isPrimary || event.button !== 0) return;
+    cast(spell, pointerToArena(event.clientX, event.clientY, canvas.getBoundingClientRect()));
+  });
 }
 
 export function attachDeploymentBrush(canvas: HTMLCanvasElement, callbacks: BrushCallbacks) {
@@ -52,7 +61,7 @@ export function attachDeploymentBrush(canvas: HTMLCanvasElement, callbacks: Brus
       const live = active.live;
       if (live) deliver();
       cancel();
-      if (!live) callbacks.commit?.({ type: kind === "archer" ? "place-archers" : "place-warriors", positions: stroke.positions });
+      if (!live) callbacks.commit?.({ type: UNIT_DEFINITIONS[kind].command, positions: stroke.positions });
     } else {
       deliver();
     }

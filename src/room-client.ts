@@ -1,11 +1,12 @@
-import { attachDeploymentBrush } from "./brush-input.ts";
+import { attachDeploymentBrush, attachSpellBrush } from "./brush-input.ts";
 import { ARMIES, BASE_HP, GOLD_PER_SECOND, MATCHES, campFor, inCamp, type MatchMode, type Team } from "./battlefield.ts";
 import type { ArenaPoint } from "./deployment.ts";
 import { createField, element } from "./field.ts";
 import { drawArena } from "./renderer.ts";
+import { SPELLS } from "./spells.ts";
 import { connectRoom, type ConnectionState } from "./room-connection.ts";
 import type { RoomAction, Snapshot, World } from "./room-protocol.ts";
-import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { UNIT_DEFINITIONS, placementKind, type UnitKind } from "./units.ts";
 
 const mode: MatchMode = location.pathname.replace(/\/$/, "") === "/ffa" ? "ffa" : "duel";
 const match = MATCHES[mode];
@@ -56,7 +57,9 @@ function updateInterface() {
   const camp = team ? campFor(mode, team).label : "";
   const roster = match.teams.filter(side => snap?.seats[side]?.connected || snap?.seats[side]?.reserved);
   field.canvas.dataset.deploying = String(edit);
-  field.canvas.setAttribute("aria-label", edit ? name + " army. Draw squads in the " + camp + "." : "Shared battlefield.");
+  const spell = live && edit ? field.selectedSpell() : undefined;
+  const castingHint = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : "";
+  field.canvas.setAttribute("aria-label", castingHint || (edit ? name + " army. Draw squads in the " + camp + "." : "Shared battlefield."));
   scenario.textContent = team ? name + " · " + match.name : match.name;
   for (const color of match.teams) {
     const seat = snap?.seats[color], tag = element(color + "-seat");
@@ -69,6 +72,8 @@ function updateInterface() {
   const rate = element("gold-rate");
   rate.hidden = !live || !edit;
   rate.textContent = bounty && snap && snap.world.tick - bounty.tick < 75 ? "+" + bounty.amount + " bounty" : "+" + GOLD_PER_SECOND + "/s";
+  field.setCasting(!!live && edit);
+  if (!edit) field.closeRoster();
   element("brush-tool").hidden = !edit;
   undo.hidden = clear.hidden = !edit || !deploy;
   undo.disabled = clear.disabled = !ownCount;
@@ -90,7 +95,7 @@ function updateInterface() {
     else if (ready) status = "Formation locked. Waiting for everyone to be ready.";
     else if (ownCount) status = "Press Ready when your army is set.";
   }
-  if (live && !reconnecting) status = edit ? "Recruit in your " + camp + ". Take down the enemy " + (mode === "duel" ? "base." : "bases.") : "Your base fell. The remaining armies are still fighting.";
+  if (live && !reconnecting) status = !edit ? "Your base fell. The remaining armies are still fighting." : castingHint || "Recruit in your " + camp + ". Take down the enemy " + (mode === "duel" ? "base." : "bases.");
   hint.textContent = closed ? "" : reconnecting ? "Reconnecting to your seat…" : notice || status;
   hint.hidden = !hint.textContent;
   result.hidden = closed || snap?.phase !== "finished";
@@ -100,9 +105,14 @@ function updateInterface() {
   }
 }
 
+game.addEventListener("brushchange", () => { notice = ""; updateInterface(); });
+
 function send(action: RoomAction) { notice = ""; connection.send(action); }
+attachSpellBrush(field.canvas, field.selectedSpell, (spell, point) => {
+  if (canDraw() && latest?.phase === "running") send({type: SPELLS[spell].command, positions: [point]});
+});
 const cancelStroke = attachDeploymentBrush(field.canvas, {
-  canDraw, selectedKind: field.selectedKind, useLive: () => latest?.phase === "running",
+  canDraw: () => canDraw() && !field.selectedSpell(), selectedKind: field.selectedKind, useLive: () => latest?.phase === "running",
   livePlace(points, kind) {
     if (!team || !latest) return;
     const cost = UNIT_DEFINITIONS[kind].cost;
@@ -110,7 +120,7 @@ const cancelStroke = attachDeploymentBrush(field.canvas, {
     for (const point of points) {
       const issue = problem([point], kind);
       if (issue || remaining < cost) { notice = issue || "Waiting for more gold."; updateInterface(); break; }
-      send({ type: kind === "warrior" ? "place-warriors" : "place-archers", positions: [point] });
+      send({ type: UNIT_DEFINITIONS[kind].command, positions: [point] });
       remaining -= cost;
     }
   },
@@ -122,7 +132,7 @@ const cancelStroke = attachDeploymentBrush(field.canvas, {
     updateInterface(); paint();
   },
   commit(command) {
-    const issue = problem(command.positions, command.type === "place-archers" ? "archer" : "warrior");
+    const issue = problem(command.positions, placementKind(command.type));
     if (issue) { notice = issue; updateInterface(); }
     else send(command);
   },

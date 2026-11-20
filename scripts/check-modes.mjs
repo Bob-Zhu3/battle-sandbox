@@ -33,6 +33,12 @@ async function open(url, width = 1000, height = 600) {
   }
   return { page, frames, joins, point, waitForUnits };
 }
+async function selectFromRoster(page, shelf, name) {
+  await page.getByRole("button",{name:"Roster",exact:true}).click();
+  const panel=page.getByRole("region",{name:"Troops and spells"});
+  await panel.getByRole("button",{name:shelf,exact:true}).click();
+  await panel.getByRole("button",{name,exact:true}).click();
+}
 async function picture(page, name) {
   if (values.output) await page.screenshot({ path: join(values.output, name + ".png") });
 }
@@ -71,6 +77,94 @@ async function playground(url) {
   assert.deepEqual(await page.locator(".demo-options a").evaluateAll(links=>links.map(a=>a.getAttribute("href"))),["/","/room","/ffa"]);
   await page.context().close();
   console.log("Playground: idle animation, same-side enemies, live pointer-down fighting, unlimited purchases, grouped undo and continued play.");
+}
+
+async function browseRoster(url) {
+  const {page,point}=await open(url);
+  try {
+    const catalog={
+      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Barrel Roller","Engineer"],
+      Machines:["Clockmouse","Bolt Drone","Mouse Workshop","Watchpost"],
+      Myths:["Giant","Storm Kirin","Phoenix"],
+      Spells:["Gust","Meteor","Healing Rain"],
+    };
+    const portraits=new Set();
+    let placed=0;
+    for(const [shelf,names] of Object.entries(catalog)) {
+      for(const [i,name] of names.entries()) {
+        await page.getByRole("button",{name:"Roster",exact:true}).click();
+        const panel=page.getByRole("region",{name:"Troops and spells"});
+        await panel.getByRole("button",{name:shelf,exact:true}).click();
+        const card=panel.getByRole("button",{name,exact:true});
+        assert.equal(await card.isEnabled(),true);
+        portraits.add(await card.locator("canvas").evaluate(c=>c.toDataURL()));
+        if(i===0 && shelf==="Myths") await picture(page,"roster-myths");
+        await card.click();
+        if(shelf==="Spells") {
+          assert.equal(await page.locator("#deploy-hint").textContent(),"Tap anywhere to cast "+name+".");
+          await page.mouse.click(...point(840,170));
+        } else {
+          await page.mouse.click(...point(155+(placed%7)*98,130+Math.floor(placed/7)*86));
+          await page.waitForFunction(n=>Number(document.querySelector("#red-count").textContent)===n,++placed);
+        }
+      }
+    }
+    assert.equal(portraits.size,17);assert.equal(placed,14);
+    await selectFromRoster(page,"Machines","Mouse Workshop");
+    for(const width of [375,601,790,1024]) {
+      await page.setViewportSize({width,height:650});
+      const outside=await page.locator(".tool-strip button:visible").evaluateAll(buttons=>buttons.filter(button=>{
+        const r=button.getBoundingClientRect();
+        return r.left<0 || r.right>innerWidth || r.bottom>innerHeight;
+      }).map(button=>button.textContent));
+      assert.deepEqual(outside,[],"Controls outside the field at "+width+"px");
+    }
+    assert.equal(await page.locator("#gold-balance").textContent(),"∞");
+    console.log("Roster: every entry has a distinct portrait, all 14 pieces place, and all three spells cast in the playground.");
+  } finally {await page.context().close();}
+}
+
+async function magicDuel(url) {
+  const red=await open(url+"/room",1000,600), blue=await open(url+"/room",390,700);
+  try {
+    for (const [player,side] of [[red,"red"],[blue,"blue"]])
+      await player.page.waitForFunction(team=>document.querySelector(".game").dataset.team===team,side);
+    await selectFromRoster(red.page,"People","Shieldbearer");
+    await red.page.mouse.click(...red.point(320,170));await red.waitForUnits(1);
+    await selectFromRoster(blue.page,"Myths","Giant");
+    await blue.page.mouse.click(...blue.point(675,170));await blue.waitForUnits(2);
+    await blue.page.getByRole("button",{name:"Roster",exact:true}).click();
+    const panel=blue.page.getByRole("region",{name:"Troops and spells"});
+    await panel.getByRole("button",{name:"Spells",exact:true}).click();
+    assert.equal(await panel.getByRole("button",{name:"Meteor",exact:true}).isEnabled(),false);
+    const fits=await panel.boundingBox(),viewport=blue.page.viewportSize();
+    assert.ok(fits.x>=0 && fits.x+fits.width<=viewport.width+1 && fits.y>=0);
+    await picture(blue.page,"roster-spells-phone");
+    await panel.getByRole("button",{name:"Close roster",exact:true}).click();
+    await Promise.all([red,blue].map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
+    await red.page.getByText("Live",{exact:true}).waitFor();
+    await selectFromRoster(red.page,"Spells","Meteor");
+    const before=red.frames.at(-1);
+    await red.page.mouse.move(...red.point(856,180));await red.page.mouse.down();
+    await red.page.mouse.move(...red.point(880,210));await red.page.mouse.up();
+    await blue.page.waitForFunction(()=>document.querySelector("#blue-score").dataset.baseHp==="154");
+    const proof=red.frames.find(f=>f.world.spells?.some(s=>s.kind==="meteor"));
+    assert.ok(proof);const effect=proof.world.spells[0];
+    assert.equal(effect.team,"red");
+    assert.ok(Math.abs(effect.x-856)<0.001 && Math.abs(effect.y-180)<0.001);
+    assert.equal(proof.gold.red,before.gold.red-20+4*(Math.floor(proof.world.tick/60)-Math.floor(before.world.tick/60)));
+    assert.equal(new Set(red.frames.flatMap(f=>(f.world.spells??[]).map(s=>s.id))).size,1);
+    await blue.page.reload({waitUntil:"domcontentloaded"});
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" &&
+      document.querySelector("#blue-score").dataset.baseHp==="154");
+    assert.equal(blue.joins[1].resumeToken,blue.joins[0].resumeToken);
+    const frame=blue.frames.at(-1);
+    const until=Date.now()+3000;
+    while(!red.frames.some(f=>f.revision===frame.revision) && Date.now()<until) await delay(10);
+    assert.deepEqual(red.frames.find(f=>f.revision===frame.revision)?.world,frame.world);
+    assert.deepEqual(frame.world.units.map(u=>u.kind),["shieldbearer","giant"]);
+    console.log("Two-client roster and magic: a 390px client bought a Giant, saw a cross-field Meteor hit its base, and rejoined the same world.");
+  } finally {await Promise.all([red,blue].map(p=>p.page.context().close()));}
 }
 
 const formations = [
@@ -156,6 +250,8 @@ async function match(url,size) {
 
 try {
   await withField(playground);
+  await withField(browseRoster);
+  await withField(magicDuel);
   await withField(url=>match(url,3));
   await withField(url=>match(url,4));
   assert.deepEqual(errors,[]);

@@ -1,8 +1,10 @@
-import { attachDeploymentBrush } from "./brush-input.ts";
+import { attachDeploymentBrush, attachSpellBrush } from "./brush-input.ts";
 import { ARMIES, TEAMS, type Team } from "./battlefield.ts";
 import { createField, element } from "./field.ts";
 import { Playground } from "./playground.ts";
 import { drawArena } from "./renderer.ts";
+import { UNIT_DEFINITIONS } from "./units.ts";
+import { SPELLS } from "./spells.ts";
 import { TICKS_PER_SECOND } from "./simulation.ts";
 
 const field = createField();
@@ -44,20 +46,30 @@ for (const color of TEAMS) {
 }
 choose(team);
 
+game.addEventListener("brushchange", () => {
+  const spell = field.selectedSpell(), hint = element("deploy-hint");
+  hint.textContent = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : "";
+  hint.hidden = !spell;
+  field.canvas.setAttribute("aria-label", spell ? hint.textContent : "Playground. Choose a color and draw troops anywhere.");
+});
+
 function paint(blend = 1) {
   drawArena(field.ctx, previous, play.world, blend);
 }
 function update() {
-  guide.hidden = !!(play.world.units.length || play.world.arrows.length);
+  guide.hidden = !!(play.world.units.length || play.world.arrows.length || play.world.spells?.length);
   undo.disabled = !play.canUndo;
   clear.disabled = !play.canUndo && !play.world.units.length && !play.world.arrows.length;
   field.updateScore(play.world);
 }
+attachSpellBrush(field.canvas, field.selectedSpell, (spell, point) => {
+  play.cast(team, spell, point.x, point.y); previous = play.world; update(); paint();
+});
 const cancel = attachDeploymentBrush(field.canvas, {
-  canDraw: () => true,
+  canDraw: () => !field.selectedSpell(),
   selectedKind() { strokeTeam = team; return field.selectedKind(); },
   livePlace(points, kind, first) {
-    play.place(strokeTeam, { type: kind === "archer" ? "place-archers" : "place-warriors", positions: points }, !first);
+    play.place(strokeTeam, { type: UNIT_DEFINITIONS[kind].command, positions: points }, !first);
     previous = play.world;
     update(); paint();
   },
@@ -74,11 +86,12 @@ function frame(time: number) {
   lastTime = time;
   const before = play.world.tick;
   const beforeCount = play.world.units.length;
+  const beforeSpells = play.world.spells?.length ?? 0;
   while (remainder >= tickMs) {
     remainder -= tickMs; previous = play.world; play.advance();
   }
-  if (beforeCount !== play.world.units.length || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
-  if (play.world.units.length || play.world.arrows.length || beforeCount) paint(remainder / tickMs);
+  if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
+  if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
   requestAnimationFrame(frame);
 }
 update();

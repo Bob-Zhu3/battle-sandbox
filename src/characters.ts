@@ -1,13 +1,12 @@
 import { restingPose, type CharacterPose } from "./character-pose.ts";
-import type { Team } from "./simulation.ts";
+import type { Team, Unit } from "./simulation.ts";
 import type { UnitKind } from "./units.ts";
 import { ARMIES } from "./battlefield.ts";
 
+import { drawSpecialist, fallenSpecialist } from "./roster-art.ts";
+import { INK, FACE, IRON, WOOD, shape, line, oval, type Pens, type Dye } from "./ink.ts";
+export { INK } from "./ink.ts";
 export const palette = ARMIES;
-export const INK = "#26332f";
-const FACE = "#fff0ca", IRON = "#d0d5bd", WOOD = "#e6ac57";
-type Pens = CanvasRenderingContext2D;
-type Dye = typeof palette[Team];
 
 // All cut shapes are drawn in the same small profile, facing right, with the
 // center of the footprint at (0,0). The two characters have different skeletons.
@@ -28,19 +27,6 @@ const shapes = {
   bow: new Path2D("M-3 -11 C-3 -8 3 -7 3 0 C3 7 -3 8 -3 11"),
   scarf: new Path2D("M-4 -1 L-4 2 Q-9 5 -13 2 Q-8 2 -7 -1Z"),
 };
-function shape(c: Pens, path: Path2D, fill: string, width = 1.35) {
-  c.fillStyle = fill; c.fill(path);
-  if (width) { c.strokeStyle = INK; c.lineWidth = width; c.stroke(path); }
-}
-function oval(c: Pens, x: number, y: number, rx: number, ry: number, fill: string) {
-  c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 2 * Math.PI);
-  c.fillStyle = fill; c.fill();
-}
-function line(c: Pens, x1: number, y1: number, x2: number, y2: number, color: string, width: number) {
-  c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2);
-  c.strokeStyle = color; c.lineWidth = width; c.stroke();
-}
-
 function feet(c: Pens, p: CharacterPose, compact: boolean) {
   const stride = p.step * (compact ? 3.3 : 4.6);
   const spread = compact ? 3.6 : 2.8;
@@ -148,7 +134,7 @@ function archer(c: Pens, dye: Dye, p: CharacterPose) {
   c.restore();
 }
 
-export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(ARMIES[team].facing)) {
+export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(ARMIES[team].facing), unit?: Unit, tick = 0) {
   c.save();
   c.translate(x, y);
   c.scale(radius / 11, radius / 11);
@@ -156,7 +142,8 @@ export function drawUnitToken(c: Pens, x: number, y: number, radius: number, tea
   c.scale(pose.side, 1);
   c.lineCap = "round"; c.lineJoin = "round";
   if (kind === "warrior") warrior(c, palette[team], pose);
-  else archer(c, palette[team], pose);
+  else if (kind === "archer") archer(c, palette[team], pose);
+  else drawSpecialist(c, palette[team], kind, pose, unit, tick);
   c.restore();
 }
 
@@ -175,9 +162,9 @@ export function drawFallen(c: Pens, x: number, y: number, radius: number, team: 
   if (kind === "warrior") {
     shape(c, shapes.helmet, IRON);
     shape(c, shapes.brim, palette[team].coat);
-  } else {
+  } else if (kind === "archer") {
     shape(c, shapes.hood, palette[team].coat);
     shape(c, shapes.feather, WOOD, 1);
-  }
+  } else fallenSpecialist(c, palette[team], kind);
   c.restore();
 }

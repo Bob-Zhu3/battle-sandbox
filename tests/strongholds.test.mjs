@@ -124,7 +124,7 @@ test("an Archer can shoot a base from its edge range and a new defender can inte
       assert.equal(room.world.arrows.length, 1);
     }
     advance(room, 24);
-    assert.equal(room.world.arrows.length, 0);
+    assert.deepEqual(room.world.arrows.map(shot => [shot.team, shot.kind]), [["blue", "bolt"]]);
     assert.equal(room.world.bases[1].hp, defend ? BASE_HP : BASE_HP - 8);
     if (defend) assert.equal(room.world.units[1].hp, 22);
     assert.equal(room.gold.red, 120);

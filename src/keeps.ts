@@ -20,6 +20,16 @@ export function drawKeep(c: CanvasRenderingContext2D, base: Base, x: number, y: 
     c.beginPath(); c.moveTo(9,-22); c.lineTo(9,-38); c.stroke();
     c.beginPath(); c.moveTo(9,-37); c.lineTo(23,-34); c.lineTo(18,-30); c.lineTo(9,-31); c.closePath();
     c.fillStyle=paint.coat; c.fill(); c.stroke();
+    const watching=base.targetId != null;
+    const recoil=Math.max(0,1-(tick-(base.lastShotTick??-1000))/9);
+    c.save(); c.translate(0,-18); c.scale(base.aimX<0?-1:1,1);
+    c.fillStyle="#fff0ca"; c.beginPath(); c.arc(0,watching?-6:-3,3.2,0,Math.PI*2);c.fill();c.stroke();
+    c.fillStyle=paint.coat;c.fillRect(-4,watching?-10:-7,7,3);
+    c.rotate(Math.atan2(base.aimY,Math.abs(base.aimX))*.65);
+    c.translate(-recoil*3,0);c.strokeStyle="#344139";c.lineCap="round";c.lineWidth=3.8;
+    c.beginPath();c.moveTo(-3,-1);c.lineTo(watching?11:7,-1);c.stroke();
+    c.strokeStyle="#d7ab64";c.lineWidth=2;c.beginPath();c.moveTo(5,-5);c.quadraticCurveTo(10,-1,5,3);c.stroke();
+    c.restore();
     if (base.hp < BASE_HP/2) {
       c.beginPath(); c.moveTo(15,-11); c.lineTo(10,-6); c.lineTo(12,-2); c.lineTo(8,3); c.lineWidth=1.1; c.stroke();
     }
