@@ -2,7 +2,8 @@ import { FACE, INK, IRON, WOOD, cut, limb, line, oval, type Dye, type Pens } fro
 import { eventFade, type CharacterPose } from "./character-pose.ts";
 import type { Unit } from "./simulation.ts";
 import { clownArt, minerArt, oldHeadgear, pigArt, reaperArt, witchArt } from "./oddities-art.ts";
-import { cyclops, frostQueen, kirin, phoenix } from "./mythical-art.ts";
+import { cyclops, frostQueen, kirin } from "./mythical-art.ts";
+import { phoenix } from "./phoenix-art.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
 const linen = "#fff5d9", leather = "#865836", brass = "#e3ad59";

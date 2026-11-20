@@ -47,6 +47,31 @@ async function selectFromRoster(page, shelf, name) {
 async function picture(page, name) {
   if (values.output) await page.screenshot({ path: join(values.output, name + ".png") });
 }
+
+async function phoenixDuringDeployment(url) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+  const download = Promise.withResolvers();
+  page.on("pageerror", error => errors.push(error.message));
+  await page.route("**/phoenix*.webp", async route => { await download.promise; await route.continue(); });
+  try {
+    await page.goto(url + "/room", {waitUntil:"domcontentloaded"});
+    await page.waitForFunction(() => document.querySelector(".game").dataset.team === "red");
+    await selectFromRoster(page,"Mythical","Phoenix");
+    const field = page.locator("#arena"), rect = await field.boundingBox();
+    await page.mouse.click(rect.x + rect.width*.34, rect.y + rect.height*.52);
+    await page.waitForFunction(() => document.querySelector("#red-count").textContent === "1");
+    await page.getByRole("button",{name:"Roster",exact:true}).click();
+    const card = page.getByRole("region",{name:"Troops and spells"}).getByRole("button",{name:"Phoenix",exact:true}).locator("canvas");
+    const before = await Promise.all([field,card].map(canvas => canvas.evaluate(c => c.toDataURL())));
+    download.resolve();
+    await page.waitForFunction(([arena,icon]) =>
+      document.querySelector("#arena").toDataURL() !== arena &&
+      document.querySelector('.roster-panel button[aria-label="Phoenix"] canvas').toDataURL() !== icon, before);
+    assert.equal(Number(await page.locator("#tick").textContent()),0);
+    console.log("Phoenix: the phone roster and the deployed bird acquire their painted feathers while the room stays on tick zero.");
+  } finally { download.resolve(); await page.context().close(); }
+}
+
 async function withField(check) {
   const {http,closeRoom} = createGameServer();
   http.listen(0,"127.0.0.1"); await once(http,"listening");
@@ -364,6 +389,7 @@ async function match(url,size) {
 }
 
 try {
+  await withField(phoenixDuringDeployment);
   await withField(arrowFlash);
   await withField(playground);
   await withField(browseRoster);

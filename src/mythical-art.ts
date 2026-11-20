@@ -1,8 +1,7 @@
 import { ARMIES } from "./battlefield.ts";
-import { eventFade, phoenixFlight, type CharacterPose } from "./character-pose.ts";
+import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { INK, cut, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import type { Unit } from "./simulation.ts";
-import { UNIT_DEFINITIONS } from "./units.ts";
 
 export function cyclops(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const lift = u?.windup?.kind === "smash" ? Math.min(1, (tick-u.windup.since+1)/18) : 0;
@@ -93,69 +92,6 @@ export function frostQueen(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefine
   c.save(); c.translate(6+3*cast,-2-2*p.ready); c.rotate(-.12-.62*p.ready+1.03*cast+.055*sway);
   limb(c,0,0,6,-2,"#e7eef7",2.4); limb(c,6,6,8,-15,"#6684a9",1.55);
   cut(c,"M8 -22 L11 -16 L8 -12 L5 -16Z","#98e2f2",1); line(c,8,-20,8,-15,"#fffdf0",1);
-  c.restore();
-}
-
-function fireWing(c: Pens, root: number, wrist: number, far: boolean, d: Dye) {
-  c.save();
-  c.translate(far ? -.3 : -2, -2);
-  if (far) c.scale(.82, .83);
-  c.rotate(root);
-  // The primaries hinge at the wrist. Their tips are still going up as
-  // the leading edge starts down, and fold back against the bird in a dive.
-  c.save(); c.translate(-10, -3); c.rotate(wrist);
-  cut(c,"M3 -2 Q-4 -5 -17 -8 Q-15 -4 -10 -2 L-19 -4 Q-16 1 -10 2 L-16 2 Q-13 6 -6 5 L-10 7 Q-3 8 3 3Z",far ? "#aa5148" : "#ea7740",1.25);
-  cut(c,"M-15 -6 L-4 -3 L0 0 L-8 -2Z M-16 -2 L-6 1 L-2 3 L-10 1Z",far ? "#dc9862" : "#ffe099",0);
-  c.restore();
-  cut(c,"M4 2 Q2 -5 -9 -7 Q-14 -7 -15 -5 Q-12 -3 -9 -3 L-12 -2 L-7 1 L-10 2 Q-4 6 2 5Z",far ? "#bc7456" : d.coat,1.35);
-  cut(c,"M0 -2 Q-6 -6 -11 -5 L-6 -2 L-8 -2 L-4 1 L-1 2Z",far ? "#edb36a" : d.light,.65);
-  c.restore();
-}
-
-function fireTalons(c: Pens, x: number, y: number, reach: number, far: boolean) {
-  const heelX = x - 3 + reach * 8, heelY = y + 2 + reach * 3;
-  const toeX = heelX + 2 + reach * 3, toeY = heelY + 2;
-  const gold = far ? "#bd874e" : "#f7c56b";
-  limb(c,x,y,heelX,heelY,gold,1.35); line(c,heelX,heelY,toeX,toeY,gold,1.8);
-  line(c,toeX,toeY,toeX+2,toeY-1.5,INK,1.05); line(c,toeX-2,toeY,toeX-.8,toeY+1.8,INK,1.05);
-}
-
-export function phoenix(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
-  const time=tick+(u?.id ?? 0)*11;
-  if (u?.emberUntil !== undefined) {
-    const glow=.5+.5*Math.sin(time*.2), near=1-Math.min(1,(u.emberUntil-tick)/UNIT_DEFINITIONS.phoenix.hatchTicks);
-    oval(c,0,5,11,3,"#865a49"); line(c,-8,5,6,7,"#4f4441",2); line(c,-5,7,8,3,"#5b423c",2);
-    // Near hatching, each tremor rocks the shell further about its base.
-    c.translate(0,3); c.rotate(Math.sin(time*.42)*near*near*.24); c.translate(0,-3-near*1.6);
-    cut(c,"M-7 2 Q-9 -3 -5 -8 Q-4 -12 0 -15 Q6 -11 8 -5 Q10 2 5 5 Q-4 8 -7 2Z","#8c4545",1.5);
-    cut(c,"M-5 2 L0 -2 L-2 -6 L3 -11 L1 -5 L4 -2 L-3 4Z","#ffd26a",.5);
-    oval(c,4,-5,1,1,"#ffeaa3");
-    for(let i=0;i<3;i++){const phase=(time*.035+i/3)%1; oval(c,-6+i*5+Math.sin(time*.09+i),-7-phase*11,1.2,1.4,"#ffb64e");}
-    c.strokeStyle="#ffeab1"; c.lineWidth=1; c.globalAlpha=.5+glow*.4; c.beginPath(); c.arc(0,0,10,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,near)); c.stroke();
-    return;
-  }
-  const f = phoenixFlight(u,p,tick);
-  c.translate(3.4*f.talons,-f.height); c.rotate(f.pitch);
-  fireWing(c,.83+f.wing*.58,.18+f.wrist*.65,true,d);
-  c.save(); c.translate(-4,1); c.rotate(.13*f.tail - .23*f.pullUp + .12*f.talons);
-  cut(c,"M3 -1 Q-5 -5 -15 0 Q-22 5 -28 1 Q-26 8 -17 6 L-21 9 Q-14 10 -7 5 L-10 9 Q-1 8 4 2Z","#d76142",1.25);
-  c.save(); c.translate(-4,2); c.rotate(.24*f.tail+.12*f.pullUp);
-  cut(c,"M4 -1 Q-3 -3 -11 3 Q-15 8 -20 8 Q-16 12 -10 8 L-13 12 Q-6 11 -2 5 L-3 8 Q2 5 4 1Z","#ffad52",.95);
-  cut(c,"M0 2 Q-7 3 -15 9 Q-9 8 -5 5Z","#ffdc85",0); c.restore(); c.restore();
-  fireTalons(c,1,2,f.talons*.78,true);
-  cut(c,"M-8 0 Q-7 -5 -1 -5 Q5 -5 7 -11 L10 -9 L10 -3 Q9 3 3 6 Q-4 7 -8 0Z","#ffbf61",1.4);
-  cut(c,"M-6 1 L1 -2 L5 -1 L3 3 L-2 5Z",d.coat,.9);
-  fireTalons(c,4,3,f.talons,false);
-  fireWing(c,f.wing,f.wrist,false,d);
-  c.save();c.translate(1.7*f.talons,-.7*f.pullUp);
-  c.rotate(-f.pitch*.44+p.pitch*.12);
-  cut(c,"M1 -3 Q4 -7 4 -12 L6 -15 L3 -20 L9 -17 L10 -22 L13 -18 L16 -19 L13 -14 L15 -14 L12 -10 L13 -7 L16 -5 L12 -3 Q9 2 4 2 L6 -2Z","#ffc668",1.4);
-  cut(c,"M3 -9 Q9 -17 15 -14 L12 -10 L8 -7 L4 -6Z","#b24a42",.8);
-  cut(c,"M6.5 -10.6 Q9 -13 13 -12 L11 -9 Q8 -8 6.5 -10.6Z","#ffefab",.8);
-  oval(c,10.5,-10.4,1.3,1.55,INK);oval(c,10.9,-11,.47,.47,"#fffaf0");
-  cut(c,"M5 -12 L8 -15 L14 -15 L12 -13 L8 -12Z","#ffda74",.75);
-  cut(c,"M12 -8 L17 -6 L15 -3 L14 -5 L11 -5Z","#ffdf95",.95);
-  cut(c,"M1 -5 L6 -6 L5 -3 L8 -4 L5 0 L1 2 L2 -1 L-1 0Z","#ffdf88",.6);
   c.restore();
 }
 
