@@ -3,10 +3,61 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Battle Sandbox</title>
+    <meta name="theme-color" content="#f7f8f5" />
+    <title>Warrior duel · Battle Sandbox</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <canvas width="960" height="360" aria-label="Battle arena"></canvas>
+    <main class="shell">
+      <header class="masthead">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Battle Sandbox</div>
+        <span class="rate"><span class="clock-icon" aria-hidden="true"></span><span id="tick-rate">60</span> ticks / sec</span>
+      </header>
+
+      <div class="match-heading">
+        <h1>Warrior duel</h1>
+        <div class="tick-counter">Tick <span id="tick">000</span></div>
+      </div>
+
+      <section class="arena-panel" aria-label="Duel arena">
+        <div class="scoreboard">
+          <div class="fighter red">
+            <div class="fighter-label">Red Warrior</div>
+            <div class="health-row">
+              <span class="health-track" aria-hidden="true"><span id="red-bar"></span></span>
+              <span class="health-number"><b id="red-hp">30</b> / 30 HP</span>
+            </div>
+          </div>
+          <span class="match-state" id="match-state" role="status">Ready</span>
+          <div class="fighter blue">
+            <div class="fighter-label">Blue Warrior</div>
+            <div class="health-row">
+              <span class="health-track" aria-hidden="true"><span id="blue-bar"></span></span>
+              <span class="health-number"><b id="blue-hp">30</b> / 30 HP</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <canvas id="arena" width="960" height="360" aria-label="Flat duel field. Red starts on the left, blue on the right.">
+            The score above the arena shows each Warrior's health.
+          </canvas>
+          <div id="result" class="result" role="status" hidden>
+            <strong id="result-title"></strong>
+            <span id="result-detail"></span>
+          </div>
+        </div>
+
+        <div class="control-bar">
+          <div class="buttons">
+            <button id="play" type="button" class="primary"><span id="play-icon" class="play-icon" aria-hidden="true"></span><span id="play-label">Start duel</span></button>
+            <button id="reset" type="button" class="secondary" disabled><span class="reset-icon" aria-hidden="true">↺</span>Reset</button>
+          </div>
+          <div class="rules"><span>Hit <b id="damage">10</b> HP</span><span>Cooldown <b id="cooldown">30</b> ticks</span></div>
+        </div>
+      </section>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
