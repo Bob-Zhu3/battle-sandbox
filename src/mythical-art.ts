@@ -1,23 +1,29 @@
 import { ARMIES } from "./battlefield.ts";
-import type { CharacterPose } from "./character-pose.ts";
+import { eventFade, phoenixFlight, type CharacterPose } from "./character-pose.ts";
 import { INK, cut, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import type { Unit } from "./simulation.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
 export function cyclops(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const lift = u?.windup?.kind === "smash" ? Math.min(1, (tick-u.windup.since+1)/18) : 0;
-  const swing = Math.max(0, 1 - (tick-(u?.lastSmashTick ?? -100))/18);
+  const swing = eventFade(tick,u?.lastSmashTick,18);
+  const startle = eventFade(tick,u?.lastStartleTick,24);
   const scoop = u?.windup?.kind === "swallow" ? Math.min(1,(tick-u.windup.since+1)/13) : 0;
   const chew = Math.max(0, 1-(tick-(u?.lastSwallow?.tick ?? -100))/22);
   const hide = "#a69a99", shadow = "#736978", horn = "#f5d7a2";
-  // The far fist and forearm disappear behind the shoulder and chest.
-  limb(c,-6,-6,-13,1,shadow,4.4);
-  oval(c,-12,2,3.5,4,INK); oval(c,-12,2,2.6,3.1,shadow);
   for (const sign of [-1,1]) {
-    const foot = sign * (5+p.step*2);
-    limb(c,sign*4,2,foot,8,shadow,3.1); line(c,foot-2,8,foot+1.8,8,INK,3);
+    const stride = sign*p.step, foot = sign*(5+lift)+stride*3;
+    const floor = 8-Math.max(0,stride)*3-(sign>0 ? startle*6 : 0);
+    limb(c,sign*4,2,foot+1,5,shadow,3.2); limb(c,foot+1,5,foot,floor,shadow,2.9);
+    line(c,foot-2,floor,foot+2.4,floor,INK,3.2);
   }
-  c.translate(-p.hurt,-p.lift-p.breath+lift*.8+scoop);
+  c.translate(p.step*1.4 - 2*lift + 2.9*swing - 2.8*startle - p.hurt,
+    -p.lift*1.6 - p.breath - lift*1.5 + 3*swing + scoop - 2*startle);
+  c.rotate(.085*p.step - .15*lift + .17*swing - .13*startle);
+  // The far fist swings behind the chest and lifts clear when a mouse squeaks.
+  const fistY = 2+p.step*2.3-startle*6;
+  limb(c,-6,-6,-12-p.step, fistY-1,shadow,4.4);
+  oval(c,-12-p.step,fistY,3.5,4,INK); oval(c,-12-p.step,fistY,2.6,3.1,shadow);
   cut(c,"M-11 -5 Q-12 -11 -5 -12 Q2 -14 8 -8 L10 -1 L7 5 L-7 6 L-11 2Z",hide,1.8);
   cut(c,"M-11 -8 L-8 -13 L-6 -11 L-4 -14 L0 -10 L-3 -7 L-6 -6Z","#574958",1);
   cut(c,"M-10 -8 L-5 -12 L6 1 L5 6 L-1 5Z",d.coat);
@@ -28,7 +34,7 @@ export function cyclops(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, 
   cut(c,"M-8 -14 L-10 -19 L-7 -18 L-5 -22 L-1 -20 L2 -23 L6 -20 L8 -17 L2 -17 L-2 -16Z","#504754");
   cut(c,"M-6 -18 Q-11 -20 -10 -26 L-6 -22 L-3 -20Z",horn,1);
   cut(c,"M-3 -13 Q1 -17 7 -14 Q7 -9 2 -8 Q-1 -8 -3 -13Z","#fff0b2",1.15);
-  const glance=(tick-(u?.lastStartleTick ?? -100)<14)?1:0;
+  const glance=startle*1.9;
   oval(c,2.7,-12.3+glance,2.35,2.7,"#e79948"); oval(c,3.2,-12.25+glance,1.25,2.1,INK);
   oval(c,3.8,-13.7,.65,.65,"#fffce9"); line(c,-3.7,-15,5,-13.9,INK,1.7);
   cut(c,"M-5 -9 L-1 -8 L-2 -6 L-5 -7Z","#806c79",0);
@@ -38,7 +44,7 @@ export function cyclops(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, 
   cut(c,"M1 -4 L1 -7 L3 -5Z",horn,.65); cut(c,"M6 -4 L8 -8 L8 -4Z",horn,.65);
   c.restore();
   c.save(); c.translate(7,-3+scoop);
-  c.rotate(-.2 - 1.05*lift + 1.4*swing + .32*scoop);
+  c.rotate(-.2 - 1.05*lift + 1.4*swing + .32*scoop - .40*startle - .10*p.step);
   limb(c,0,2,7,1,hide,4.2);
   limb(c,5,5,12,-13,"#ae7950",2.6);
   cut(c,"M8 -10 L7 -15 L9 -21 L14 -22 L17 -18 L16 -12 L12 -9Z","#745a50",1.5);
@@ -51,13 +57,16 @@ export function cyclops(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, 
   }
 }
 
-export function frostQueen(c: Pens, d: Dye, u: Unit | undefined, tick: number) {
+export function frostQueen(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const sway = Math.sin((tick+(u?.id ?? 0)*17)*.061);
-  const cast = Math.max(0,1-(tick-(u?.lastAttackTick ?? -90))/19);
-  c.translate(0,-1.8-sway*.7);
+  const cast = eventFade(tick,u?.lastAttackTick,19);
+  c.translate(2.8*cast-p.ready,-1.8-sway*1.35-p.pace);
+  c.rotate(.025*sway+.08*cast-.06*p.ready);
   // Train, face-framing curls and dark bodice have separate silhouettes.
+  c.save(); c.translate(-4,-6); c.rotate(.135*sway+.22*p.pace-.13*cast); c.translate(4,6);
   cut(c,"M-5 -8 Q-12 -5 -13 2 Q-15 6 -20 8 Q-17 12 -12 11 L-14 13 Q-6 13 1 8 L8 7 L5 -7Z","#94b1d0",1.25);
   cut(c,"M-9 -2 Q-12 7 -17 9 Q-12 10 -7 5Z","#c2e1eb",0);
+  c.restore();
   cut(c,"M-4 -7 Q-1 -10 4 -7 L4 -1 Q6 4 13 8 L7 10 L3 8 L0 11 L-5 9 L-11 10 L-6 3Z","#e9f5f9",1.45);
   cut(c,"M-2 -7 L3 -6 L4 -1 L8 7 L3 6 L1 3 L-3 8 L-7 8 L-3 -1Z",d.coat,1);
   cut(c,"M-5 -8 Q0 -12 5 -7 L3 -1 L0 1 L-3 -2Z","#293747",1);
@@ -80,18 +89,44 @@ export function frostQueen(c: Pens, d: Dye, u: Unit | undefined, tick: number) {
   cut(c,"M-6 -1 Q-4 1 0 2 L3 0 L4 2 L1 4 L-4 3 L-6 2Z","#c1d9eb",.7);
   cut(c,"M-8 6 L-11 9 L-7 9 L-2 5 L-3 8 L2 6 L1 10 L-3 11 L-5 9 L-12 11Z","#f9faf0",.65);
   oval(c,0,-5.9,1.5,1.9,d.hem);
-  c.save(); c.translate(6,-2); c.rotate(cast*.42);
+  // Her wrist lifts the crystal overhead, then sweeps it ahead of her face at release.
+  c.save(); c.translate(6+3*cast,-2-2*p.ready); c.rotate(-.12-.62*p.ready+1.03*cast+.055*sway);
   limb(c,0,0,6,-2,"#e7eef7",2.4); limb(c,6,6,8,-15,"#6684a9",1.55);
   cut(c,"M8 -22 L11 -16 L8 -12 L5 -16Z","#98e2f2",1); line(c,8,-20,8,-15,"#fffdf0",1);
   c.restore();
 }
 
-export function phoenix(c: Pens, d: Dye, u: Unit | undefined, tick: number) {
+function fireWing(c: Pens, root: number, wrist: number, far: boolean, d: Dye) {
+  c.save();
+  c.translate(far ? -.3 : -2, -2);
+  if (far) c.scale(.82, .83);
+  c.rotate(root);
+  // The primaries hinge at the wrist. Their tips are still going up as
+  // the leading edge starts down, and fold back against the bird in a dive.
+  c.save(); c.translate(-10, -3); c.rotate(wrist);
+  cut(c,"M3 -2 Q-4 -5 -17 -8 Q-15 -4 -10 -2 L-19 -4 Q-16 1 -10 2 L-16 2 Q-13 6 -6 5 L-10 7 Q-3 8 3 3Z",far ? "#aa5148" : "#ea7740",1.25);
+  cut(c,"M-15 -6 L-4 -3 L0 0 L-8 -2Z M-16 -2 L-6 1 L-2 3 L-10 1Z",far ? "#dc9862" : "#ffe099",0);
+  c.restore();
+  cut(c,"M4 2 Q2 -5 -9 -7 Q-14 -7 -15 -5 Q-12 -3 -9 -3 L-12 -2 L-7 1 L-10 2 Q-4 6 2 5Z",far ? "#bc7456" : d.coat,1.35);
+  cut(c,"M0 -2 Q-6 -6 -11 -5 L-6 -2 L-8 -2 L-4 1 L-1 2Z",far ? "#edb36a" : d.light,.65);
+  c.restore();
+}
+
+function fireTalons(c: Pens, x: number, y: number, reach: number, far: boolean) {
+  const heelX = x - 3 + reach * 8, heelY = y + 2 + reach * 3;
+  const toeX = heelX + 2 + reach * 3, toeY = heelY + 2;
+  const gold = far ? "#bd874e" : "#f7c56b";
+  limb(c,x,y,heelX,heelY,gold,1.35); line(c,heelX,heelY,toeX,toeY,gold,1.8);
+  line(c,toeX,toeY,toeX+2,toeY-1.5,INK,1.05); line(c,toeX-2,toeY,toeX-.8,toeY+1.8,INK,1.05);
+}
+
+export function phoenix(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const time=tick+(u?.id ?? 0)*11;
   if (u?.emberUntil !== undefined) {
     const glow=.5+.5*Math.sin(time*.2), near=1-Math.min(1,(u.emberUntil-tick)/UNIT_DEFINITIONS.phoenix.hatchTicks);
     oval(c,0,5,11,3,"#865a49"); line(c,-8,5,6,7,"#4f4441",2); line(c,-5,7,8,3,"#5b423c",2);
-    c.translate(0,-near*1.6);
+    // Near hatching, each tremor rocks the shell further about its base.
+    c.translate(0,3); c.rotate(Math.sin(time*.42)*near*near*.24); c.translate(0,-3-near*1.6);
     cut(c,"M-7 2 Q-9 -3 -5 -8 Q-4 -12 0 -15 Q6 -11 8 -5 Q10 2 5 5 Q-4 8 -7 2Z","#8c4545",1.5);
     cut(c,"M-5 2 L0 -2 L-2 -6 L3 -11 L1 -5 L4 -2 L-3 4Z","#ffd26a",.5);
     oval(c,4,-5,1,1,"#ffeaa3");
@@ -99,36 +134,52 @@ export function phoenix(c: Pens, d: Dye, u: Unit | undefined, tick: number) {
     c.strokeStyle="#ffeab1"; c.lineWidth=1; c.globalAlpha=.5+glow*.4; c.beginPath(); c.arc(0,0,10,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,near)); c.stroke();
     return;
   }
-  const beat=Math.sin(time*.108);
-  const rake=Math.max(0,1-(tick-(u?.lastAttackTick ?? -80))/12);
-  c.translate(0,-4.4-beat*1.6); c.rotate(rake*.15);
-  c.save(); c.scale(.86,.9); c.rotate(.45+beat*.22);
-  cut(c,"M0 0 Q-8 -9 -11 -23 L-7 -18 L-7 -24 L-3 -17 L0 -20 L4 -6Z","#a6494a",1.3); c.restore();
-  cut(c,"M-1 0 Q-11 -5 -18 3 Q-21 7 -25 6 Q-21 12 -12 7 L-16 12 Q-8 12 -2 6 L-4 10 Q3 7 6 1Z","#e97148",1.3);
-  cut(c,"M-4 2 Q-13 0 -21 7 Q-14 6 -9 4 L-13 8Z","#ffd275",.6);
-  c.save(); c.translate(-2,0); c.rotate(beat*.39);
-  cut(c,"M4 2 Q-3 -3 -10 -8 Q-19 -14 -19 -23 L-13 -18 L-14 -25 L-6 -17 L-6 -21 Q2 -16 5 -8 L7 -3Z",d.coat,1.5);
-  cut(c,"M-17 -20 L-8 -12 L-11 -19 L-4 -12 L-4 -16 L2 -8 L1 -5 Q-9 -10 -17 -20Z","#ffb04f",.8);
-  cut(c,"M-4 -8 Q0 -5 4 -5 L3 0 L0 2 L-2 0Z",d.light,.8); c.restore();
-  cut(c,"M-6 2 Q0 -3 3 -6 L5 -12 L7 -14 L6 -18 L10 -16 L14 -18 L12 -14 L15 -14 L12 -10 L12 -7 L16 -5 L12 -3 Q9 4 3 5 L-2 4Z","#ffc668",1.45);
+  const f = phoenixFlight(u,p,tick);
+  c.translate(3.4*f.talons,-f.height); c.rotate(f.pitch);
+  fireWing(c,.83+f.wing*.58,.18+f.wrist*.65,true,d);
+  c.save(); c.translate(-4,1); c.rotate(.13*f.tail - .23*f.pullUp + .12*f.talons);
+  cut(c,"M3 -1 Q-5 -5 -15 0 Q-22 5 -28 1 Q-26 8 -17 6 L-21 9 Q-14 10 -7 5 L-10 9 Q-1 8 4 2Z","#d76142",1.25);
+  c.save(); c.translate(-4,2); c.rotate(.24*f.tail+.12*f.pullUp);
+  cut(c,"M4 -1 Q-3 -3 -11 3 Q-15 8 -20 8 Q-16 12 -10 8 L-13 12 Q-6 11 -2 5 L-3 8 Q2 5 4 1Z","#ffad52",.95);
+  cut(c,"M0 2 Q-7 3 -15 9 Q-9 8 -5 5Z","#ffdc85",0); c.restore(); c.restore();
+  fireTalons(c,1,2,f.talons*.78,true);
+  cut(c,"M-8 0 Q-7 -5 -1 -5 Q5 -5 7 -11 L10 -9 L10 -3 Q9 3 3 6 Q-4 7 -8 0Z","#ffbf61",1.4);
+  cut(c,"M-6 1 L1 -2 L5 -1 L3 3 L-2 5Z",d.coat,.9);
+  fireTalons(c,4,3,f.talons,false);
+  fireWing(c,f.wing,f.wrist,false,d);
+  c.save();c.translate(1.7*f.talons,-.7*f.pullUp);
+  c.rotate(-f.pitch*.44+p.pitch*.12);
+  cut(c,"M1 -3 Q4 -7 4 -12 L6 -15 L3 -20 L9 -17 L10 -22 L13 -18 L16 -19 L13 -14 L15 -14 L12 -10 L13 -7 L16 -5 L12 -3 Q9 2 4 2 L6 -2Z","#ffc668",1.4);
   cut(c,"M3 -9 Q9 -17 15 -14 L12 -10 L8 -7 L4 -6Z","#b24a42",.8);
   cut(c,"M6.5 -10.6 Q9 -13 13 -12 L11 -9 Q8 -8 6.5 -10.6Z","#ffefab",.8);
   oval(c,10.5,-10.4,1.3,1.55,INK);oval(c,10.9,-11,.47,.47,"#fffaf0");
   cut(c,"M5 -12 L8 -15 L14 -15 L12 -13 L8 -12Z","#ffda74",.75);
   cut(c,"M12 -8 L17 -6 L15 -3 L14 -5 L11 -5Z","#ffdf95",.95);
   cut(c,"M1 -5 L6 -6 L5 -3 L8 -4 L5 0 L1 2 L2 -1 L-1 0Z","#ffdf88",.6);
-  cut(c,"M-1 2 L6 -3 L6 1 L2 5 L-2 4Z",d.coat,.8);
-  line(c,2,4,2+3*rake,7,"#844b38",1.3); line(c,5,3,6+4*rake,6,"#844b38",1.2);
+  c.restore();
 }
 
 export function kirin(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
-  const live = u?.arc && tick-u.arc.tick<19;
-  c.translate(0,-1.8-Math.sin((tick+(u?.id ?? 0)*7)*.063));
-  for(const side of [-1,1]) {
-    limb(c,side*5,1,side*7+p.step*2,8,"#82bbaa",2);
-    line(c,side*7+p.step*2,8,side*7+2+p.step*2,8,"#354f55",2.5);
+  const rear = eventFade(tick,u?.arc?.tick,19);
+  const swish = Math.sin((tick+(u?.id ?? 0)*7)*.082);
+  c.translate(0,-1.4-p.lift*1.8);
+  for (const far of [true,false]) {
+    for (const front of [false,true]) {
+      const hip = (front ? 5 : -5) - (far ? 2 : 0);
+      const step = (front !== far ? 1 : -1)*p.step;
+      const reach = front ? rear : 0, hoofX = hip+step*4.7+reach*4;
+      const floor = 8-Math.max(0,step)*3.7-reach*7.5;
+      const kneeX = hip+(front ? 2 : -2)+step*1.5+reach*4, kneeY = 4-reach*7;
+      const shade = far ? "#588c84" : "#95c9b1";
+      limb(c,hip,1-reach*4,kneeX,kneeY,shade,1.8);
+      limb(c,kneeX,kneeY,hoofX,floor,shade,1.55);
+      line(c,hoofX-.6,floor,hoofX+1.5,floor,"#354f55",2.25);
+    }
   }
+  c.translate(-5,1); c.rotate(-.32*rear+.08*p.ready-.045*p.step); c.translate(5,-1);
+  c.save();c.translate(-7,-1);c.rotate(.23*swish+.22*rear);c.translate(7,1);
   cut(c,"M-8 0 Q-16 -3 -16 -13 L-19 -16 L-13 -16 L-11 -13 L-13 -19 Q-8 -17 -9 -10 L-4 -5Z",d.light,1.2);
+  c.restore();
   cut(c,"M-10 -4 Q-5 -9 1 -6 L4 -14 L8 -17 L12 -14 L12 -11 L17 -8 L14 -5 L8 -7 L6 0 Q1 6 -8 3Z","#75ad9f",1.5);
   cut(c,"M-6 -5 L0 -6 L4 -4 L1 2 L-5 3 L-8 0Z",d.coat,1);
   cut(c,"M-3 -4 L0 -3 L-2 0 L-4 -1Z","#e6d59a",.65);
@@ -140,5 +191,5 @@ export function kirin(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, ti
   cut(c,"M6 -13.4 Q10 -15.8 13 -12.8 L10 -9.7 L7 -10.5Z","#fff2bc",.85);
   oval(c,10.2,-12.4,1.35,1.55,"#23423e"); oval(c,10.65,-13,.42,.42,"#fff9d6");
   line(c,3,-16,9,-14,"#426776",1.25);
-  if(live) {line(c,1,-25,5,-27,"#fff8b1",1.6);line(c,5,-27,8,-24,"#fff8b1",1.6);}
+  if(rear>0) {line(c,1,-25,5,-27,"#fff8b1",1.6);line(c,5,-27,8,-24,"#fff8b1",1.6);}
 }

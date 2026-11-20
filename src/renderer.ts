@@ -7,7 +7,7 @@ import { drawTrail, drawTunnel, drawChange, drawSoul } from "./field-effects.ts"
 import { drawChain, drawConditions, drawGroundEffect, drawSpecialShot, drawStun } from "./combat-art.ts";
 import { drawKeep } from "./keeps.ts";
 import { ARMIES, campFor, type MatchMode } from "./battlefield.ts";
-import { characterPose, restingPose } from "./character-pose.ts";
+import { characterPose, HIT_FLASH_TICKS, restingPose } from "./character-pose.ts";
 import { drawFallen, drawUnitToken, INK, palette } from "./characters.ts";
 
 function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team, length: number) {
@@ -103,13 +103,22 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     ctx.lineWidth=2.8*scale;ctx.setLineDash([4*scale,2*scale]);ctx.beginPath();
     ctx.moveTo(x,y-2*scale);ctx.quadraticCurveTo((x+ex)/2,(y+ey)/2+5*scale,ex,ey-2*scale);ctx.stroke();ctx.restore();
   }
-  for (const { unit, x, y } of bodies) {
+  for (const { unit, from, x, y } of bodies) {
     if (unit.hp || unit.lastHitTick === null || unit.swallowedTick !== undefined) continue;
     const age = Math.max(0, tick - unit.lastHitTick);
     if (age < 48) {
       const side = unit.aimX < 0 ? -1 : 1;
       const radius = UNIT_DEFINITIONS[unit.kind].radius * scale;
-      drawFallen(ctx, x, y, radius, unit.team, unit.kind, side, age);
+      // A base retreat also timestamps the fallen pose, but only combat kills
+      // earn a killer in a match. Keep the struck body visible for its flash.
+      const combatKill = !current.bases || unit.killedBy !== undefined;
+      if (combatKill && age < HIT_FLASH_TICKS) {
+        const pose = characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, unit.walkDistance, from.lastHitTick);
+        drawUnitToken(ctx, x, y, radius, unit.team, unit.kind, pose, unit, tick);
+      } else {
+        const fallAge = combatKill ? (age - HIT_FLASH_TICKS) * 48 / (48 - HIT_FLASH_TICKS) : age;
+        drawFallen(ctx, x, y, radius, unit.team, unit.kind, side, fallAge);
+      }
     }
   }
   for (const { unit, from, x, y } of bodies) {
@@ -117,7 +126,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     if (unit.tunnel) {drawTunnel(ctx,unit,x,y,tick,sx,sy); continue;}
     const travel = from.walkDistance + (unit.walkDistance - from.walkDistance) * blend;
     const pose = deploying ? restingPose(ARMIES[unit.team].facing)
-      : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, travel);
+      : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, travel, from.lastHitTick);
     const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
     const hand = scoops.get(unit.id);
     if (hand) {
@@ -131,16 +140,6 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     if (unit.lastTreatedTick !== undefined && tick - unit.lastTreatedTick < 16) {
       ctx.save();ctx.globalAlpha=1-(tick-unit.lastTreatedTick)/16;ctx.strokeStyle="#fff7cc";ctx.lineWidth=2*scale;
       ctx.beginPath();ctx.arc(x,y-r*.4,r*.85,0,Math.PI*1.5);ctx.stroke();ctx.restore();
-    }
-    const hitAge = unit.lastHitTick === null ? Infinity : Math.max(0, tick - unit.lastHitTick);
-    if (hitAge < 6) {
-      ctx.save();
-      ctx.translate(x + pose.side * r * .81, y - r * .65);
-      ctx.scale(pose.side * scale, scale);
-      ctx.globalAlpha = 1 - hitAge / 6;
-      ctx.strokeStyle = "#fff2cd"; ctx.lineWidth = 2.2; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(1, -1); ctx.lineTo(3, -4); ctx.moveTo(3, 1); ctx.lineTo(6, 0); ctx.stroke();
-      ctx.restore();
     }
   }
   for (const u of current.units) if (u.arc) drawChain(ctx,u.arc,tick,sx,sy);

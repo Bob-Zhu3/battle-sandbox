@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { playOddities } from "./oddities-scenes.mjs";
+import { playMotion } from "./motion-scenes.mjs";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -9,7 +10,7 @@ import { parseArgs } from "node:util";
 import { chromium } from "playwright";
 import { createGameServer } from "../server/http.ts";
 
-const {values} = parseArgs({options:{oddities:{type:"boolean"}, headless:{type:"boolean"}, frames:{type:"string"}, channel:{type:"string"}}});
+const {values} = parseArgs({options:{oddities:{type:"boolean"}, motion:{type:"boolean"}, headless:{type:"boolean"}, frames:{type:"string"}, channel:{type:"string"}}});
 const {http,closeRoom} = createGameServer();
 http.listen(0,"127.0.0.1");
 await once(http,"listening");
@@ -58,7 +59,8 @@ try {
       if(!hold) await page.clock.runFor(50);
     }
   }
-  if(values.oddities) await playOddities({page,place,show,clear,hp});
+  if(values.motion) await playMotion({place,show,clear,hp});
+  else if(values.oddities) await playOddities({page,place,show,clear,hp});
   else {
     await place("Red","Watchpost",300,166);
     await place("Blue","Lancer",515,170);await place("Blue","Watchpost",500,228);
@@ -106,7 +108,10 @@ try {
   assert.deepEqual(errors,[]);
   if(values.frames) {
     await writeFile(join(values.frames,"timeline.json"),JSON.stringify(frames));
-    const characters = values.oddities ? [
+    const characters = values.motion ? [
+      ["Blue","Mythical","Phoenix","Flight and talon strike"], ["Blue","Mythical","Cyclops","Ground smash"],
+      ["Red","People","Musketeer","Recoil and reload"], ["Violet","Mythical","Storm Kirin","Chain lightning"],
+    ] : values.oddities ? [
       ["Amber","People","Miner","Cross-field tunnels"], ["Red","People","Clown","Poison balloons"],
       ["Violet","Mythical","Reaper","Soul harvest"], ["Blue","Mythical","Witch","Hex Pig"],
     ] : [
@@ -138,14 +143,17 @@ try {
     },cards);
     await writeFile(join(values.frames,"portraits.png"),Buffer.from(sheet,"base64"));
   }
-  if(values.oddities) console.log("PASS: tunnels, counterattacking pigs, direct Zombie conversions, poison clouds, soul harvests and mythical trails.");
+  if(values.motion) console.log("PASS: four encounters, from the Phoenix's first wingbeat to the Kirin's lightning strike.");
+  else if(values.oddities) console.log("PASS: tunnels, counterattacking pigs, direct Zombie conversions, poison clouds, soul harvests and mythical trails.");
   else console.log("PASS: four enemies struck, the Cyclops scattered a line and swallowed a wounded Lancer, and a one-HP egg hatched at half health.");
   if(!values.headless) {
     await clear();
-    if(values.oddities){await place("Red","Zombie",397,166);await brush("Blue","Archer");}
+    if(values.motion){await place("Blue","Phoenix",429,184);await brush("Red","Shieldbearer");}
+    else if(values.oddities){await place("Red","Zombie",397,166);await brush("Blue","Archer");}
     else {await place("Red","Storm Kirin",392,166);await brush("Blue","Lancer");}
     await page.clock.resume();
-    if(values.oddities) console.log("Your turn. Place a Blue Archer by the waiting Red Zombie. Close the window when finished.");
+    if(values.motion) console.log("Your turn. Place a Red Shieldbearer near the waiting Blue Phoenix. Close the window when finished.");
+    else if(values.oddities) console.log("Your turn. Place a Blue Archer by the waiting Red Zombie. Close the window when finished.");
     else console.log("Your turn. Draw Blue Lancers in front of the Storm Kirin. Close the window when finished.");
     await page.waitForEvent("close",{timeout:0});
   }

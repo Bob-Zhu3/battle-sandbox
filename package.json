@@ -13,6 +13,8 @@
     "start": "node server/start.ts",
     "predemo:encounters": "npm run build --silent",
     "demo:encounters": "node scripts/demo-encounters.mjs",
+    "predemo:motion": "npm run build --silent",
+    "demo:motion": "node scripts/demo-encounters.mjs --motion",
     "predemo:room": "npm run build --silent",
     "demo:room": "node scripts/demo-room.mjs",
     "predemo:oddities": "npm run build --silent",

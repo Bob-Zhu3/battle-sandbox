@@ -1,4 +1,4 @@
-import { restingPose, type CharacterPose } from "./character-pose.ts";
+import { phoenixFlight, restingPose, type CharacterPose } from "./character-pose.ts";
 import type { Team, Unit } from "./simulation.ts";
 import type { UnitKind } from "./units.ts";
 import { ARMIES } from "./battlefield.ts";
@@ -134,16 +134,62 @@ function archer(c: Pens, dye: Dye, p: CharacterPose) {
   c.restore();
 }
 
-export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(ARMIES[team].facing), unit?: Unit, tick = 0) {
-  c.save();
-  c.translate(x, y);
-  c.scale(radius / 11, radius / 11);
-  oval(c, -.3, 8.7, kind === "warrior" ? 9.8 : 8.1, 2.8, "rgba(45,57,40,.22)");
-  c.scale(pose.side, 1);
+function drawBody(c: Pens, team: Team, kind: UnitKind, pose: CharacterPose, unit: Unit | undefined, tick: number) {
   c.lineCap = "round"; c.lineJoin = "round";
   if (kind === "warrior") warrior(c, palette[team], pose);
   else if (kind === "archer") archer(c, palette[team], pose);
   else drawSpecialist(c, palette[team], kind, pose, unit, tick);
+}
+
+// One transparent layer fits any animated pose, including the outstretched
+// lance and club. Tinting this layer leaves shadows, neighbors and trails alone.
+const spriteExtent = 100;
+const hitOutline = [[-.7,0],[.7,0],[0,-.7],[0,.7]] as const;
+let hitLayer: Pens | undefined;
+
+export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(ARMIES[team].facing), unit?: Unit, tick = 0) {
+  c.save();
+  c.translate(x, y);
+  c.scale(radius / 11, radius / 11);
+  if (kind === "phoenix" && unit?.emberUntil === undefined) {
+    const height = phoenixFlight(unit, pose, tick).height;
+    c.save(); c.globalAlpha *= 1 - height * .025;
+    oval(c, -.3, 8.7, 10.7 - height * .24, 3.1 - height * .055, "rgba(45,57,40,.27)"); c.restore();
+  } else {
+    oval(c, -.3, 8.7, kind === "warrior" ? 9.8 : 8.1, 2.8, "rgba(45,57,40,.22)");
+  }
+  c.scale(pose.side, 1);
+  const flash = pose.hitFlash;
+  if (flash > 0) {
+    const layer = hitLayer ??= document.createElement("canvas").getContext("2d")!;
+    const transform = c.getTransform();
+    const pixels = spriteExtent * Math.max(1, Math.ceil(Math.hypot(transform.a, transform.b)));
+    if (layer.canvas.width !== layer.canvas.height || layer.canvas.width < pixels) {
+      layer.canvas.width = layer.canvas.height = pixels;
+    }
+    // Filtered pixels at the crop edge can otherwise pick up the last larger sprite.
+    layer.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+    layer.save();
+    layer.setTransform(pixels / spriteExtent, 0, 0, pixels / spriteExtent, pixels / 2, pixels / 2);
+    drawBody(layer, team, kind, pose, unit, tick);
+    layer.restore();
+    // Leave a hairline of the original outline where two struck bodies overlap.
+    const edge = -spriteExtent / 2;
+    c.save(); c.globalAlpha *= .72 * flash;
+    for (const [dx,dy] of hitOutline) {
+      c.drawImage(layer.canvas, 0, 0, pixels, pixels, edge + dx, edge + dy, spriteExtent, spriteExtent);
+    }
+    c.restore();
+    layer.save();
+    layer.globalCompositeOperation = "source-atop";
+    layer.globalAlpha = flash;
+    layer.fillStyle = "#fff";
+    layer.fillRect(0, 0, pixels, pixels);
+    layer.restore();
+    c.drawImage(layer.canvas, 0, 0, pixels, pixels, edge, edge, spriteExtent, spriteExtent);
+  } else {
+    drawBody(c, team, kind, pose, unit, tick);
+  }
   c.restore();
 }
 

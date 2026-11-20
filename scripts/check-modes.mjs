@@ -14,8 +14,13 @@ const browser = await chromium.launch({ headless: true, channel: values.channel 
 const errors = [];
 if (values.output) await mkdir(values.output, { recursive: true });
 
-async function open(url, width = 1000, height = 600) {
+async function open(url, width = 1000, height = 600, pauseClock = false) {
   const page = await browser.newPage({ viewport: { width, height } });
+  if (pauseClock) {
+    const time = new Date("2026-01-01T12:00:00Z");
+    await page.clock.install({time});
+    await page.clock.pauseAt(new Date(time.getTime()+1000));
+  }
   const frames = [], joins = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("websocket", socket => socket.on("framereceived", ({payload}) => {
@@ -47,6 +52,37 @@ async function withField(check) {
   http.listen(0,"127.0.0.1"); await once(http,"listening");
   try { await check("http://127.0.0.1:" + http.address().port); }
   finally { closeRoom(); await new Promise(resolve => http.close(resolve)); }
+}
+
+async function arrowFlash(url) {
+  const {page,point}=await open(url,960,540,true);
+  try {
+    const pick=name=>page.getByRole("button",{name,exact:true}).click({force:true});
+    await pick("Archer"); await page.mouse.click(...point(390,180));
+    await pick("Blue army"); await pick("Warrior"); await page.mouse.click(...point(502,180));
+    const frames=[];
+    for(let i=0;i<33;i++) {
+      await page.clock.runFor(17);
+      frames.push(await page.locator("#arena").evaluate(canvas=>{
+        const c=canvas.getContext("2d");
+        function white(left,width) {
+          const pixels=c.getImageData(left,240,width,45).data;
+          let count=0;
+          for(let j=0;j<pixels.length;j+=4) {
+            if(pixels[j]===255 && pixels[j+1]===255 && pixels[j+2]===255 && pixels[j+3]>245) count++;
+          }
+          return count;
+        }
+        return [white(360,60),white(435,100)];
+      }));
+    }
+    assert.ok(frames.every(([archer])=>archer<8),"The untouched Archer keeps its colors");
+    assert.ok(frames.slice(0,9).every(([,target])=>target<8),"The arrow is still in flight");
+    assert.ok(frames.some(([,target])=>target>150),"The Warrior's whole silhouette turns white");
+    assert.ok(frames.slice(-4).every(([,target])=>target<8),"The Warrior regains its colors");
+    assert.equal(await page.locator("#blue-hp").textContent(),"22");
+    console.log("Arrow impact: the struck Warrior flashes and recovers its colors while the Archer stays red.");
+  } finally { await page.context().close(); }
 }
 
 async function playground(url) {
@@ -328,6 +364,7 @@ async function match(url,size) {
 }
 
 try {
+  await withField(arrowFlash);
   await withField(playground);
   await withField(browseRoster);
   await withField(magicDuel);
