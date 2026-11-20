@@ -1,4 +1,5 @@
-import { ARENA, boundCenter, type Battle, type Team } from "./simulation.ts";
+import { ARENA, boundCenter, type Team } from "./simulation.ts";
+import type { World } from "./room-protocol.ts";
 import { teamAt, type ArenaPoint } from "./deployment.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
@@ -116,7 +117,7 @@ function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: n
   ctx.restore();
 }
 
-function projection(w: number, h: number, current: Battle, deploying: boolean) {
+function projection(w: number, h: number, current: World, deploying: boolean) {
   if (deploying || !current.units.length) {
     return { sx: w / ARENA.width, sy: h / ARENA.height, ox: 0, oy: 0 };
   }
@@ -157,13 +158,17 @@ function drawDivider(ctx: CanvasRenderingContext2D, w: number, h: number, empty:
   ctx.restore();
 }
 
-export function drawArena(ctx: CanvasRenderingContext2D, previous: Battle, current: Battle, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior") {
+export function drawArena(ctx: CanvasRenderingContext2D, previous: World, current: World, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior", ownTeam?: Team) {
   const w = ctx.canvas.clientWidth, h = ctx.canvas.clientHeight;
   if (!w || !h) return;
   ctx.setTransform(ctx.canvas.width / w, 0, 0, ctx.canvas.height / h, 0, 0);
   ctx.clearRect(0, 0, w, h);
   const { sx, sy, ox, oy } = projection(w, h, current, deploying);
   const scale = Math.min(sx, sy);
+  if (deploying && ownTeam) {
+    ctx.fillStyle = "rgba(52, 68, 51, .10)";
+    ctx.fillRect(ownTeam === "red" ? w / 2 : 0, 0, w / 2, h);
+  }
   if (deploying) drawDivider(ctx, w, h, !current.units.length && !preview.length);
 
   for (const unit of current.units) {

@@ -1,26 +1,12 @@
 import { battleOutcome, stepBattle, TICKS_PER_SECOND } from "./simulation.ts";
 import { archerScreen, battleFromDeployment, twentyVsTwenty, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
 import { attachDeploymentBrush } from "./brush-input.ts";
-import { drawLandscape } from "./landscape.ts";
-import { drawArena, drawUnitToken } from "./renderer.ts";
-import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { drawArena } from "./renderer.ts";
+import { createField, element, updateFieldScore } from "./field.ts";
+import type { UnitKind } from "./units.ts";
 
-function element<T extends HTMLElement = HTMLElement>(id: string): T {
-  const found = document.getElementById(id);
-  if (!found) throw new Error("Missing interface element: " + id);
-  return found as T;
-}
-
-function contextFor(canvas: HTMLCanvasElement) {
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("This browser could not open a 2D canvas.");
-  return context;
-}
-
-const canvas = element<HTMLCanvasElement>("arena");
-const landscape = element<HTMLCanvasElement>("landscape");
-const ctx = contextFor(canvas);
-const ground = contextFor(landscape);
+const field = createField();
+const { canvas, ctx } = field;
 const play = element<HTMLButtonElement>("play");
 const replay = element<HTMLButtonElement>("replay");
 const edit = element<HTMLButtonElement>("edit");
@@ -32,20 +18,13 @@ const scenarioName = element("scenario-name");
 const hint = element("deploy-hint");
 const emptyGuide = element("empty-guide");
 const brushTool = element("brush-tool");
-const brushButtons = { warrior: element<HTMLButtonElement>("brush-warrior"), archer: element<HTMLButtonElement>("brush-archer") };
 const keyAction = element("key-action");
 const playLabel = element("play-label");
 const playIcon = element("play-icon");
 const stateLabel = element("match-state");
-const tickLabel = element("tick");
 const result = element("result");
 const resultTitle = element("result-title");
 const resultDetail = element("result-detail");
-const health = {
-  red: { score: element("red-score"), hp: element("red-hp"), max: element("red-max"), count: element("red-count"), bar: element("red-bar") },
-  blue: { score: element("blue-score"), hp: element("blue-hp"), max: element("blue-max"), count: element("blue-count"), bar: element("blue-bar") },
-};
-
 const millisecondsPerTick = 1000 / TICKS_PER_SECOND;
 const labels = {
   deploy: { status: "Deployment", button: "Start" },
@@ -62,8 +41,7 @@ const demos = {
 };
 type Demo = keyof typeof demos;
 let activeDemo: Demo | null = null;
-let selectedKind: UnitKind = "warrior";
-let draftKind: UnitKind = selectedKind;
+let draftKind: UnitKind = "warrior";
 let draft: readonly ArenaPoint[] = [];
 let mode: Playback = "deploy";
 let battle = battleFromDeployment(formation);
@@ -77,25 +55,7 @@ function updateGuide() {
 }
 
 function updateScore() {
-  tickLabel.textContent = String(battle.tick).padStart(3, "0");
-  const totals = { red: { units: 0, warrior: 0, archer: 0, hp: 0, max: 0 }, blue: { units: 0, warrior: 0, archer: 0, hp: 0, max: 0 } };
-  for (const unit of battle.units) {
-    const team = totals[unit.team];
-    team.units++;
-    if (unit.hp > 0) team[unit.kind]++;
-    team.hp += unit.hp;
-    team.max += UNIT_DEFINITIONS[unit.kind].maxHp;
-  }
-  for (const side of ["red", "blue"] as const) {
-    const { units, warrior, archer, hp, max } = totals[side];
-    const alive = warrior + archer;
-    const display = health[side];
-    if (display.count.textContent !== String(alive)) display.count.textContent = String(alive);
-    if (display.max.textContent !== String(max)) display.max.textContent = String(max);
-    if (display.hp.textContent !== String(hp)) display.hp.textContent = String(hp);
-    display.score.title = alive + " of " + units + " alive · Warriors " + warrior + " · Archers " + archer + " · " + hp + "/" + max + " HP";
-    display.bar.style.transform = "scaleX(" + (max ? hp / max : 0) + ")";
-  }
+  const totals = updateFieldScore(battle);
   if (mode === "deploy") {
     const red = totals.red.units, blue = totals.blue.units;
     play.disabled = !red || !blue;
@@ -131,18 +91,6 @@ function setMode(next: Playback) {
 
 function paint(blend = 1) {
   drawArena(ctx, previous, battle, blend, mode === "deploy", draft, draftKind);
-}
-
-function resizeArena() {
-  const ratio = window.devicePixelRatio || 1;
-  const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
-  const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
-  for (const layer of [landscape, canvas]) {
-    layer.width = width;
-    layer.height = height;
-  }
-  drawLandscape(ground);
-  paint(mode === "running" ? remainder / millisecondsPerTick : 1);
 }
 
 function frame(time: number) {
@@ -194,7 +142,7 @@ function pauseBattle() {
 
 const cancelStroke = attachDeploymentBrush(canvas, {
   canDraw: () => mode === "deploy",
-  selectedKind: () => selectedKind,
+  selectedKind: field.selectedKind,
   preview(points, kind) {
     draft = points;
     draftKind = kind;
@@ -259,19 +207,7 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-for (const kind of ["warrior", "archer"] as const) {
-  const definition = UNIT_DEFINITIONS[kind];
-  const button = brushButtons[kind];
-  drawUnitToken(contextFor(element<HTMLCanvasElement>("icon-" + kind)), 36, 36, 31, "red", kind);
-  button.title = definition.name + " · " + definition.maxHp + " HP · " + definition.damage + " damage · " + definition.reach + " reach · " + definition.cooldownTicks + " ticks between attacks";
-  button.addEventListener("click", () => {
-    brushButtons[selectedKind].setAttribute("aria-pressed", "false");
-    selectedKind = kind;
-    button.setAttribute("aria-pressed", "true");
-  });
-}
 const requestedDemo = new URLSearchParams(location.search).get("demo");
 if (requestedDemo === "20v20" || requestedDemo === "archers") activeDemo = requestedDemo;
-resizeArena();
+field.watchSize(() => paint(mode === "running" ? remainder / millisecondsPerTick : 1));
 loadFormation(activeDemo ? "running" : "deploy");
-new ResizeObserver(resizeArena).observe(canvas);

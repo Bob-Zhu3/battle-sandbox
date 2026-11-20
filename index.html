@@ -21,24 +21,28 @@
           <div id="red-score" class="pennant red">
             <span class="pennant-name">Red</span><strong id="red-count">0</strong>
             <span class="life-line" aria-hidden="true"><i id="red-bar"></i></span>
+            <span id="red-seat" class="seat-label" hidden></span>
             <span class="sr-only"><span id="red-hp">0</span> of <span id="red-max">0</span> HP</span>
           </div>
           <span class="versus" aria-hidden="true">vs</span>
           <div id="blue-score" class="pennant blue">
             <span class="pennant-name">Blue</span><strong id="blue-count">0</strong>
             <span class="life-line" aria-hidden="true"><i id="blue-bar"></i></span>
+            <span id="blue-seat" class="seat-label" hidden></span>
             <span class="sr-only"><span id="blue-hp">0</span> of <span id="blue-max">0</span> HP</span>
           </div>
         </div>
         <div class="demo-controls">
           <details id="demo-picker">
-            <summary class="demo-button"><span class="flag-icon" aria-hidden="true"></span>Demos <span aria-hidden="true">▾</span></summary>
+            <summary class="demo-button"><span class="flag-icon" aria-hidden="true"></span>Play modes <span aria-hidden="true">▾</span></summary>
             <div class="demo-options">
+              <a href="/room" target="_blank" rel="noopener">Two-player room ↗</a>
               <button id="demo-archers" type="button">Archer screen</button>
               <button id="demo-warriors" type="button">20 vs 20 Warriors</button>
             </div>
           </details>
           <button id="demo-back" class="demo-button" type="button" hidden><span class="flag-icon" aria-hidden="true"></span>Back to field</button>
+          <a id="room-leave" class="demo-button" href="/" hidden>Leave room</a>
         </div>
       </header>
 
@@ -69,6 +73,6 @@
         <span class="key-hint"><kbd>Space</kbd><span id="key-action">Start</span></span>
       </footer>
     </main>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/entry.ts"></script>
   </body>
 </html>

@@ -1,10 +1,26 @@
 # Battle Sandbox
 
-A Canvas 2D battle sandbox. Draw a formation on the field or open **Demos** to watch a battle. The local game draws its own meadow, flags, units and arrows.
+A Canvas 2D battle sandbox. Draw a formation on the field or open **Play modes** for the two-player room and the example battles. The game draws its own meadow, flags, units and arrows.
 
 ## Run locally
 
-Use Node.js 22.18 or later. In this directory, run `npm ci` and `npm run dev`, then open the local URL Vite prints. Run `npm test` for the deployment and combat tests and `npm run build` for type checking and the production build.
+Use Node.js 22.18 or later. In this directory, run `npm ci` and `npm run dev`, then open the local URL Vite prints. The development server hosts the game and its WebSocket endpoint on the same port. For a built game, run `npm run build` followed by `npm start`. The standalone Node server defaults to `http://127.0.0.1:4173` and accepts `HOST` and `PORT` environment variables.
+
+## Two-player room
+
+Open `/room` in two browser windows on the same server. The first connection gets Red on the left and the second gets Blue on the right. Each player can draw while the other is drawing. A stroke previews locally and appears in both windows on release. **Undo** and **Clear** affect only the player's own squads.
+
+**Ready** locks a player's formation after they place at least one unit. When both players are ready, the Node server runs the existing simulation at 60 fixed ticks per second. It sends both clients the same full world every three ticks and immediately on deployment changes, start and finish. Each browser projects the shared 960 × 360 arena onto its own canvas. The server assigns unit IDs and computes movement, arrows, damage and the result.
+
+The server checks stroke type, length, finite coordinates, arena bounds, team half and the 100-unit budget per player before committing any part of a stroke. Each command carries a round and a per-connection sequence number. Duplicate commands and commands from an earlier round cannot place units twice. A third window sees **Room full**. **New round** restores both starting formations. If a player leaves, their seat opens and their opponent keeps their own formation for the next round.
+
+## Verify the room
+
+`npm test` includes a real WebSocket match that compares both clients' snapshots against the original Node simulation through the simultaneous tick-61 duel.
+
+After `npm run build`, run `npm run demo:room -- --headed --channel chrome` for the two-window demonstration using installed Chrome. Alternatively run `npx playwright install chromium` and omit `--channel chrome`. The demo opens 960 × 600 and 600 × 480 viewports, holds both pointers down at once, draws Warriors and Archers, and presses Ready in each window. It checks every deployed unit's ID and arena coordinates, samples the rendered team colors at those positions in both canvases, and compares the battle snapshots through the final tick.
+
+The demonstration normally starts an isolated local server. Pass `--url http://127.0.0.1:5173/room` to use an empty running room. Add `--keep-open` to leave both windows on the restored formation for another match, or `--output <directory>` to save both views and the coordinate record.
 
 ## Deployment
 
@@ -35,4 +51,4 @@ The [arrow tests](tests/archer.test.mjs) include a single shot at a stationary e
 
 The [crowd tests](tests/crowd.test.mjs) cover allies sharing a starting point, stacks against all four walls, and the full 20-vs-20 fight. In that formation, the test requires the opposing ranks to touch while all 40 are standing and verifies that each living pair stays at least 90% of one diameter apart.
 
-The local Git tag `project-start` marks the runnable blank-canvas starter. Codex implemented the duel, brush, crowd demo and Archer from the supplied specifications.
+The local Git tag `project-start` marks the runnable blank-canvas starter. Codex implemented the duel, brush, crowd demo, Archer and two-player room from the supplied specifications.

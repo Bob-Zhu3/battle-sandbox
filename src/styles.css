@@ -54,8 +54,15 @@ button:disabled { cursor: default; }
 .demo-controls summary { list-style: none; cursor: pointer; }
 .demo-controls summary::-webkit-details-marker { display: none; }
 .demo-options { position: absolute; right: 0; top: calc(100% + 9px); width: max-content; display: grid; gap: 3px; }
-.demo-options button { border: 2px solid var(--ink); border-radius: 4px; background: var(--paper); box-shadow: 2px 2px var(--ink); text-align: left; padding: 8px 12px; }
-.demo-options button:hover, .demo-options button:focus-visible { background: var(--gold); }
+.demo-options button, .demo-options a { border: 2px solid var(--ink); border-radius: 4px; background: var(--paper); box-shadow: 2px 2px var(--ink); text-align: left; padding: 8px 12px; }
+.demo-controls a { color: var(--ink); text-decoration: none; }
+.demo-options :is(button, a):is(:hover, :focus-visible) { background: var(--gold); }
+.seat-label { position: absolute; top: calc(100% + 6px); font: 800 .82rem/1 var(--display); letter-spacing: .04em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+.game[data-team] #scenario-name { display: inline-flex; align-items: center; gap: .4em; font-weight: 600; }
+.game[data-team] #scenario-name::before { content: ""; width: .68em; height: .68em; border: 1px solid var(--ink); border-radius: 50%; background: #e46950; }
+.game[data-team="blue"] #scenario-name::before { background: #5798cf; }
+.game[data-team] .hint { background: #d3e6a6e8; border-radius: 3px; padding-inline: 5px; }
+.game[data-room] .empty-guide h2 { font-size: clamp(1.9rem, 3.5vw, 3.1rem); }
 .flag-icon { width: 17px; height: 17px; position: relative; border-left: 2px solid var(--ink); transform: rotate(7deg); }
 .flag-icon::after { content: ""; position: absolute; left: 0; top: 0; width: 13px; height: 10px; background: repeating-conic-gradient(var(--ink) 0% 25%, var(--paper) 0% 50%) 0 0 / 7px 7px; border: 1px solid var(--ink); }
 .empty-guide, .result { position: absolute; left: 50%; text-align: center; pointer-events: none; }
