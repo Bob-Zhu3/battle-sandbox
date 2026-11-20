@@ -1,5 +1,4 @@
 import { drawLandscape } from "./landscape.ts";
-import { phoenixArtLoaded, phoenixArtReady } from "./phoenix-art.ts";
 import { maxHealth } from "./transformations.ts";
 import { createRoster } from "./roster.ts";
 import { UNIT_DEFINITIONS, UNIT_KINDS } from "./units.ts";
@@ -55,7 +54,6 @@ export function createField(mode?: MatchMode) {
     }
     resize();
     new ResizeObserver(resize).observe(canvas);
-    if (!phoenixArtLoaded) void phoenixArtReady.then(loaded => { if (loaded) paint(); });
   }
   const health = sides.map(side => ({
     side, score: element(side + "-score"), hp: element(side + "-hp"), max: element(side + "-max"),

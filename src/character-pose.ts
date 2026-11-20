@@ -113,6 +113,9 @@ export function phoenixFlight(unit: Unit | undefined, pose: CharacterPose, tick:
     wrist: a[2] + (b[2] - a[2]) * t + .66 * talons,
     height: 5.4 + a[3] + (b[3] - a[3]) * t + 2.8 * aim - 7 * talons + 2.4 * pullUp - 4 * takeoff,
     pitch: .07 * pose.pace + .34 * talons - .16 * pullUp - .11 * aim,
-    tail: Math.sin(2 * Math.PI * (phase - .12)), talons, pullUp, takeoff,
+    // The tip follows the root by about eleven ticks as the bird changes height.
+    tail: Math.sin(2 * Math.PI * (phase - .12)),
+    tailTip: Math.sin(2 * Math.PI * (phase - .32)),
+    talons, pullUp, takeoff,
   };
 }

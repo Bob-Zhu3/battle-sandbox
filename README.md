@@ -35,7 +35,7 @@ npm run demo:encounters
 
 A friendly Warrior standing between an Archer and its target ducks as the arrow passes its shoulder. The Archer rises to follow the shot. [Watch the Archer and Warrior](media/over-the-shoulder.mp4)
 
-Run `npm run demo:motion` to watch the Phoenix glide, strike with its talons and climb away. Three more encounters show a Lancer charging a Cyclops, a Musketeer reloading as a Reaper closes, and a Storm Kirin rearing under the Frost Queen's staff. A troop flashes white for seven ticks when damage lands, including each pulse of poison or fire. [Watch the same fights before and after](media/troops-in-motion.mp4)
+Run `npm run demo:motion` to watch the Phoenix glide, strike with its talons and climb away. Three more encounters show a Lancer charging a Cyclops, a Musketeer reloading as a Reaper closes, and a Storm Kirin rearing under the Frost Queen's staff. It then leaves you with a blue lineup. Place the selected Red Shieldbearer in front of the Phoenix to draw a strike. A troop flashes white for seven ticks when damage lands, including each pulse of poison or fire. [Watch the same fights before and after](media/troops-in-motion.mp4)
 
 Place a Zombie beside an enemy Archer. The Archer turns at the first bite, keeps its feathered cap and can infect the next human it reaches. [See the same Archer before and after the bite](media/zombie-bite.png)
 

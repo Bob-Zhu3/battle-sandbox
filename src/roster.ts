@@ -1,6 +1,5 @@
 import { ARMIES, type Team } from "./battlefield.ts";
 import { drawUnitToken } from "./characters.ts";
-import { phoenixArtLoaded, phoenixArtReady } from "./phoenix-art.ts";
 import { drawSpellIcon } from "./magic-art.ts";
 import { SPELLS, type SpellKind } from "./spells.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
@@ -37,15 +36,8 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     c.scale(2,2);
     if(isSpell(key)){c.translate(36,36);c.scale(1.95,1.95);drawSpellIcon(c,key);}
     else if (key === "phoenix") {
-      const side = team, x = 36 + ARMIES[side].facing * 12;
-      const paint = () => {
-        c.clearRect(0,0,72,72);
-        drawUnitToken(c,x,49,11.8,side,key);
-      };
-      paint();
-      if (!phoenixArtLoaded) void phoenixArtReady.then(loaded => { if (loaded) paint(); });
-    }
-    else {
+      drawUnitToken(c, 36 + ARMIES[team].facing * 9.5, 49, 13.5, team, key);
+    } else {
       const myth = key === "cyclops" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
       const longWeapon = key === "musketeer" || key === "lancer";
       const size = myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;

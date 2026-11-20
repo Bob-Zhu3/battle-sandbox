@@ -148,11 +148,15 @@ try {
   else console.log("PASS: four enemies struck, the Cyclops scattered a line and swallowed a wounded Lancer, and a one-HP egg hatched at half health.");
   if(!values.headless) {
     await clear();
-    if(values.motion){await place("Blue","Phoenix",429,184);await brush("Red","Shieldbearer");}
+    if(values.motion){
+      await place("Blue","Phoenix",391,181);await place("Blue","Warrior",467,185);
+      await place("Blue","Storm Kirin",538,181);await place("Blue","Frost Queen",616,181);
+      await brush("Red","Shieldbearer");
+    }
     else if(values.oddities){await place("Red","Zombie",397,166);await brush("Blue","Archer");}
     else {await place("Red","Storm Kirin",392,166);await brush("Blue","Lancer");}
     await page.clock.resume();
-    if(values.motion) console.log("Your turn. Place a Red Shieldbearer near the waiting Blue Phoenix. Close the window when finished.");
+    if(values.motion) console.log("Your turn. The Blue Phoenix leads the line. Place a Red Shieldbearer in front of it to see the strike. Close the window when finished.");
     else if(values.oddities) console.log("Your turn. Place a Blue Archer by the waiting Red Zombie. Close the window when finished.");
     else console.log("Your turn. Draw Blue Lancers in front of the Storm Kirin. Close the window when finished.");
     await page.waitForEvent("close",{timeout:0});

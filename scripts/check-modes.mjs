@@ -7,7 +7,8 @@ import { parseArgs } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 import { createGameServer } from "../server/http.ts";
-import { ARENA, TEAMS } from "../src/battlefield.ts";
+import { ARENA, ARMIES, TEAMS } from "../src/battlefield.ts";
+import { FACE, INK } from "../src/ink.ts";
 
 const { values } = parseArgs({ options: { channel: { type: "string" }, output: { type: "string" } } });
 const browser = await chromium.launch({ headless: true, channel: values.channel ?? (existsSync(chromium.executablePath()) ? undefined : "chrome") });
@@ -49,27 +50,42 @@ async function picture(page, name) {
 }
 
 async function phoenixDuringDeployment(url) {
-  const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
-  const download = Promise.withResolvers();
-  page.on("pageerror", error => errors.push(error.message));
-  await page.route("**/phoenix*.webp", async route => { await download.promise; await route.continue(); });
+  const {page, point, waitForUnits} = await open(url + "/room", 390, 700);
   try {
-    await page.goto(url + "/room", {waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector(".game").dataset.team === "red");
-    await selectFromRoster(page,"Mythical","Phoenix");
-    const field = page.locator("#arena"), rect = await field.boundingBox();
-    await page.mouse.click(rect.x + rect.width*.34, rect.y + rect.height*.52);
+    await selectFromRoster(page, "Mythical", "Phoenix");
+    await page.mouse.click(...point(326, 187));
+    await waitForUnits(1);
     await page.waitForFunction(() => document.querySelector("#red-count").textContent === "1");
-    await page.getByRole("button",{name:"Roster",exact:true}).click();
-    const card = page.getByRole("region",{name:"Troops and spells"}).getByRole("button",{name:"Phoenix",exact:true}).locator("canvas");
-    const before = await Promise.all([field,card].map(canvas => canvas.evaluate(c => c.toDataURL())));
-    download.resolve();
-    await page.waitForFunction(([arena,icon]) =>
-      document.querySelector("#arena").toDataURL() !== arena &&
-      document.querySelector('.roster-panel button[aria-label="Phoenix"] canvas').toDataURL() !== icon, before);
-    assert.equal(Number(await page.locator("#tick").textContent()),0);
-    console.log("Phoenix: the phone roster and the deployed bird acquire their painted feathers while the room stays on tick zero.");
-  } finally { download.resolve(); await page.context().close(); }
+    const colors = [INK, ARMIES.red.coat, FACE].map(hex =>
+      [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16)));
+    async function checkPaint(canvas, field = false) {
+      const paint = await canvas.evaluate((el, {colors, field}) => {
+        const area = field ? [.28, .43, .12, .14] : [0, 0, 1, 1];
+        const [x, y, w, h] = area.map((v, i) => Math.round(v * (i % 2 ? el.height : el.width)));
+        const pixels = el.getContext("2d").getImageData(x, y, w, h).data;
+        // At phone size the ink stroke can cover only part of a pixel.
+        const found = colors.map(color => {
+          for (let i = 0; i < pixels.length; i += 4) {
+            if (pixels[i + 3] >= 110 && color.every((v, k) => Math.abs(pixels[i + k] - v) <= 10)) return true;
+          }
+          return false;
+        });
+        const clearFrame = field || pixels.every((alpha, i) => {
+          if (i % 4 !== 3 || alpha < 32) return true;
+          const col = (i >> 2) % w, row = Math.floor((i >> 2) / w);
+          return col > 0 && col < w - 1 && row > 0 && row < h - 1;
+        });
+        return {found, clearFrame};
+      }, {colors, field});
+      assert.deepEqual(paint.found, [true, true, true], "The Phoenix has its ink outline, team feathers and pale face");
+      assert.ok(paint.clearFrame, "The full wing and forked tail fit inside the portrait");
+    }
+    await checkPaint(page.locator("#roster-open canvas"));
+    await checkPaint(page.locator("#arena"), true);
+    assert.equal(Number(await page.locator("#tick").textContent()), 0);
+    console.log("Phoenix: the complete roster portrait and deployed bird are visible on a phone at tick zero.");
+  } finally { await page.context().close(); }
 }
 
 async function withField(check) {
