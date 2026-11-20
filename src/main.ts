@@ -1,5 +1,5 @@
-import { battleOutcome, stepBattle, TICKS_PER_SECOND } from "./simulation.ts";
-import { archerScreen, battleFromDeployment, twentyVsTwenty, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
+import { battleOutcome, createDuel, stepBattle, TICKS_PER_SECOND } from "./simulation.ts";
+import { archerScreen, battleFromDeployment, overTheShoulder, twentyVsTwenty, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
 import { attachDeploymentBrush } from "./brush-input.ts";
 import { drawArena } from "./renderer.ts";
 import { createField, element, updateFieldScore } from "./field.ts";
@@ -28,6 +28,7 @@ const resultDetail = element("result-detail");
 const millisecondsPerTick = 1000 / TICKS_PER_SECOND;
 const labels = {
   deploy: { status: "Deployment", button: "Start" },
+  staged: { status: "Ready", button: "Start" },
   running: { status: "Live", button: "Pause" },
   paused: { status: "Paused", button: "Resume" },
   finished: { status: "Finished", button: "Replay" },
@@ -36,8 +37,10 @@ type Playback = keyof typeof labels;
 
 const formation: PlacementCommand[] = [];
 const demos = {
-  "20v20": { name: "20 vs 20 Warriors", formation: twentyVsTwenty() },
-  archers: { name: "Archer screen", formation: archerScreen() },
+  shoulder: { name: "Over the shoulder", battle: () => battleFromDeployment(overTheShoulder()) },
+  duel: { name: "Warrior duel", battle: createDuel },
+  "20v20": { name: "20 vs 20 Warriors", battle: () => battleFromDeployment(twentyVsTwenty()) },
+  archers: { name: "Archer screen", battle: () => battleFromDeployment(archerScreen()) },
 };
 type Demo = keyof typeof demos;
 let activeDemo: Demo | null = null;
@@ -49,6 +52,7 @@ let previous = battle;
 let remainder = 0;
 let lastTime = 0;
 let frameId = 0;
+let paintedBlend = 1;
 
 function updateGuide() {
   emptyGuide.hidden = mode !== "deploy" || battle.units.length > 0 || draft.length > 0;
@@ -89,7 +93,8 @@ function setMode(next: Playback) {
   updateGuide();
 }
 
-function paint(blend = 1) {
+function paint(blend = paintedBlend) {
+  paintedBlend = blend;
   drawArena(ctx, previous, battle, blend, mode === "deploy", draft, draftKind);
 }
 
@@ -115,12 +120,13 @@ function frame(time: number) {
   if (mode === "running") frameId = requestAnimationFrame(frame);
 }
 
-function loadFormation(next: "deploy" | "running") {
+function loadFormation(next: "deploy" | "staged" | "running") {
   cancelAnimationFrame(frameId);
   cancelStroke();
-  battle = battleFromDeployment(activeDemo ? demos[activeDemo].formation : formation);
+  battle = activeDemo ? demos[activeDemo].battle() : battleFromDeployment(formation);
   previous = battle;
   remainder = 0;
+  paintedBlend = 1;
   setMode(next);
   updateScore();
   paint();
@@ -128,8 +134,6 @@ function loadFormation(next: "deploy" | "running") {
 }
 
 function startClock() {
-  previous = battle;
-  remainder = 0;
   lastTime = performance.now();
   frameId = requestAnimationFrame(frame);
 }
@@ -168,9 +172,11 @@ play.addEventListener("click", () => {
 function openDemo(name: Demo | null) {
   activeDemo = name;
   demoPicker.open = false;
-  loadFormation(name ? "running" : "deploy");
+  loadFormation(name === "shoulder" ? "staged" : name ? "running" : "deploy");
   canvas.focus({ preventScroll: true });
 }
+element("demo-shoulder").addEventListener("click", () => openDemo("shoulder"));
+element("demo-duel").addEventListener("click", () => openDemo("duel"));
 element("demo-archers").addEventListener("click", () => openDemo("archers"));
 element("demo-warriors").addEventListener("click", () => openDemo("20v20"));
 demoBack.addEventListener("click", () => openDemo(null));
@@ -208,6 +214,6 @@ document.addEventListener("visibilitychange", () => {
 });
 
 const requestedDemo = new URLSearchParams(location.search).get("demo");
-if (requestedDemo === "20v20" || requestedDemo === "archers") activeDemo = requestedDemo;
-field.watchSize(() => paint(mode === "running" ? remainder / millisecondsPerTick : 1));
-loadFormation(activeDemo ? "running" : "deploy");
+if (requestedDemo === "shoulder" || requestedDemo === "duel" || requestedDemo === "20v20" || requestedDemo === "archers") activeDemo = requestedDemo;
+field.watchSize(() => paint());
+loadFormation(activeDemo === "shoulder" ? "staged" : activeDemo ? "running" : "deploy");

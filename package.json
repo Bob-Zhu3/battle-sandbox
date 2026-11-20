@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "demo:characters": "vite --host 127.0.0.1 --open /?demo=shoulder",
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build",
     "start": "node server/start.ts",
     "demo:room": "node scripts/demo-room.mjs",

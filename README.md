@@ -6,6 +6,8 @@ A Canvas 2D battle sandbox. Draw a formation on the field or open **Play modes**
 
 Use Node.js 22.18 or later. In this directory, run `npm ci` and `npm run dev`, then open the local URL Vite prints. The development server hosts the game and its WebSocket endpoint on the same port. For a built game, run `npm run build` followed by `npm start`. The standalone Node server defaults to `http://127.0.0.1:4173` and accepts `HOST` and `PORT` environment variables.
 
+Run `npm run demo:characters` to open **Over the shoulder**. Press **Start** and watch the upper red Archer on its first shot. It rises to see over its Warrior. As the shaft approaches from behind, the Warrior tucks its helmet under its shield. **Pause** holds the pose and **Replay** repeats the fight. The duel, Archer screen and 20-vs-20 fight are also available under **Play modes**. [Before-and-after clip](media/over-the-shoulder.mp4)
+
 ## Two-player room
 
 Open `/room` in two browser windows on the same server. The first connection gets Red on the left and the second gets Blue on the right. Each player can draw while the other is drawing. A stroke previews locally and appears in both windows on release. **Undo** and **Clear** affect only the player's own squads.

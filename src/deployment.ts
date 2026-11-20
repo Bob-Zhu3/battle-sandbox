@@ -90,3 +90,10 @@ export function archerScreen(): PlacementCommand[] {
     { type: "place-warriors", positions: opponents },
   ];
 }
+
+export function overTheShoulder(): PlacementCommand[] {
+  return [
+    { type: "place-warriors", positions: [{ x: 414, y: 155 }, { x: 343, y: 210 }, { x: 602, y: 160 }, { x: 655, y: 212 }] },
+    { type: "place-archers", positions: [{ x: 334, y: 151 }, { x: 688, y: 208 }] },
+  ];
+}

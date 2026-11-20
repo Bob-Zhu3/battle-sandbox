@@ -2,114 +2,24 @@ import { ARENA, boundCenter, type Team } from "./simulation.ts";
 import type { World } from "./room-protocol.ts";
 import { teamAt, type ArenaPoint } from "./deployment.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { characterPose, restingPose } from "./character-pose.ts";
+import { drawFallen, drawUnitToken, INK, palette } from "./characters.ts";
 
-const colors = {
-  red: { shell: "#e46950", shade: "#af453c", gleam: "#ffb685" },
-  blue: { shell: "#5798cf", shade: "#3e6d9d", gleam: "#afddf1" },
-};
-const INK = "#293731";
-const TAU = 2 * Math.PI;
-
-function circle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-}
-
-// The brush stamp, placement preview and live unit share a silhouette.
-export function drawUnitToken(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, side: Team, kind: UnitKind, flash = false) {
-  const color = colors[side];
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale((side === "red" ? r : -r) / 16, r / 16);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  circle(ctx, 0, 0, 15);
-  ctx.fillStyle = flash ? color.gleam : color.shell;
-  ctx.fill();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-13, 3);
-  ctx.bezierCurveTo(-8, 11, 4, 14, 12, 5);
-  ctx.bezierCurveTo(8, 17, -9, 17, -13, 3);
-  ctx.fillStyle = color.shade;
-  ctx.fill();
-
-  if (kind === "archer") drawBow(ctx);
-  else drawVisor(ctx, side);
-  ctx.restore();
-}
-
-function drawBow(ctx: CanvasRenderingContext2D) {
-  ctx.beginPath();
-  ctx.moveTo(-4, -10); ctx.lineTo(-9, 0); ctx.lineTo(-4, 10);
-  ctx.strokeStyle = "#fff2c7";
-  ctx.lineWidth = 1.35;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-4, -10);
-  ctx.bezierCurveTo(-1, -8, 5, -9, 6, 0);
-  ctx.bezierCurveTo(5, 9, -1, 8, -4, 10);
-  ctx.strokeStyle = INK; ctx.lineWidth = 4.8; ctx.stroke();
-  ctx.strokeStyle = "#ffd077"; ctx.lineWidth = 2.4; ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-9, 0); ctx.lineTo(10, 0);
-  ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(12, 0); ctx.lineTo(7, -2.8); ctx.lineTo(7, 2.8); ctx.closePath();
-  ctx.fillStyle = "#fff2c7"; ctx.fill();
-  ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke();
-}
-
-function drawVisor(ctx: CanvasRenderingContext2D, side: Team) {
-  // A cream visor with one eye facing the other army reads even at a small size.
-  ctx.beginPath();
-  ctx.moveTo(-7, -4);
-  ctx.quadraticCurveTo(2, -1, 12, -5);
-  ctx.lineTo(11, 2);
-  ctx.quadraticCurveTo(6, 6, -2, 6);
-  ctx.lineTo(-6, 3);
-  ctx.closePath();
-  ctx.fillStyle = "#fff2c7";
-  ctx.fill();
-  ctx.lineWidth = 1.65;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(7, -1);
-  ctx.lineTo(7, 1.5);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  ctx.strokeStyle = colors[side].gleam;
-  ctx.lineWidth = 2.1;
-  ctx.beginPath();
-  if (side === "red") {
-    ctx.moveTo(-7, -9); ctx.quadraticCurveTo(-4, -12, 0, -12);
-  } else {
-    ctx.moveTo(-6, -9); ctx.lineTo(-3, -12);
-    ctx.moveTo(-1, -9); ctx.lineTo(2, -12);
-  }
-  ctx.stroke();
-}
-
-function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team) {
+function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team, length: number) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-  ctx.scale(scale, scale);
+  ctx.scale(scale * length, scale);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  // The tip is the simulated point of impact.
+  // The front of the shaft follows the simulated tip at bow height.
   ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(-2, 0);
   ctx.strokeStyle = INK; ctx.lineWidth = 2.8; ctx.stroke();
   ctx.strokeStyle = "#ffd073"; ctx.lineWidth = 1; ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(-10, 0); ctx.lineTo(-14, -3); ctx.lineTo(-17, -3);
   ctx.lineTo(-15, 0); ctx.lineTo(-17, 3); ctx.lineTo(-14, 3); ctx.closePath();
-  ctx.fillStyle = colors[side].gleam; ctx.fill();
+  ctx.fillStyle = palette[side].light; ctx.fill();
   ctx.strokeStyle = INK; ctx.lineWidth = .85; ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(0, 0); ctx.lineTo(-5.5, -2.8); ctx.lineTo(-4.3, 0); ctx.lineTo(-5.5, 2.8); ctx.closePath();
@@ -171,46 +81,35 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
   if (deploying) drawDivider(ctx, w, h, !current.units.length && !preview.length);
 
-  for (const unit of current.units) {
-    if (unit.hp || unit.lastHitTick === null) continue;
-    const age = current.tick - unit.lastHitTick;
-    if (age >= 24) continue;
-    const x = ox + unit.x * sx, y = oy + unit.y * sy;
-    const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
-    ctx.save();
-    ctx.globalAlpha = .46 * (1 - age / 24);
-    ctx.strokeStyle = colors[unit.team].shade;
-    ctx.lineWidth = Math.max(1, r * .15);
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(x - .36 * r, y - .36 * r); ctx.lineTo(x + .36 * r, y + .36 * r);
-    ctx.moveTo(x + .36 * r, y - .36 * r); ctx.lineTo(x - .36 * r, y + .36 * r);
-    ctx.stroke();
-    ctx.restore();
-  }
-  for (const [i, unit] of current.units.entries()) {
-    if (!unit.hp) continue;
+  const tick = previous.tick + (current.tick - previous.tick) * blend;
+  const byId = new Map(current.units.map(unit => [unit.id, unit]));
+  const bodies = current.units.map((unit, i) => {
     const from = previous.units[i];
-    const x = ox + (from.x + (unit.x - from.x) * blend) * sx;
-    const y = oy + (from.y + (unit.y - from.y) * blend) * sy;
-    const age = unit.lastHitTick === null ? Infinity : current.tick - unit.lastHitTick;
+    return { unit, from, x: ox + (from.x + (unit.x - from.x) * blend) * sx, y: oy + (from.y + (unit.y - from.y) * blend) * sy };
+  }).sort((a, b) => a.y - b.y || a.unit.id - b.unit.id);
+  for (const { unit, x, y } of bodies) {
+    if (unit.hp || unit.lastHitTick === null) continue;
+    const age = Math.max(0, tick - unit.lastHitTick);
+    if (age < 48) {
+      const side = unit.aimX < 0 ? -1 : 1;
+      drawFallen(ctx, x, y, UNIT_DEFINITIONS[unit.kind].radius * scale, unit.team, unit.kind, side, age);
+    }
+  }
+  for (const { unit, from, x, y } of bodies) {
+    if (!unit.hp) continue;
+    const travel = from.walkDistance + (unit.walkDistance - from.walkDistance) * blend;
+    const pose = deploying ? restingPose(unit.team === "red" ? 1 : -1)
+      : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, travel);
     const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
-    drawUnitToken(ctx, x, y, r, unit.team, unit.kind, age < 5);
-    if (age < 8) {
-      // A brief spark at the visor leaves the circular silhouette readable in a crowd.
-      const direction = unit.team === "red" ? 1 : -1;
+    drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose);
+    const hitAge = unit.lastHitTick === null ? Infinity : Math.max(0, tick - unit.lastHitTick);
+    if (hitAge < 6) {
       ctx.save();
-      ctx.translate(x + direction * r * .86, y - direction * r * (.67 + age * .055));
-      ctx.scale(r * (1 - age / 9), r * (1 - age / 9));
-      ctx.beginPath();
-      ctx.moveTo(0, -.45); ctx.lineTo(.09, -.12); ctx.lineTo(.31, -.05); ctx.lineTo(.12, .06);
-      ctx.lineTo(0, .37); ctx.lineTo(-.1, .09); ctx.lineTo(-.31, .01); ctx.lineTo(-.1, -.1);
-      ctx.closePath();
-      ctx.fillStyle = "#ffe9a0";
-      ctx.fill();
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = .06;
-      ctx.stroke();
+      ctx.translate(x + pose.side * r * .81, y - r * .65);
+      ctx.scale(pose.side * scale, scale);
+      ctx.globalAlpha = 1 - hitAge / 6;
+      ctx.strokeStyle = "#fff2cd"; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(1, -1); ctx.lineTo(3, -4); ctx.moveTo(3, 1); ctx.lineTo(6, 0); ctx.stroke();
       ctx.restore();
     }
   }
@@ -218,7 +117,8 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const rewind = arrow.releasedTick === current.tick ? 0 : 1 - blend;
     const x = ox + (arrow.x - arrow.vx * rewind) * sx;
     const y = oy + (arrow.y - arrow.vy * rewind) * sy;
-    drawArrow(ctx, x, y, Math.atan2(arrow.vy, arrow.vx), scale, arrow.team);
+    const length = Math.min(1, Math.max(0, tick - arrow.releasedTick) / 3);
+    if (length > 0) drawArrow(ctx, x, y - 7 * scale, Math.atan2(arrow.vy, arrow.vx), scale, arrow.team, length);
   }
   if (view.showIds) {
     ctx.save();

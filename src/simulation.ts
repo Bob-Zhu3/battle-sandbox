@@ -21,6 +21,15 @@ export interface Unit extends Placement {
   hp: number;
   nextAttackTick: number;
   lastHitTick: number | null;
+  targetId: number | null;
+  aimX: number;
+  aimY: number;
+  walkDistance: number;
+  pace: number;
+  lastAttackTick: number | null;
+  attackDirection: { x: number; y: number } | null;
+  // Archer peeking past cover, or Warrior hearing a friendly shaft pass behind.
+  lastAttentionTick: number | null;
 }
 
 export type Warrior = Unit & { kind: "warrior" };
@@ -58,6 +67,8 @@ export function createBattle(placements: readonly Placement[]): Battle {
     return {
       ...placement, kind, x: boundCenter(placement.x, ARENA.width, radius), y: boundCenter(placement.y, ARENA.height, radius),
       hp: maxHp, nextAttackTick: 1, lastHitTick: null,
+      targetId: null, aimX: placement.team === "red" ? 1 : -1, aimY: 0,
+      walkDistance: 0, pace: 0, lastAttackTick: null, attackDirection: null, lastAttentionTick: null,
     };
   });
   return new Battle(0, units, []);
@@ -136,6 +147,34 @@ function separateFootprints(previous: readonly Unit[], next: Unit[], solid: read
   return overlapping;
 }
 
+function shootingPastCover(archer: Unit, units: readonly Unit[], range: number) {
+  return units.some(ally => {
+    if (ally.kind !== "warrior" || ally.team !== archer.team || ally.hp <= 0) return false;
+    const dx = ally.x - archer.x, dy = ally.y - archer.y;
+    const ahead = dx * archer.aimX + dy * archer.aimY;
+    const across = dx * archer.aimY - dy * archer.aimX;
+    return ahead > 0 && ahead < range && Math.abs(across) < WARRIOR.radius + 5;
+  });
+}
+
+// A Warrior can hear an arrow just before it passes its shoulder. This stamps a
+// pose only. Allies still let the same projectile through along its original path.
+function noticeFriendlyArrow(arrow: Arrow, units: Unit[], tick: number) {
+  const speed = Math.hypot(arrow.vx, arrow.vy);
+  if (!speed) return;
+  const ax = arrow.vx / speed, ay = arrow.vy / speed;
+  for (const unit of units) {
+    if (unit.team !== arrow.team || unit.kind !== "warrior" || unit.hp <= 0) continue;
+    if (unit.lastAttentionTick !== null && tick - unit.lastAttentionTick < 24) continue;
+    if (ax * unit.aimX + ay * unit.aimY < .5) continue;
+    const dx = unit.x - arrow.x, dy = unit.y - arrow.y;
+    const ahead = dx * ax + dy * ay;
+    if (ahead >= 0 && ahead <= 26 && Math.abs(dx * ay - dy * ax) <= WARRIOR.radius + 2) {
+      unit.lastAttentionTick = tick;
+    }
+  }
+}
+
 export function stepBattle(battle: Battle): Battle {
   const tick = battle.tick + 1;
   const damage = new Map<number, number>();
@@ -146,12 +185,20 @@ export function stepBattle(battle: Battle): Battle {
     const next = { ...unit };
     if (unit.hp <= 0) return next;
     const target = nearestEnemy(unit, battle.units);
+    next.targetId = target?.id ?? null;
     if (!target) return next;
 
     const definition = UNIT_DEFINITIONS[unit.kind];
     const dx = target.x - unit.x;
     const dy = target.y - unit.y;
     const distance = Math.hypot(dx, dy);
+    if (distance > 0) {
+      next.aimX = dx / distance;
+      next.aimY = dy / distance;
+    } else {
+      next.aimX = unit.team === "red" ? 1 : -1;
+      next.aimY = 0;
+    }
     const stopAt = definition.attack === "arrow" ? definition.reach : definition.radius + UNIT_DEFINITIONS[target.kind].radius;
     if (distance > stopAt) {
       const travel = Math.min(definition.speed / TICKS_PER_SECOND, distance - stopAt);
@@ -160,14 +207,16 @@ export function stepBattle(battle: Battle): Battle {
     }
     if (distance <= definition.reach && tick >= unit.nextAttackTick) {
       next.nextAttackTick = tick + definition.cooldownTicks;
+      next.lastAttackTick = tick;
+      next.attackDirection = { x: next.aimX, y: next.aimY };
       if (definition.attack === "melee") {
         damage.set(target.id, (damage.get(target.id) ?? 0) + definition.damage);
       } else {
+        if (shootingPastCover(next, battle.units, distance)) next.lastAttentionTick = tick;
         const step = definition.arrowSpeed / TICKS_PER_SECOND;
-        const facing = unit.team === "red" ? 1 : -1;
         arrows.push({
           x: unit.x, y: unit.y, team: unit.team, releasedTick: tick, damage: definition.damage,
-          vx: step * (distance > 0 ? dx / distance : facing), vy: step * (distance > 0 ? dy / distance : 0),
+          vx: step * next.aimX, vy: step * next.aimY,
         });
       }
     }
@@ -182,6 +231,7 @@ export function stepBattle(battle: Battle): Battle {
   }
   // Only previously released arrows fly this tick. Each one is consumed by its first hit.
   for (const arrow of battle.arrows) {
+    noticeFriendlyArrow(arrow, units, tick);
     const hit = firstArrowImpact(arrow, battle.units, units);
     if (hit) {
       damage.set(hit.id, (damage.get(hit.id) ?? 0) + arrow.damage);
@@ -190,7 +240,12 @@ export function stepBattle(battle: Battle): Battle {
     const x = arrow.x + arrow.vx, y = arrow.y + arrow.vy;
     if (x >= 0 && x <= ARENA.width && y >= 0 && y <= ARENA.height) arrows.push({ ...arrow, x, y });
   }
-  for (const unit of units) {
+  for (const [index, unit] of units.entries()) {
+    const from = battle.units[index];
+    const distance = Math.hypot(unit.x - from.x, unit.y - from.y);
+    unit.walkDistance += distance;
+    const speed = UNIT_DEFINITIONS[unit.kind].speed / TICKS_PER_SECOND;
+    unit.pace += (distance / speed - unit.pace) * .3;
     const amount = damage.get(unit.id);
     if (amount === undefined) continue;
     unit.hp = Math.max(0, unit.hp - amount);

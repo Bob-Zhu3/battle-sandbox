@@ -1,5 +1,5 @@
 import { drawLandscape } from "./landscape.ts";
-import { drawUnitToken } from "./renderer.ts";
+import { drawUnitToken } from "./characters.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import type { Team } from "./simulation.ts";
 import type { World } from "./room-protocol.ts";
@@ -28,7 +28,7 @@ export function createField() {
     for (const kind of ["warrior", "archer"] as const) {
       const icon = contextFor(element<HTMLCanvasElement>("icon-" + kind));
       icon.clearRect(0, 0, 72, 72);
-      drawUnitToken(icon, 36, 36, 31, team, kind);
+      drawUnitToken(icon, 36, 42, 22, team, kind);
     }
   }
   colorBrush("red");
