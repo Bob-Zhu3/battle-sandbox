@@ -7,7 +7,7 @@ import { UNIT_DEFINITIONS } from "./units.ts";
 export const ROOM_SOCKET = MATCHES.duel.socket;
 export const TEAM_LIMIT = Math.floor(STARTING_GOLD / Math.min(...Object.values(UNIT_DEFINITIONS).map(unit => unit.cost)));
 export const SNAPSHOT_EVERY = 3;
-export type World = Pick<Battle, "tick" | "units" | "arrows" | "bases" | "spells">;
+export type World = Pick<Battle, "tick" | "units" | "arrows" | "bases" | "spells" | "effects">;
 export type ControlAction = { type: "ready" | "undo" | "clear" | "new-round" };
 export type PurchaseCommand = PlacementCommand | {type: SpellType; positions: readonly ArenaPoint[]};
 export type RoomAction = PurchaseCommand | ControlAction;

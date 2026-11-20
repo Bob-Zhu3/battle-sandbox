@@ -51,13 +51,13 @@ test("tower locks break by ID, restart on leaving range, and observe the reload 
   w.bases[0].hp=0;w=advance(w,90);assert.equal(w.bases[0].lastShotTick,95);
 });
 
-test("the Shieldbearer raises its shield before impact; arrows, rear shots and barrels resolve differently",()=>{
-  for(const [kind,front,damage] of [[undefined,true,2],["bolt",true,2],[undefined,false,8],["barrel",true,8]]) {
+test("the Shieldbearer raises its shield before impact; frontal and rear shots resolve differently",()=>{
+  for(const [kind,front,damage] of [[undefined,true,2],["bolt",true,2],[undefined,false,8],["bullet",true,2]]) {
     let w=quiet(createBattle([at(1,"shieldbearer","red",350),at(2,"post","blue",600)]));
     w.arrows.push(shot("blue",front?400:316,180,front?-5:5,8,kind));
     w=stepBattle(w);
     assert.equal(find(w,1).hp,46);
-    if(front && kind!=="barrel") assert.equal(find(w,1).lastBraceTick,1);
+    if(front) assert.equal(find(w,1).lastBraceTick,1);
     w=until(w,s=>find(s,1).hp<46);
     assert.equal(find(w,1).hp,46-damage);
     assert.equal(find(w,1).lastBlockTick!==undefined,damage===2);
@@ -88,50 +88,6 @@ test("a Medic wraps a wounded person, never a machine; a hit on the final wrap t
   const interrupted=stepBattle(held);
   assert.equal(find(interrupted,2).hp,18);assert.equal(find(interrupted,1).wrappingSince,undefined);
   assert.equal(find(interrupted,1).aidReadyTick,49);
-});
-
-function barrelYard() {return createBattle([at(1,"giant","red",405),at(2,"cooper","blue",555)]);}
-test("a Giant catches a real rolled barrel and returns it to the Roller with the new allegiance",()=>{
-  let w=until(barrelYard(),s=>!!find(s,1).barrel);
-  const caught=w.tick;assert.equal(find(w,1).hp,84);assert.equal(w.arrows.length,0);
-  const restored=structuredClone(w);
-  w=advance(w,defs.giant.holdTicks-1);assert.ok(find(w,1).barrel);
-  w=stepBattle(w);assert.equal(w.tick,caught+defs.giant.holdTicks);
-  assert.deepEqual(w.arrows.filter(a=>a.returned).map(a=>[a.kind,a.team,a.returned]),[["barrel","red",true]]);
-  assert.deepEqual(JSON.stringify(w),JSON.stringify(advance(restored,defs.giant.holdTicks)));
-  w=until(w,s=>find(s,2).lastHitTick!==null);
-  assert.equal(find(w,2).hp,defs.cooper.maxHp-defs.cooper.damage);
-});
-test("either color of Clockmouse makes the carrying Giant drop the barrel and flee from its actual position",()=>{
-  for(const team of ["red","blue"]) {
-    let w=until(barrelYard(),s=>!!find(s,1).barrel);
-    const giant=find(w,1);
-    w.units.push(...createBattle([at(3,"mouse",team,giant.x+36)]).units);
-    w=stepBattle(w);
-    const frightened=find(w,1);
-    assert.equal(frightened.fearId,3);assert.equal(frightened.barrel,undefined);
-    assert.equal(frightened.droppedBarrel.tick,w.tick);assert.equal(find(w,3).lastSqueakTick,w.tick);
-    assert.ok(frightened.x<giant.x);
-    assert.equal(w.arrows.some(a=>a.returned),false);
-  }
-});
-
-test("a barrel that hits a Giant from behind or has already been returned cannot be caught",()=>{
-  for(const returned of [false,true]) {
-    let w=quiet(createBattle([at(1,"giant","red",400),at(2,"post","blue",560)]));
-    w.arrows.push({...shot("blue",returned?410:390,180,returned?-3:3,13,"barrel"),returned});
-    w=stepBattle(w);
-    assert.equal(find(w,1).barrel,undefined);assert.equal(find(w,1).hp,defs.giant.maxHp-13);
-  }
-});
-
-test("a startled Giant keeps running briefly after a mouse leaves, then turns back to the fight",()=>{
-  let w=quiet(createBattle([at(1,"giant","red",400),at(2,"mouse","red",450),at(3,"post","blue",640)]));
-  w=stepBattle(w);const startled=find(w,1).x;
-  find(w,2).x=850;
-  w=advance(w,defs.giant.fleeTicks-1);
-  assert.ok(find(w,1).x<startled-25);assert.equal(find(w,1).fearId,2);
-  w=stepBattle(w);assert.equal(find(w,1).fearId,undefined);assert.equal(find(w,1).targetId,3);assert.ok(find(w,1).aimX>0);
 });
 
 test("a full roster and its battlefield effects resume identically from a wire snapshot",()=>{
@@ -177,11 +133,11 @@ test("an Engineer builds a single Watchpost and repairs its damaged mechanism",(
 
 test("a metal target carries the Kirin's next spark across a gap that an organic target cannot bridge",()=>{
   for(const first of ["mouse","warrior"]){
-    let w=createBattle([at(1,"kirin","red",220),at(2,first,"blue",309),at(3,"medic","blue",380),at(4,"archer","blue",408)]);
+    let w=createBattle([at(1,"kirin","red",220),at(2,first,"blue",309),at(3,"medic","blue",402),at(4,"archer","blue",430)]);
     w=stepBattle(w);
     assert.equal(find(w,1).arc.path.length,first==="mouse"?4:2);
-    assert.equal(find(w,3).hp,defs.medic.maxHp-(first==="mouse"?5:0));
-    assert.equal(find(w,4).hp,defs.archer.maxHp-(first==="mouse"?3:0));
+    assert.equal(find(w,3).hp,defs.medic.maxHp-(first==="mouse"?7:0));
+    assert.equal(find(w,4).hp,defs.archer.maxHp-(first==="mouse"?5:0));
   }
 });
 
@@ -200,21 +156,21 @@ function ember(){
 }
 test("a Phoenix ember hatches once, a friendly Gust fans it early, and enemy rain douses it",()=>{
   let w=ember();assert.equal(w.units[0].hp,1);assert.equal(w.units[0].killedBy,undefined);
-  const hatches=advance(structuredClone(w),90);assert.equal(hatches.units[0].hp,14);
+  const hatches=advance(structuredClone(w),90);assert.equal(hatches.units[0].hp,Math.ceil(defs.phoenix.maxHp/2));
   assert.equal(hatches.units[0].emberUntil,undefined);
   hatches.arrows.push(shot("blue",400,180,-5,30));assert.equal(stepBattle(hatches).units[0].hp,0);
-  const early=advance(cast(structuredClone(w),"gust","red",400,180),8);assert.equal(early.units[0].hp,14);
+  const early=advance(cast(structuredClone(w),"gust","red",400,180),8);assert.equal(early.units[0].hp,Math.ceil(defs.phoenix.maxHp/2));
   assert.equal(early.units[0].lastHatchTick,9);
   w.bases=[makeBase("duel","red"),makeBase("duel","blue")];
   const out=advance(cast(w,"rain","blue",400,180),12);assert.equal(out.units[0].hp,0);assert.equal(out.units[0].killedBy,"blue");
 });
 
-test("Gust deflects hostile shafts, leaves barrels rolling, pushes troops and leaves buildings rooted",()=>{
+test("Gust deflects hostile shafts, leaves heavy bombs airborne, pushes troops and leaves buildings rooted",()=>{
   let w=quiet(createBattle([at(1,"warrior","blue",430),at(2,"post","blue",430,213)]));
   w=cast(w,"gust","red",400,180);w=advance(w,7);
-  w.arrows.push(shot("blue",360,175,5),shot("blue",360,174,3,8,"barrel"));
+  w.arrows.push(shot("blue",360,175,5),{...shot("blue",360,174,3,8,"bomb"),landTick:30});
   w=stepBattle(w);assert.ok(find(w,1).x>455);assert.deepEqual([find(w,2).x,find(w,2).y],[430,213]);
-  assert.deepEqual(w.arrows.map(a=>a.kind),["barrel"]);
+  assert.deepEqual(w.arrows.map(a=>a.kind),["bomb"]);
 });
 test("rain pulses three times and a marked Meteor hits only the enemies still inside on the impact tick",()=>{
   let w=quiet(createBattle([at(1,"warrior","red",400),at(2,"post","blue",430),at(3,"archer","blue",446,187)]));

@@ -34,7 +34,7 @@ export function facesShot(unit: Unit, shot: Arrow) {
 export function incomingShot(unit: Unit, shots: readonly Arrow[]) {
   const guard = UNIT_DEFINITIONS.shieldbearer;
   return shots.some(shot => {
-    if (shot.kind === "barrel" || shot.team === unit.team || !facesShot(unit, shot)) return false;
+    if (shot.kind === "bomb" || shot.kind === "ice" || shot.team === unit.team || !facesShot(unit, shot)) return false;
     const speed = Math.hypot(shot.vx, shot.vy);
     const dx = unit.x - shot.x, dy = unit.y - shot.y;
     const ahead = (dx * shot.vx + dy * shot.vy) / speed;

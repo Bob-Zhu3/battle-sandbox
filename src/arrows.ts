@@ -3,12 +3,13 @@ import { BASE_RADIUS } from "./battlefield.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Arrow {
-  kind?: "bolt" | "barrel" | "dart"; // Ordinary bow shots carry no tag.
-  returned?: boolean; // A Giant can return a barrel once.
+  kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom";
+  piercedIds?: number[];
+  landTick?: number;
   team: Team;
   x: number;
   y: number;
-  vx: number; // Arena units per tick. The direction is fixed at release.
+  vx: number;
   vy: number;
   damage: number;
   releasedTick: number;
@@ -18,7 +19,7 @@ export interface Arrow {
 // frame of reference the circle stands still and the tip follows one segment.
 function contactTime(arrow: Arrow, from: Target, to: Target): number | undefined {
   const x = arrow.x - from.x, y = arrow.y - from.y;
-  const radius = (from.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[from.kind].radius) + (arrow.kind === "barrel" ? 5 : 0);
+  const radius = from.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[from.kind].radius;
   const c = x * x + y * y - radius * radius;
   if (c <= 0) return 0;
 
@@ -33,17 +34,17 @@ function contactTime(arrow: Arrow, from: Target, to: Target): number | undefined
   if (t <= 1) return t;
 }
 
-export function firstArrowImpact(arrow: Arrow, previous: readonly Target[], next: readonly Target[]): Target | undefined {
-  let first: Target | undefined;
-  let earliest = Infinity;
-  for (const [index, unit] of previous.entries()) {
-    if (unit.team === arrow.team || unit.hp <= 0 || (arrow.kind === "bolt" && unit.kind === "base")) continue;
-    const time = contactTime(arrow, unit, next[index]);
-    if (time === undefined) continue;
-    if (!first || time < earliest || (time === earliest && unit.id < first.id)) {
-      first = unit;
-      earliest = time;
-    }
+export function projectileContacts(shot: Arrow, previous: readonly Target[], next: readonly Target[]) {
+  const hits: {target: Target; time: number}[] = [];
+  for (const [i, target] of previous.entries()) {
+    if (target.hp <= 0 || target.team === shot.team || shot.piercedIds?.includes(target.id) ||
+        (shot.kind === "bolt" && target.kind === "base")) continue;
+    const time = contactTime(shot, target, next[i]);
+    if (time !== undefined) hits.push({target, time});
   }
-  return first;
+  return hits.sort((a, b) => a.time - b.time || a.target.id - b.target.id);
+}
+
+export function firstArrowImpact(shot: Arrow, previous: readonly Target[], next: readonly Target[]) {
+  return projectileContacts(shot, previous, next)[0]?.target;
 }

@@ -16,3 +16,13 @@ export function line(c: Pens, x1: number, y1: number, x2: number, y2: number, co
   c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2);
   c.strokeStyle = color; c.lineWidth = width; c.stroke();
 }
+
+const paths = new Map<string, Path2D>();
+export function cut(c: Pens, path: string, paint: string, width = 1.35) {
+  let cached = paths.get(path);
+  if (!cached) { cached = new Path2D(path); paths.set(path, cached); }
+  shape(c, cached, paint, width);
+}
+export function limb(c: Pens, x: number, y: number, ex: number, ey: number, paint: string, width = 3) {
+  line(c,x,y,ex,ey,INK,width+1.5); line(c,x,y,ex,ey,paint,width);
+}

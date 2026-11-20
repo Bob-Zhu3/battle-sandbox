@@ -1,4 +1,4 @@
-import type { Team } from "./battlefield.ts";
+import { ARMIES, type Team } from "./battlefield.ts";
 import { drawUnitToken } from "./characters.ts";
 import { drawSpellIcon } from "./magic-art.ts";
 import { SPELLS, type SpellKind } from "./spells.ts";
@@ -6,9 +6,9 @@ import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
 type Brush = UnitKind | SpellKind;
 const shelves: {name: string; items: Brush[]}[] = [
-  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","cooper","engineer"]},
+  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","engineer"]},
   {name: "Machines", items: ["mouse","drone","workshop","post"]},
-  {name: "Myths", items: ["giant","kirin","phoenix"]},
+  {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","zombie"]},
   {name: "Spells", items: ["gust","meteor","rain"]},
 ];
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
@@ -31,10 +31,17 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   opener.setAttribute("aria-label","Roster");opener.setAttribute("aria-controls",panel.id);
 
   function icon(key: Brush) {
-    const art = document.createElement("canvas");art.width=art.height=72;art.className="brush-icon";art.setAttribute("aria-hidden","true");
+    const art = document.createElement("canvas");art.width=art.height=144;art.className="brush-icon";art.setAttribute("aria-hidden","true");
     const c=art.getContext("2d")!;
+    c.scale(2,2);
     if(isSpell(key)){c.translate(36,36);c.scale(1.95,1.95);drawSpellIcon(c,key);}
-    else drawUnitToken(c,36,43,key==="giant"?21:key==="mouse"?17:20,team,key);
+    else {
+      const myth = key === "cyclops" || key === "phoenix" || key === "frostqueen" || key === "kirin";
+      const longWeapon = key === "musketeer" || key === "lancer";
+      const size = myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
+      const shift = key === "phoenix" ? 4 : longWeapon || key === "cyclops" ? -4 : 0;
+      drawUnitToken(c,36 + ARMIES[team].facing * shift,myth ? 49 : 44,size,team,key);
+    }
     return art;
   }
   function toggle(open: boolean) {

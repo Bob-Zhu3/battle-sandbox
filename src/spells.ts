@@ -9,7 +9,7 @@ export const SPELLS = {
   meteor: { name: "Meteor", command: "cast-meteor", cost: 20, radius: 58, delay: 48, duration: 69,
     description: "Marks the ground, then strikes enemies inside the ring. Troops can escape the shadow." },
   rain: { name: "Healing Rain", command: "cast-rain", cost: 15, radius: 65, delay: 12, duration: 100,
-    description: "Three showers heal friendly creatures and people. Rain puts out enemy Phoenix embers." },
+    description: "Three showers heal allies and put out burning feathers or clothing. Rain puts out enemy Phoenix eggs." },
 } as const;
 export type SpellKind = keyof typeof SPELLS;
 export type SpellType = (typeof SPELLS)[SpellKind]["command"];
@@ -25,7 +25,7 @@ export function insideSpell(spell: FieldSpell, point: {x: number; y: number}, ex
   return Math.hypot(spell.x - point.x, spell.y - point.y) <= SPELLS[spell.kind].radius + extra;
 }
 export function blownAway(shot: Arrow, winds: readonly FieldSpell[]) {
-  return shot.kind !== "barrel" && winds.some(wind => wind.team !== shot.team && insideSpell(wind, shot));
+  return shot.kind !== "bomb" && shot.kind !== "bullet" && winds.some(wind => wind.team !== shot.team && insideSpell(wind, shot));
 }
 
 export function applyMagic(active: readonly FieldSpell[], units: Unit[], targets: readonly Target[], tick: number,
@@ -42,6 +42,7 @@ export function applyMagic(active: readonly FieldSpell[], units: Unit[], targets
       if (unit.hp <= 0 || !insideSpell(spell, unit)) continue;
       const friendly = unit.team === spell.team;
       if (spell.kind === "rain") {
+        if (friendly) delete unit.burn;
         if (!friendly && unit.emberUntil !== undefined) hit(unit, 1, spell.team);
         if (friendly && !isMachine(unit.kind) && unit.emberUntil === undefined) heals.set(unit.id, (heals.get(unit.id) ?? 0) + 5);
       } else if (friendly && unit.emberUntil !== undefined) {

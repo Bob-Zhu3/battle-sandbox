@@ -1,20 +1,12 @@
-import { FACE, INK, IRON, WOOD, line, oval, shape, type Dye, type Pens } from "./ink.ts";
+import { FACE, INK, IRON, WOOD, cut, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import type { CharacterPose } from "./character-pose.ts";
 import type { Unit } from "./simulation.ts";
+import { cyclops, frostQueen, kirin, phoenix } from "./mythical-art.ts";
 import type { UnitKind } from "./units.ts";
 
-const linen = "#fff5d9", leather = "#865836", brass = "#e3ad59", jade = "#7bb4a0";
-const paths = new Map<string, Path2D>();
-function cut(c: Pens, path: string, paint: string, width = 1.35) {
-  let cached = paths.get(path);
-  if (!cached) { cached = new Path2D(path); paths.set(path, cached); }
-  shape(c, cached, paint, width);
-}
+const linen = "#fff5d9", leather = "#865836", brass = "#e3ad59";
 function ring(c: Pens, x: number, y: number, r: number, color: string) {
   oval(c,x,y,r,r,INK); oval(c,x,y,r-1.2,r-1.2,color);
-}
-function limb(c: Pens, x: number, y: number, ex: number, ey: number, paint: string, width = 3) {
-  line(c,x,y,ex,ey,INK,width+1.5); line(c,x,y,ex,ey,paint,width);
 }
 function boots(c: Pens, step: number, spread = 4) {
   for (const sign of [-1,1]) {
@@ -27,11 +19,13 @@ function tunic(c: Pens, d: Dye, p: CharacterPose) {
   oval(c,1,-7,5.4,5.3,INK); oval(c,1.3,-7,4.6,4.3,FACE);
   oval(c,3.6,-7.3+p.pitch*.5,1,Math.max(.35,1.2-p.blink),INK);
 }
-export function drawBarrel(c: Pens, x: number, y: number, tilt: number, scale = 1) {
-  c.save(); c.translate(x,y); c.rotate(tilt); c.scale(scale,scale);
-  cut(c,"M-7 -6 Q-1 -9 6 -6 Q9 0 6 6 Q0 9 -7 6 Q-9 0 -7 -6Z","#bd8145");
-  line(c,-4,-6,-4,6,IRON,2); line(c,4,-6,4,6,IRON,2);
-  line(c,-2,-3,2,-3,"#eac386",1.1); oval(c,0,2,1.1,1.1,leather);
+export function drawBomb(c: Pens, x: number, y: number, size: number, tick: number) {
+  c.save(); c.translate(x,y); c.scale(size,size);
+  oval(c,0,0,5.3,5.2,INK); oval(c,.3,-.3,4.25,3.9,"#56636a");
+  oval(c,-1.3,-1.7,1.3,.9,"#c5d0c4");
+  line(c,1,-4,3,-7,"#8b683e",1.6);
+  const spark=1.3+Math.sin(tick*.65)*.45;
+  oval(c,3,-7,spark+1,spark+1,"#e67a3f"); oval(c,3,-7,spark,spark,"#fff1a3");
   c.restore();
 }
 const fade = (tick: number, then: number | undefined | null, duration: number) =>
@@ -61,14 +55,32 @@ function human(c: Pens, d: Dye, kind: UnitKind, p: CharacterPose, u: Unit | unde
     cut(c,"M-5 -10 L-5 -13 L1 -16 L6 -12 L7 -10Z",IRON);
     cut(c,"M0 -15 Q-4 -22 -10 -18 L-5 -17 L-7 -15Z",d.light);
     const charge=Math.min(1,(u?.runUp??0)/50);
-    c.save(); c.translate(1+4*strike,0); c.rotate(-.44 + .4*charge + .35*strike + p.pitch*.45);
+    const stagger = (u?.stunnedUntil ?? 0)>tick ? 1 : 0;
+    c.save(); c.translate(1+4*strike-stagger,0); c.rotate(-.64 + .65*charge + .35*strike - .25*stagger + p.pitch*.45);
     limb(c,-8,1,17,1,WOOD,1.5); cut(c,"M15 -1 L23 1 L15 3Z",IRON);
     cut(c,"M12 1 L12 5 L5 4 L8 2Z",d.coat,1); c.restore();
-  } else if (kind==="cooper") {
-    cut(c,"M-6 -10 Q-7 -16 1 -15 Q6 -15 7 -10 L9 -9 L-6 -8Z",d.hem);
-    cut(c,"M-4 -3 L3 -5 L5 5 L-4 5Z",leather,1);
-    if (strike<.42) drawBarrel(c,6,1,-.18,.8);
-    limb(c,-1,0,5+8*strike,1+3*strike,FACE,2.4);
+  } else if (kind==="bomber") {
+    cut(c,"M-7 -10 Q-7 -17 1 -16 Q7 -15 7 -10 L10 -8 L-6 -8Z",d.hem);
+    cut(c,"M-5 -10 Q1 -13 7 -11 L7 -8 L-5 -8Z","#a97e55",1);
+    oval(c,2,-10,2.4,2.1,INK); oval(c,2,-10,1.5,1.2,"#bfe2df");
+    cut(c,"M-7 -4 L-3 -6 L6 3 L3 6Z",leather,1);
+    limb(c,1,0,6+7*strike,-2-4*strike,FACE,2.6);
+    if (strike<.44) drawBomb(c,7,0,.86,tick);
+  } else if (kind==="musketeer") {
+    cut(c,"M-6 -12 L-4 -18 L3 -18 L7 -12 Q11 -13 13 -12 Q6 -7 -10 -10Z",d.hem);
+    cut(c,"M-4 -16 Q-9 -23 -14 -20 L-11 -16 L-7 -16 L-8 -13Z",d.light,1);
+    line(c,-5,-2,1,4,"#f4d695",2.2);
+    c.save(); c.translate(4-3*strike,-1); c.rotate(p.pitch*.65);
+    cut(c,"M-7 0 L1 -3 L7 -3 L8 0 L0 1 L-5 3Z","#a57448",1.1);
+    limb(c,5,-2,16,-2,"#b0bec2",2); oval(c,3,0,2,1.4,FACE);
+    if(strike>.6) cut(c,"M17 -2 L20 -5 L20 -3 L24 -2 L20 -1 L20 1Z","#ffe28c",.75);
+    c.restore();
+  } else if (kind==="scout") {
+    cut(c,"M-8 -9 Q-6 -16 1 -16 L6 -13 L8 -9 L2 -10Z","#536351");
+    cut(c,"M-4 -12 Q-9 -19 -14 -16 Q-12 -12 -6 -11Z",d.light,1);
+    cut(c,"M-4 -7 L6 -8 L5 -4 L0 -2 L-6 -4Z","#715779",1);
+    limb(c,3,-5,14,-5+p.pitch*3,"#777c56",1.3);
+    oval(c,-5,2,2.6,3,INK); oval(c,-5,2,1.6,2,"#c786be");
   } else if (kind==="medic") {
     cut(c,"M-7 -8 L-8 -12 Q-3 -18 4 -15 L7 -11 L4 -9 L-1 -11Z",linen);
     line(c,-6,-12,3,-14,d.coat,2);
@@ -87,21 +99,17 @@ function human(c: Pens, d: Dye, kind: UnitKind, p: CharacterPose, u: Unit | unde
     c.restore();
   }
 }
-function giant(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
-  const fear=u?.fearId!==undefined, held=!!u?.barrel;
-  const shove=fade(tick,u?.lastAttackTick,16);
-  boots(c,p.step*(fear?1.7:1),5);
-  c.translate(-p.hurt,-p.lift*(fear?2.5:1)-p.breath);
-  cut(c,"M-10 -6 Q-6 -11 1 -9 L8 -6 L9 4 L5 7 L-9 6Z",d.coat,1.5);
-  cut(c,"M-9 -5 L-6 -9 L2 5 L-2 6Z",leather,1);
-  cut(c,"M-6 -14 Q-1 -18 5 -14 L7 -10 L9 -9 L8 -4 Q4 -1 -3 -4 L-6 -8Z","#e7b188");
-  cut(c,"M-7 -10 L-8 -15 L-6 -14 L-4 -18 L0 -16 L3 -18 L6 -15 L4 -12 L-2 -13Z","#785945");
-  oval(c,fear?1.8:4.5,-9.6+(fear?1:0),fear?1.5:1,fear?1.9:1.2,INK);
-  if (fear) oval(c,6,-6,1.5,1.9,INK);
-  const y=held?-17:fear?-12:2, front=held?7:fear?9:8+3*shove;
-  limb(c,-7,-4,-9,y,FACE,3.1); limb(c,6,-3,front,y,FACE,3.7);
-  if (held) drawBarrel(c,2,-21.5,-.15,.94);
-  if (fear) { line(c,-8,-15,-11,-18,linen,1.2); line(c,-10,-13,-14,-14,linen,1); }
+function zombie(c: Pens, d: Dye, p: CharacterPose, u: Unit|undefined, tick: number) {
+  const bite=fade(tick,u?.lastAttackTick,14), rising=fade(tick,u?.raisedTick,15);
+  c.translate(0,3*rising); c.rotate(.12+p.step*.07);
+  boots(c,p.step*1.3,3);
+  limb(c,-4,-3,4,-4,"#647c69",2.4);
+  cut(c,"M-7 -5 L1 -7 L6 -4 L6 4 L3 3 L1 6 L-2 4 L-5 7 L-7 3Z",d.coat);
+  cut(c,"M-6 -9 Q-7 -15 -1 -16 L5 -15 L7 -12 L7 -8 L9 -7 L6 -4 L2 -4 L-4 -6Z","#9db481",1.35);
+  cut(c,"M-6 -11 L-7 -15 L-4 -14 L-3 -17 L2 -16 L4 -17 L6 -14 L0 -14 L-3 -12Z","#4c6459",1);
+  oval(c,4,-10,2,1.6,INK); oval(c,4.3,-10,.85,1,"#f3e393");
+  line(c,-3,-10,-1,-7,"#677a62",1); line(c,2,-6,7,-6-bite,"#58494b",1.4);
+  limb(c,3,-2,10+3*bite,-4-bite,"#9db481",2.5); line(c,10+3*bite,-4-bite,13+3*bite,-3,INK,1);
 }
 function mouse(c: Pens,d: Dye,p: CharacterPose,t: number) {
   c.translate(0,-Math.abs(p.step)*1.4);
@@ -145,34 +153,12 @@ function drone(c: Pens,d: Dye,u: Unit|undefined,t: number) {
   ring(c,4,-1,3.3,"#a3e3dd"); oval(c,5,-1,1.1,1.1,INK);
   limb(c,-1,5,7-fade(t,u?.lastAttackTick,9)*2,5,IRON,2);
 }
-function kirin(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,t: number) {
-  c.translate(0,-2.5-Math.sin(t*.065)*1.3);
-  for(const s of [-1,1]) { limb(c,s*4,2,s*5+p.step,7,jade,1.6); line(c,s*5+p.step,7,s*5+2+p.step,7,INK,1.9); }
-  cut(c,"M-8 -4 Q-3 -8 2 -4 L4 -11 L7 -14 L9 -11 L13 -8 L11 -6 L7 -7 L5 0 Q1 6 -7 3Z",jade);
-  cut(c,"M-8 -3 Q-11 -12 -15 -9 L-12 -5 L-15 -5 L-9 2Z",d.light);
-  cut(c,"M-5 -4 Q0 -6 4 -4 L3 1 L-2 2Z",d.coat,1);
-  limb(c,6,-12,5,-20,WOOD,1.3); limb(c,5,-16,2,-18,WOOD,1);
-  limb(c,8,-12,11,-18,WOOD,1.2); oval(c,9,-10,1,1.1,INK);
-  if(fade(t,u?.arc?.tick,9)) line(c,4,-20,10,-20,"#fff8b2",1.7);
-}
-function phoenix(c: Pens,d: Dye,u: Unit|undefined,t: number) {
-  if(u?.emberUntil!==undefined) {
-    oval(c,0,5,6,2.5,"#866a52"); const pulse=1+Math.sin(t*.23)*.5;
-    cut(c,"M-4 5 Q-6 0 -2 -1 L0 -5 L2 -1 Q7 1 4 5Z","#ee8753");
-    oval(c,1,2,1.5,pulse,"#fff4af"); return;
-  }
-  const flap=Math.sin(t*.115); c.translate(0,-3-flap*1.4);
-  cut(c,"M0 1 Q-9 -1 -15 5 L-9 5 L-12 9 L-3 5Z","#ed8757");
-  c.save(); c.rotate(flap*.44);
-  cut(c,"M2 -2 Q-5 -8 -13 -15 L-12 -8 L-15 -10 L-10 -3 Q-5 2 2 1Z",d.coat);
-  line(c,-9,-8,-4,-3,"#ffd879",1.25); c.restore();
-  cut(c,"M-5 1 Q-1 -5 4 -5 L7 -10 L9 -8 L9 -4 L13 -3 L9 -1 Q4 5 -3 4Z","#ffc56b");
-  oval(c,7,-5,1,1,INK); cut(c,"M-2 1 L3 -2 L6 -1 L1 4Z",d.coat,1);
-}
 export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?: Unit,tick=0) {
   const t=tick+(u?.id??0)*11;
   switch(kind) {
-    case "giant": giant(c,d,p,u,tick); break;
+    case "cyclops": cyclops(c,d,p,u,tick); break;
+    case "frostqueen": frostQueen(c,d,u,tick); break;
+    case "zombie": zombie(c,d,p,u,tick); break;
     case "mouse":
       mouse(c,d,p,t);
       if(fade(tick,u?.lastSqueakTick,20)>.1) {
@@ -182,12 +168,12 @@ export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?
     case "workshop": case "post": building(c,d,kind,u,tick); break;
     case "drone": drone(c,d,u,tick); break;
     case "kirin": kirin(c,d,p,u,tick); break;
-    case "phoenix": phoenix(c,d,u,t); break;
+    case "phoenix": phoenix(c,d,u,tick); break;
     default: human(c,d,kind,p,u,tick);
   }
 }
 export function fallenSpecialist(c: Pens,d: Dye,kind: UnitKind) {
-  if(kind==="cooper") drawBarrel(c,0,0,.2,.75);
+  if(kind==="bomber") cut(c,"M-6 0 Q0 -7 5 0 L7 2 L-6 2Z",d.hem);
   else if(kind==="shieldbearer") shield(c,d,0,0);
   else if(kind==="medic" || kind==="engineer") cut(c,"M-6 -3 L4 -4 L6 3 L-5 4Z",leather);
   else if(kind==="mouse" || kind==="drone" || kind==="post" || kind==="workshop") ring(c,0,0,4,brass);

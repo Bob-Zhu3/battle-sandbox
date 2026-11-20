@@ -3,7 +3,7 @@ import type { World } from "./room-protocol.ts";
 import { type ArenaPoint } from "./deployment.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { drawFieldSpell } from "./magic-art.ts";
-import { drawBarrel } from "./roster-art.ts";
+import { drawChain, drawConditions, drawGroundEffect, drawSpecialShot, drawStun } from "./combat-art.ts";
 import { drawKeep } from "./keeps.ts";
 import { ARMIES, campFor, type MatchMode } from "./battlefield.ts";
 import { characterPose, restingPose } from "./character-pose.ts";
@@ -70,29 +70,28 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
 
   const tick = previous.tick + (current.tick - previous.tick) * blend;
+  for (const effect of current.effects ?? []) drawGroundEffect(ctx, effect, tick, sx, sy);
   for (const spell of current.spells ?? []) drawFieldSpell(ctx, spell, tick, sx, sy);
   const targets = [...current.units, ...(current.bases ?? [])];
   const byId = new Map(targets.map(target => [target.id, target]));
-  for (const base of current.bases ?? []) drawKeep(ctx, base, base.x*sx, base.y*sy, scale, tick);
+  for (const base of current.bases ?? []) {
+    drawKeep(ctx, base, base.x*sx, base.y*sy, scale, tick);
+    if (base.hp && (base.stunnedUntil ?? 0)>tick) drawStun(ctx,base.x*sx,base.y*sy-24*scale,scale,tick,base.id);
+  }
   const prior = new Map(previous.units.map(unit => [unit.id, unit]));
+  const scoops = new Map<number, (typeof current.units)[number]>();
+  for (const caster of current.units) {
+    const swing = caster.windup;
+    if (!caster.hp || swing?.kind !== "swallow" || scoops.has(swing.targetId)) continue;
+    const meal = byId.get(swing.targetId);
+    if (meal?.kind !== "base" && meal && meal.hp > 0 && meal.hp <= UNIT_DEFINITIONS.cyclops.swallowHp &&
+        Math.hypot(meal.x-caster.x,meal.y-caster.y) <= UNIT_DEFINITIONS.cyclops.swallowRange+3) scoops.set(meal.id,caster);
+  }
   const bodies = current.units.map(unit => {
     const from = prior.get(unit.id) ?? unit;
     return { unit, from, x: (from.x + (unit.x - from.x) * blend) * sx, y: (from.y + (unit.y - from.y) * blend) * sy };
   }).sort((a, b) => a.y - b.y || a.unit.id - b.unit.id);
   for (const {unit,x,y} of bodies) {
-    const drop = unit.droppedBarrel;
-    if (drop && tick >= drop.tick && tick - drop.tick < 62) {
-      const age = tick - drop.tick;
-      const fall = Math.min(1, age / 10);
-      const bounce = age > 10 && age < 22 ? Math.sin(Math.PI * (age - 10) / 12) * 6 : 0;
-      const height = 33 * (1 - fall * fall) + bounce;
-      const roll = 3 + 15 * (1 - Math.exp(-age / 15));
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, (62 - age) / 20);
-      drawBarrel(ctx, drop.x * sx + roll * drop.side * scale, drop.y * sy - height * scale,
-        (.12 + Math.min(age, 34) * .07) * drop.side, (1.4 - fall * .4) * scale);
-      ctx.restore();
-    }
     if (!unit.hp || unit.wrappingSince === undefined || unit.targetId === null) continue;
     const patient = byId.get(unit.targetId);
     if (!patient || !patient.hp || patient.team !== unit.team) continue;
@@ -103,11 +102,13 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     ctx.moveTo(x,y-2*scale);ctx.quadraticCurveTo((x+ex)/2,(y+ey)/2+5*scale,ex,ey-2*scale);ctx.stroke();ctx.restore();
   }
   for (const { unit, x, y } of bodies) {
-    if (unit.hp || unit.lastHitTick === null) continue;
+    if (unit.hp || unit.lastHitTick === null || unit.swallowedTick !== undefined) continue;
     const age = Math.max(0, tick - unit.lastHitTick);
     if (age < 48) {
       const side = unit.aimX < 0 ? -1 : 1;
-      drawFallen(ctx, x, y, UNIT_DEFINITIONS[unit.kind].radius * scale, unit.team, unit.kind, side, age);
+      const radius = UNIT_DEFINITIONS[unit.kind].radius * scale;
+      drawFallen(ctx, x, y, radius, unit.team, unit.kind, side, age);
+      if (unit.rising) drawConditions(ctx,unit,x,y,radius,scale,tick);
     }
   }
   for (const { unit, from, x, y } of bodies) {
@@ -116,7 +117,13 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const pose = deploying ? restingPose(ARMIES[unit.team].facing)
       : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, travel);
     const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
-    drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, tick);
+    const hand = scoops.get(unit.id);
+    if (hand) {
+      const lift = Math.max(0, Math.min(1, (tick-hand.windup!.since-3)/(UNIT_DEFINITIONS.cyclops.swallowTicks-3)));
+      const mouthX = hand.x*sx + (hand.aimX<0?-1:1)*9*scale, mouthY = hand.y*sy-12*scale;
+      drawUnitToken(ctx,x+(mouthX-x)*lift,y+(mouthY-y)*lift-12*scale*Math.sin(Math.PI*lift),r*(1-.82*lift),unit.team,unit.kind,pose,unit,tick);
+    } else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, tick);
+    if (unit.burn || unit.poison || unit.infection || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) drawConditions(ctx,unit,x,y,r,scale,tick);
     if (unit.lastTreatedTick !== undefined && tick - unit.lastTreatedTick < 16) {
       ctx.save();ctx.globalAlpha=1-(tick-unit.lastTreatedTick)/16;ctx.strokeStyle="#fff7cc";ctx.lineWidth=2*scale;
       ctx.beginPath();ctx.arc(x,y-r*.4,r*.85,0,Math.PI*1.5);ctx.stroke();ctx.restore();
@@ -132,25 +139,14 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       ctx.restore();
     }
   }
-  for (const unit of current.units) {
-    const arc = unit.arc;
-    if (!arc || tick < arc.tick || tick-arc.tick >= 12) continue;
-    ctx.save();ctx.globalAlpha=1-(tick-arc.tick)/12;ctx.beginPath();
-    for(const [i,point] of arc.path.entries()){
-      const x=point.x*sx, y=point.y*sy-8*scale;
-      if(!i) {ctx.moveTo(x,y);continue;}
-      const from=arc.path[i-1];ctx.lineTo((from.x+point.x)*sx/2+3*scale,(from.y+point.y)*sy/2-12*scale);
-      ctx.lineTo(x,y);
-    }
-    ctx.strokeStyle="#538c91";ctx.lineWidth=3.5*scale;ctx.stroke();ctx.strokeStyle="#fff5ad";ctx.lineWidth=1.5*scale;ctx.stroke();ctx.restore();
-  }
+  for (const u of current.units) if (u.arc) drawChain(ctx,u.arc,tick,sx,sy);
   for (const arrow of current.arrows) {
     const rewind = arrow.releasedTick === current.tick ? 0 : 1 - blend;
     const x = (arrow.x - arrow.vx * rewind) * sx;
     const y = (arrow.y - arrow.vy * rewind) * sy;
     const length = Math.min(1, Math.max(0, tick - arrow.releasedTick) / 3);
-    if (arrow.kind === "barrel") {
-      drawBarrel(ctx,x,y-3*scale,(tick-arrow.releasedTick)*.16*(arrow.vx<0?-1:1),scale);
+    if (arrow.kind === "bomb" || arrow.kind === "ice" || arrow.kind === "bullet" || arrow.kind === "venom") {
+      drawSpecialShot(ctx,arrow,x,y,Math.atan2(arrow.vy*sy,arrow.vx*sx),scale,tick);
     } else if (length > 0) {
       const height=arrow.kind==="bolt" ? 7+15*Math.max(0,1-(tick-arrow.releasedTick)/22) : 7;
       drawArrow(ctx,x,y-height*scale,Math.atan2(arrow.vy*sy,arrow.vx*sx),scale*(arrow.kind==="dart"?.73:1),arrow.team,length);

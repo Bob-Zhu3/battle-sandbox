@@ -13,7 +13,7 @@ export function medicDuty(medic: Unit, units: readonly Unit[], enemy: Target | u
       escort = ally;
       escortDistance = distance;
     }
-    if (isMachine(ally.kind) !== (medic.kind === "engineer") || ally.emberUntil !== undefined || tick < (medic.aidReadyTick ?? 0) || ally.hp >= UNIT_DEFINITIONS[ally.kind].maxHp || distance > kit.sight ** 2) continue;
+    if (isMachine(ally.kind) !== (medic.kind === "engineer") || ally.emberUntil !== undefined || tick < (medic.aidReadyTick ?? 0) || (ally.hp >= UNIT_DEFINITIONS[ally.kind].maxHp && !(medic.kind === "medic" && ally.poison)) || distance > kit.sight ** 2) continue;
     if (medic.wrappingSince !== undefined && ally.id === medic.targetId) {
       patient = ally;
       break;
@@ -49,7 +49,8 @@ export function finishTreatments(units: Unit[], byId: ReadonlyMap<number, Unit>,
     }
     if (tick - medic.wrappingSince < kit.wrapTicks) continue;
     delete medic.wrappingSince;
-    if (patient.hp >= UNIT_DEFINITIONS[patient.kind].maxHp) continue;
+    if (patient.hp >= UNIT_DEFINITIONS[patient.kind].maxHp && !(medic.kind === "medic" && patient.poison)) continue;
+    if (medic.kind === "medic") delete patient.poison;
     medic.lastHealTick = tick;
     medic.aidReadyTick = tick + kit.recoveryTicks;
     healing.set(patient.id, (healing.get(patient.id) ?? 0) + kit.aidAmount);

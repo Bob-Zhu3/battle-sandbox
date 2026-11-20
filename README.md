@@ -1,6 +1,6 @@
 # Battle Sandbox
 
-Draw a squad into a meadow and watch it fight. Open **Roster** to choose from fourteen troops and buildings or three spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
+Draw a squad into a meadow and watch it fight. Open **Roster** to choose from eighteen troops and buildings or three spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
 ![Four armies in a live free-for-all, with a base in each corner and recruitment controls below the field](media/free-for-all.png)
 
@@ -25,9 +25,9 @@ The playground opens in your browser. To play together on the same network, have
 
 Click to place one troop. Hold and drag to add another every 24 arena units. Friendly troops breathe and blink while they wait. Place an enemy nearby and they react while your pointer is still down. Gold is unlimited. When a fight ends, you can paint the next one straight onto the same field. **Undo** removes the last stroke. **Clear** empties the field.
 
-Place a red Giant opposite a blue Barrel Roller. When the barrel reaches his hands, the Giant hoists it over his head and bowls it back. Try again and place a red Clockmouse by his boots while he's holding it. He drops the barrel where he stands and runs. [Starting position](media/giant-setup.jpg) · [Watch the two outcomes](media/giant-and-clockmouse.mp4)
+Let a Lancer build speed toward a distant Watchpost. Place a Storm Kirin beside the approaching line. Follow the bolt along the enemy formation and watch the spear lift when the stun erases its charge. [Watch the battle clip](media/mythical-encounters.mp4)
 
-This command plays both encounters on the field, then leaves the controls in your hands.
+This command plays the chain strike, the Cyclops's ground smash, a Frost Queen fight under Healing Rain, and the Phoenix's rebirth. It then leaves the field open for you.
 
 ```sh
 npm run demo:encounters
@@ -46,28 +46,36 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 
 ### The roster
 
+![Eight roster portraits showing the Cyclops, Storm Kirin, Frost Queen, Phoenix, Bomber, Musketeer, Venom Scout and Zombie](media/mythical-roster.png)
+
 | Troop or building | Gold | Bounty | What to watch |
 | --- | ---: | ---: | --- |
 | Warrior | 12 | 6 | Hurries into sword range and ducks under a friendly arrow. |
 | Archer | 8 | 4 | Stops at bow range and peeks over a friendly shield or sword when shooting. |
-| Shieldbearer | 16 | 8 | Lifts the shield when a shot approaches. Takes one quarter of frontal projectile damage, rounded up. A barrel gets through. |
-| Field Medic | 10 | 5 | Crouches and unrolls a bandage toward a wounded ally. Hitting the Medic interrupts the wrap. |
-| Lancer | 14 | 7 | Lowers the lance after a straight run. A shield facing the charge stops the bonus hit and briefly staggers the Lancer. |
-| Barrel Roller | 13 | 6 | Bowls a heavy wooden barrel along the ground. A Giant facing the roll can catch it. |
+| Shieldbearer | 16 | 8 | Lifts the shield when a shot approaches. Stops a piercing bullet and takes one quarter of direct frontal shot damage, rounded up. A ground blast can reach behind the shield. |
+| Field Medic | 10 | 5 | Crouches and unrolls a bandage toward a wounded ally. Finishing a wrap removes poison. A hit interrupts treatment. |
+| Lancer | 14 | 7 | Lowers the lance after a straight run. Facing shields check the thrust. Any stun erases the run-up, including a stun on the contact tick. |
+| Bomber | 16 | 8 | Lobs a sparking bomb at a fixed spot. When it lands it deals 13 damage to each enemy troop within 43 arena units. |
+| Musketeer | 17 | 8 | One bullet deals 11 damage to its first enemy and 6 to the next. A front-facing shield or a base ends the shot. |
+| Venom Scout | 13 | 6 | The dart deals 3 immediately, then venom deals 3 every half second for three pulses. Machines and Zombies resist venom. |
 | Engineer | 21 | 10 | Hammers together one Watchpost near the fight, then repairs damaged machines. |
-| Clockmouse | 8 | 4 | Squeaks and sends a nearby Giant running, even one wearing the same colors. |
+| Clockmouse | 8 | 4 | A squeak at a Cyclops's boots can interrupt a raised club, even on its own team. |
 | Bolt Drone | 15 | 7 | Commits to one line for a three-bolt burst. A sidestepping enemy can escape the later shots. |
 | Mouse Workshop | 23 | 11 | Winds the drum and releases up to three Clockmice, one at a time. |
 | Watchpost | 15 | 7 | Stays where it was built and fires at enemies in range. An Engineer can mend it. |
-| Giant | 28 | 14 | Holds a caught barrel overhead before returning it. A Clockmouse can make him drop it. |
-| Storm Kirin | 20 | 10 | Its lightning jumps from one enemy to the next. A metal body or shield lets the next spark cross a wider gap. |
-| Phoenix | 19 | 9 | Falls into a glowing ember once and returns at half health if the ember survives 1.5 seconds. |
+| Cyclops | 33 | 16 | Raises its spiked club for 0.45 seconds, then smashes a patch of ground. The impact scatters enemies and stuns them. It can lift and swallow a human at 12 HP or less who stays within reach. |
+| Storm Kirin | 23 | 11 | Lightning travels through up to four enemies, stunning every contact for 0.35 seconds. Metal and shields carry the next jump up to 110 units. Other targets carry it up to 78. |
+| Frost Queen | 24 | 12 | Her crystal bursts on impact. Enemies inside the frost walk at 48% speed for 100 ticks. |
+| Phoenix | 22 | 11 | A talon strike sets its target on fire for three pulses of 2 damage. On its first defeat it becomes a 1 HP ember egg and hatches at half health after 1.5 seconds if protected. |
+| Zombie | 10 | 5 | A bite marks a human for 155 ticks. If they fall while marked, they rise 32 ticks later as a Zombie for the biting team, keeping their unit ID. A swallowed victim stays down. |
 
 | Spell | Gold | What happens |
 | --- | ---: | --- |
-| Gust | 10 | Shoves enemies and scatters hostile arrows and bolts in its circle. Barrels keep rolling. A friendly Phoenix ember hatches immediately. |
+| Gust | 10 | Shoves enemies and scatters hostile arrows and bolts in its circle. Bullets and lobbed bombs keep flying. A friendly Phoenix egg hatches immediately. |
 | Meteor | 20 | Marks the ground for 0.8 seconds before dealing 17 damage to enemies still inside or 6 to a base. |
-| Healing Rain | 15 | Three showers each restore 5 HP to friendly people and creatures. An enemy Phoenix ember goes out in the rain. |
+| Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies and puts out an enemy Phoenix egg. |
+
+Stars overhead mark a stun. Ice around the feet marks a slow. Violet bubbles mean poison, green bite marks mean infection, and small orange flames on a troop deal continuing burn damage. The Phoenix's cracked ember egg only counts down to its own rebirth.
 
 ### Reconnecting
 
@@ -78,8 +86,8 @@ A connection loss reserves your seat for 60 seconds. Reopen the match to reclaim
 | Command | What it demonstrates |
 | --- | --- |
 | `npm test` | Fixed-tick combat, troop interactions, towers, spells, returning to a full-roster fight, brush spacing, spending and two real WebSocket clients |
-| `npm run demo:encounters` | A Giant returns a barrel, then a Clockmouse changes the same encounter. The playground stays open for you. |
-| `npm run check:modes` | Every roster entry, a cross-field Meteor in a desktop-and-phone duel, and complete three- and four-player matches with reconnection and rematches |
+| `npm run demo:encounters` | A charged Lancer meets chain lightning, a Cyclops smashes and swallows, and a Phoenix hatches from its ember egg. |
+| `npm run check:modes` | Every roster entry, a cross-field Meteor in a desktop-and-phone duel, a reconnect after a four-target chain stun, and complete three- and four-player matches with reconnection and rematches |
 | `npm run demo:room -- --headed` | Two browser windows drawing at the same time, then recruiting during a base battle |
 | `npm run demo:retry` | Drop confirmation of a five-Warrior stroke, disconnect and return with the original five IDs and one charge |
 | `npm run demo:reconnect` | Disconnect Blue after the first hit, catch up to the live fight and verify both browsers agree through the fall of a base |
@@ -88,7 +96,7 @@ Browser checks use Playwright Chromium when available or installed Chrome. Use `
 
 ## How the field works
 
-The browser playground and Node match server share a deterministic 60-tick simulation. Targets break distance ties by stable ID. Troops have circular footprints, separate when crowded and stay inside the arena. Buildings stay rooted. Arrows fly at 300 arena units per second, starting on the tick after release. They pass allies and strike the first living enemy troop or base along their line. All impacts on a tick resolve together. A Warrior duel beginning in reach deals simultaneous hits on ticks 1, 31 and 61. [Combat simulation](src/simulation.ts) · [Troop definitions](src/units.ts)
+The browser playground and Node match server share a deterministic 60-tick simulation. Targets break distance ties by stable ID. Troops have circular footprints, separate when crowded and stay inside the arena. Buildings stay rooted. Arrows fly at 300 arena units per second, starting on the tick after release. They pass allies and strike the first living enemy troop or base along their line. Damage on a tick resolves together. Instant lightning and completed ground smashes interrupt wind-ups before charged attacks land. A Warrior duel beginning in reach deals simultaneous hits on ticks 1, 31 and 61. [Combat simulation](src/simulation.ts) · [Troop definitions](src/units.ts)
 
 The server validates territory and funds, assigns IDs and broadcasts the same world to every browser. It normally sends 20 snapshots per second, with additional updates for purchases, payouts and changes of phase. Each browser projects the same 960 × 360 arena onto its own canvas.
 

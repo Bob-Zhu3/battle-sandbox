@@ -1,78 +1,105 @@
-import type { Arrow } from "./arrows.ts";
-import { ARENA, ARMIES } from "./battlefield.ts";
+import { ARENA, BASE_RADIUS } from "./battlefield.ts";
+import type { GroundEffect, Hit } from "./conditions.ts";
 import type { Unit, Target, Placement } from "./simulation.ts";
 import { nearestEnemy } from "./targeting.ts";
-import { isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { isHuman, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
-type Hit = (target: Target, amount: number, team: Unit["team"]) => void;
+export interface Windup { kind: "smash" | "swallow"; since: number; x: number; y: number; targetId: number }
+const club = UNIT_DEFINITIONS.cyclops;
+const storm = UNIT_DEFINITIONS.kirin;
 
-export function giantTurn(giant: Unit, units: readonly Unit[], tick: number, shots: Arrow[], tickRate: number) {
-  const spec = UNIT_DEFINITIONS.giant;
-  const range = spec.fearRange + (giant.fearId !== undefined ? 16 : 0);
-  let mouse: Unit | undefined, closest = range ** 2;
-  for (const other of units) {
-    if (other.kind !== "mouse" || other.hp <= 0) continue;
-    const d = (giant.x - other.x) ** 2 + (giant.y - other.y) ** 2;
-    if (d < closest || (d === closest && (!mouse || other.id < mouse.id))) { mouse = other; closest = d; }
-  }
-  if (mouse) {
-    giant.fearId = giant.targetId = mouse.id;
-    if (giant.barrel) {
-      giant.droppedBarrel = { x: giant.x, y: giant.y, tick, side: giant.aimX < 0 ? -1 : 1 };
-      delete giant.barrel;
+function within(a: {x: number; y: number}, b: {x: number; y: number}, range: number) {
+  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= range ** 2;
+}
+
+export function startCyclopsSwing(unit: Unit, units: readonly Unit[], target: Target, tick: number, distance: number) {
+  if (tick >= (unit.nextSwallowTick ?? 0)) {
+    const humans = units.filter(u => isHuman(u.kind) && u.hp <= club.swallowHp);
+    const meal = nearestEnemy(unit, humans, club.swallowRange);
+    if (meal) {
+      const dx = meal.x - unit.x, dy = meal.y - unit.y, length = Math.hypot(dx, dy) || 1;
+      unit.aimX = dx / length; unit.aimY = dy / length;
+      unit.targetId = meal.id;
+      unit.windup = { kind: "swallow", since: tick, x: meal.x, y: meal.y, targetId: meal.id };
+      return;
     }
-    giant.frightUntil = tick + spec.fleeTicks;
   }
-  if (mouse || tick < (giant.frightUntil ?? 0)) {
-    let dx = mouse ? giant.x - mouse.x : giant.aimX;
-    let dy = mouse ? giant.y - mouse.y : giant.aimY;
-    if (!dx && !dy) dx = ARMIES[giant.team].facing;
-    // At a wall, run along it. A frightened Giant can get round a corner.
-    if ((giant.x <= spec.radius + 2 && dx < 0) || (giant.x >= ARENA.width - spec.radius - 2 && dx > 0)) { dx = 0; dy ||= giant.y < ARENA.height / 2 ? 1 : -1; }
-    if ((giant.y <= spec.radius + 2 && dy < 0) || (giant.y >= ARENA.height - spec.radius - 2 && dy > 0)) { dy = 0; dx ||= giant.x < ARENA.width / 2 ? 1 : -1; }
-    const distance = Math.hypot(dx, dy) || 1;
-    giant.aimX = dx / distance; giant.aimY = dy / distance;
-    giant.x += giant.aimX * spec.speed / tickRate; giant.y += giant.aimY * spec.speed / tickRate;
-    return true;
-  }
-  delete giant.fearId;
-  delete giant.frightUntil;
-  const held = giant.barrel;
-  if (!held) return false;
-  giant.aimX = held.dx; giant.aimY = held.dy;
-  if (tick - held.since >= spec.holdTicks) {
-    const speed = UNIT_DEFINITIONS.cooper.arrowSpeed / tickRate;
-    shots.push({ kind: "barrel", returned: true, team: giant.team, x: giant.x, y: giant.y,
-      vx: held.dx * speed, vy: held.dy * speed, damage: held.damage, releasedTick: tick });
-    giant.lastAttackTick = tick;
-    giant.attackDirection = {x: held.dx, y: held.dy};
-    delete giant.barrel;
-  }
-  return true;
+  if (tick < unit.nextAttackTick || distance > club.reach + (target.kind === "base" ? BASE_RADIUS : 0)) return;
+  unit.windup = { kind: "smash", since: tick, x: unit.x + unit.aimX * 26, y: unit.y + unit.aimY * 26, targetId: target.id };
 }
 
-export function catchBarrel(giant: Unit, shot: Arrow, tick: number) {
-  if (shot.kind !== "barrel" || shot.returned || giant.barrel || giant.fearId !== undefined) return false;
-  const speed = Math.hypot(shot.vx, shot.vy) || 1;
-  if (giant.aimX * shot.vx + giant.aimY * shot.vy > -0.15 * speed) return false;
-  giant.barrel = { since: tick, dx: -shot.vx / speed, dy: -shot.vy / speed, damage: shot.damage };
-  return true;
-}
-
-export function chainLightning(caster: Unit, first: Target, units: readonly Unit[], tick: number, hit: Hit) {
-  const path = [{ x: caster.x, y: caster.y }];
-  const visited = new Set<number>();
-  let target: Target | undefined = first;
-  for (const amount of [UNIT_DEFINITIONS.kirin.damage, 5, 3]) {
-    if (!target) break;
-    path.push({ x: target.x, y: target.y });
-    hit(target, amount, caster.team);
-    visited.add(target.id);
-    if (target.kind === "base") break;
-    const reach: number = isMachine(target.kind) || target.kind === "shieldbearer" ? 82 : 38;
-    target = nearestEnemy({ ...path.at(-1)!, team: caster.team }, units.filter(u => !visited.has(u.id)), reach);
+// Instant bolts and startle reactions interrupt a charge before its contact tick.
+// Two slams landing together resolve by who started winding up first, then by ID.
+export function resolveControl(units: readonly Unit[], targets: readonly Target[], tick: number, hit: Hit, effects: GroundEffect[]) {
+  const stuns = new Map<number, number>();
+  const arcs = new Map<number, NonNullable<Unit["arc"]>>();
+  const mice = new Map<number, number>();
+  const finished = new Set<number>();
+  const meals = new Map<number, Unit>();
+  const swallowed = new Set<number>();
+  const shocks = new Map<number, Windup[]>();
+  const disable = (id: number, duration: number) => stuns.set(id, Math.max(stuns.get(id) ?? 0, tick + duration));
+  for (const u of units) {
+    if (u.hp <= 0 || (u.stunnedUntil ?? 0) > tick) continue;
+    if (u.kind === "cyclops" && tick - (u.lastStartleTick ?? -Infinity) >= 165) {
+      let mouse: Unit | undefined, closest = 30 ** 2;
+      for (const other of units) {
+        if (other.kind !== "mouse" || other.hp <= 0) continue;
+        const d = (other.x-u.x)**2 + (other.y-u.y)**2;
+        if (d < closest || (d === closest && (!mouse || other.id < mouse.id))) {
+          mouse = other; closest = d;
+        }
+      }
+      if (mouse) { mice.set(u.id, mouse.id); disable(u.id, 14); }
+    }
+    if (u.kind !== "kirin" || tick < u.nextAttackTick) continue;
+    let target: Target | undefined = nearestEnemy(u, targets);
+    if (!target || !within(u, target, storm.reach + (target.kind === "base" ? BASE_RADIUS : 0))) continue;
+    const path = [{x: u.x, y: u.y}], visited = new Set<number>();
+    for (const amount of [storm.damage, 7, 5, 3]) {
+      if (!target) break;
+      hit(target, amount, u.team);
+      disable(target.id, storm.stunTicks);
+      path.push({x: target.x, y: target.y});
+      visited.add(target.id);
+      const conductive: boolean = target.kind === "base" || target.kind === "shieldbearer" || isMachine(target.kind);
+      target = nearestEnemy({team: u.team, ...path[path.length - 1]}, targets.filter(t => !visited.has(t.id)), conductive ? storm.metalRange : storm.jumpRange);
+    }
+    arcs.set(u.id, {tick, path});
   }
-  caster.arc = {tick, path};
+
+  const ready = units.filter(u => u.hp > 0 && u.windup && tick >= (u.stunnedUntil ?? 0) &&
+    tick - u.windup.since >= (u.windup.kind === "smash" ? club.windup : club.swallowTicks));
+  ready.sort((a, b) => a.windup!.since - b.windup!.since || a.id - b.id);
+  for (const caster of ready) {
+    const swing = caster.windup!;
+    if (swing.kind !== "smash" || stuns.has(caster.id)) continue;
+    finished.add(caster.id);
+    effects.push({kind: "smash", team: caster.team, x: swing.x, y: swing.y, tick, radius: club.blastRadius});
+    for (const target of targets) {
+      const base = target.kind === "base";
+      if (target.team === caster.team || target.hp <= 0 || !within(swing, target, club.blastRadius + (base ? BASE_RADIUS : 0))) continue;
+      hit(target, base ? 10 : club.damage, caster.team);
+      disable(target.id, club.stunTicks);
+      if (!base) {
+        const list = shocks.get(target.id) ?? [];
+        list.push(swing);
+        shocks.set(target.id, list);
+      }
+    }
+  }
+  for (const caster of ready) {
+    const swing = caster.windup!;
+    if (swing.kind !== "swallow" || stuns.has(caster.id)) continue;
+    finished.add(caster.id);
+    const meal = units.find(u => u.id === swing.targetId);
+    if (!meal || swallowed.has(meal.id) || meal.team === caster.team || !isHuman(meal.kind) ||
+        meal.hp <= 0 || meal.hp > club.swallowHp || !within(caster, meal, club.swallowRange + 3)) continue;
+    meals.set(caster.id, meal);
+    swallowed.add(meal.id);
+    hit(meal, meal.hp, caster.team);
+  }
+  return {stuns, arcs, mice, finished, shocks, meals, swallowed};
 }
 
 export function finishBuilding(unit: Unit, tick: number): Placement | undefined {

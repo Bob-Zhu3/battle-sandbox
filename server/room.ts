@@ -116,7 +116,7 @@ export class Room {
 
     const saved = player.receipts.get(commandId);
     if (saved) {
-      if (saved.type !== action.type || saved.points.length !== points.length || !saved.points.every((unit, i) => {
+      if (saved.type !== (spell ? SPELLS[spell].command : UNIT_DEFINITIONS[kind!].command) || saved.points.length !== points.length || !saved.points.every((unit, i) => {
         const point = points[i];
         return record(point) && unit.x === point.x && unit.y === point.y;
       })) return "That placement ID already belongs to a different stroke.";
@@ -144,7 +144,7 @@ export class Room {
       const cast = { id, kind: spell, team, x, y, startTick: this.world.tick };
       const ack: PlacementAck = { type: "placement-ack", round, commandId, unitIds: [], spellId: id };
       this.gold[team]! -= price;
-      this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, this.world.bases, [...(this.world.spells ?? []), cast]);
+      this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, this.world.bases, [...(this.world.spells ?? []), cast], this.world.effects);
       player.receipts.set(commandId, { ack, type: SPELLS[spell].command, points: [{x, y}] });
       return { ack, fresh: true };
     }
@@ -170,7 +170,7 @@ export class Room {
     if (live) {
       this.gold[team]! -= price;
       const recruits = createBattle(units).units;
-      this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases, this.world.spells);
+      this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases, this.world.spells, this.world.effects);
     } else {
       this.strokes.push(stroke);
       this.rebuild();

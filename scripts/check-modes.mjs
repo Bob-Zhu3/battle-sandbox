@@ -83,9 +83,9 @@ async function browseRoster(url) {
   const {page,point}=await open(url);
   try {
     const catalog={
-      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Barrel Roller","Engineer"],
+      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Engineer"],
       Machines:["Clockmouse","Bolt Drone","Mouse Workshop","Watchpost"],
-      Myths:["Giant","Storm Kirin","Phoenix"],
+      Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Zombie"],
       Spells:["Gust","Meteor","Healing Rain"],
     };
     const portraits=new Set();
@@ -98,18 +98,18 @@ async function browseRoster(url) {
         const card=panel.getByRole("button",{name,exact:true});
         assert.equal(await card.isEnabled(),true);
         portraits.add(await card.locator("canvas").evaluate(c=>c.toDataURL()));
-        if(i===0 && shelf==="Myths") await picture(page,"roster-myths");
+        if(i===0 && shelf==="Mythical") await picture(page,"roster-mythical");
         await card.click();
         if(shelf==="Spells") {
           assert.equal(await page.locator("#deploy-hint").textContent(),"Tap anywhere to cast "+name+".");
           await page.mouse.click(...point(840,170));
         } else {
-          await page.mouse.click(...point(155+(placed%7)*98,130+Math.floor(placed/7)*86));
+          await page.mouse.click(...point(125+(placed%9)*86,125+Math.floor(placed/9)*78));
           await page.waitForFunction(n=>Number(document.querySelector("#red-count").textContent)===n,++placed);
         }
       }
     }
-    assert.equal(portraits.size,17);assert.equal(placed,14);
+    assert.equal(portraits.size,21);assert.equal(placed,18);
     await selectFromRoster(page,"Machines","Mouse Workshop");
     for(const width of [375,601,790,1024]) {
       await page.setViewportSize({width,height:650});
@@ -120,7 +120,7 @@ async function browseRoster(url) {
       assert.deepEqual(outside,[],"Controls outside the field at "+width+"px");
     }
     assert.equal(await page.locator("#gold-balance").textContent(),"∞");
-    console.log("Roster: every entry has a distinct portrait, all 14 pieces place, and all three spells cast in the playground.");
+    console.log("Roster: every entry has a distinct portrait, all 18 pieces place, and all three spells cast in the playground.");
   } finally {await page.context().close();}
 }
 
@@ -131,7 +131,7 @@ async function magicDuel(url) {
       await player.page.waitForFunction(team=>document.querySelector(".game").dataset.team===team,side);
     await selectFromRoster(red.page,"People","Shieldbearer");
     await red.page.mouse.click(...red.point(320,170));await red.waitForUnits(1);
-    await selectFromRoster(blue.page,"Myths","Giant");
+    await selectFromRoster(blue.page,"Mythical","Cyclops");
     await blue.page.mouse.click(...blue.point(675,170));await blue.waitForUnits(2);
     await blue.page.getByRole("button",{name:"Roster",exact:true}).click();
     const panel=blue.page.getByRole("region",{name:"Troops and spells"});
@@ -162,8 +162,46 @@ async function magicDuel(url) {
     const until=Date.now()+3000;
     while(!red.frames.some(f=>f.revision===frame.revision) && Date.now()<until) await delay(10);
     assert.deepEqual(red.frames.find(f=>f.revision===frame.revision)?.world,frame.world);
-    assert.deepEqual(frame.world.units.map(u=>u.kind),["shieldbearer","giant"]);
-    console.log("Two-client roster and magic: a 390px client bought a Giant, saw a cross-field Meteor hit its base, and rejoined the same world.");
+    assert.deepEqual(frame.world.units.map(u=>u.kind),["shieldbearer","cyclops"]);
+    console.log("Two-client roster and magic: a 390px client bought a Cyclops, saw a cross-field Meteor hit its base, and rejoined the same world.");
+  } finally {await Promise.all([red,blue].map(p=>p.page.context().close()));}
+}
+
+async function stormDuel(url) {
+  const red=await open(url+"/room",1040,620),blue=await open(url+"/room",640,510);
+  try {
+    await red.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="red");
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue");
+    await selectFromRoster(red.page,"Mythical","Storm Kirin");
+    await red.page.mouse.click(...red.point(438,165));await red.waitForUnits(1);
+    await selectFromRoster(blue.page,"People","Lancer");
+    await blue.page.mouse.click(...blue.point(666,165));await blue.waitForUnits(2);
+    await selectFromRoster(blue.page,"Machines","Watchpost");
+    for(const [i,x] of [660,716,772].entries()) {
+      await blue.page.mouse.click(...blue.point(x,190));await blue.waitForUnits(3+i);
+    }
+    await Promise.all([red,blue].map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
+    const deadline=Date.now()+10000;
+    let contact;
+    while(!contact && Date.now()<deadline){
+      contact=blue.frames.find(f=>f.world.units.find(u=>u.kind==="kirin")?.arc?.path.length===5);
+      if(!contact)await delay(12);
+    }
+    assert.ok(contact,"no four-target chain reached the blue browser");
+    const spark=contact.world.units.find(u=>u.kind==="kirin").arc;
+    const enemies=contact.world.units.filter(u=>u.team==="blue");
+    assert.ok(enemies.every(u=>u.stunnedUntil>contact.world.tick));
+    assert.ok(blue.frames.some(f=>f.world.tick<spark.tick && f.world.units.some(u=>u.kind==="lancer" && u.runUp>=52)));
+    assert.equal(enemies.find(u=>u.kind==="lancer").runUp,0);
+    await blue.page.reload({waitUntil:"domcontentloaded"});
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" && Number(document.querySelector("#tick").textContent)>0);
+    assert.equal(blue.joins[0].resumeToken,blue.joins[1].resumeToken);
+    const latest=blue.frames.at(-1),limit=Date.now()+3000;
+    while(!red.frames.some(f=>f.revision===latest.revision) && Date.now()<limit)await delay(10);
+    assert.deepEqual(red.frames.find(f=>f.revision===latest.revision)?.world,latest.world);
+    assert.deepEqual(latest.world.units.map(u=>u.id),contact.world.units.map(u=>u.id));
+    assert.ok(latest.world.units.find(u=>u.kind==="kirin").arc.tick>=spark.tick);
+    console.log("Chain stun: both browsers agreed on four stunned enemies, the Lancer lost a full charge, and the returning player recovered the same world.");
   } finally {await Promise.all([red,blue].map(p=>p.page.context().close()));}
 }
 
@@ -194,6 +232,7 @@ async function match(url,size) {
     }
     const expected=TEAMS.slice(0,size);
     const allPlaced=frame=>frame?.phase==="deploy" && frame.world.units.length===size*2;
+    await Promise.all(players.map(p=>p.waitForUnits(size*2)));
     assert.ok(players.every(p=>allPlaced(p.frames.at(-1))));
     const deploy=players.at(-1).frames.at(-1);
     for (const player of players) assert.deepEqual(player.frames.at(-1),deploy);
@@ -252,6 +291,7 @@ try {
   await withField(playground);
   await withField(browseRoster);
   await withField(magicDuel);
+  await withField(stormDuel);
   await withField(url=>match(url,3));
   await withField(url=>match(url,4));
   assert.deepEqual(errors,[]);

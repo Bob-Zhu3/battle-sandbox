@@ -57,7 +57,7 @@ function paint(blend = 1) {
   drawArena(field.ctx, previous, play.world, blend);
 }
 function update() {
-  guide.hidden = !!(play.world.units.length || play.world.arrows.length || play.world.spells?.length);
+  guide.hidden = !!(play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length);
   undo.disabled = !play.canUndo;
   clear.disabled = !play.canUndo && !play.world.units.length && !play.world.arrows.length;
   field.updateScore(play.world);
@@ -86,12 +86,12 @@ function frame(time: number) {
   lastTime = time;
   const before = play.world.tick;
   const beforeCount = play.world.units.length;
-  const beforeSpells = play.world.spells?.length ?? 0;
+  const beforeSpells = (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0);
   while (remainder >= tickMs) {
     remainder -= tickMs; previous = play.world; play.advance();
   }
-  if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
-  if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
+  if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
+  if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
   requestAnimationFrame(frame);
 }
 update();

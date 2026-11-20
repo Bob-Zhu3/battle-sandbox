@@ -1,10 +1,12 @@
 import { applyMagic, blownAway, pulses, SPELLS, type FieldSpell } from "./spells.ts";
-import { catchBarrel, chainLightning, finishBuilding, giantTurn } from "./encounters.ts";
-import { aimTower, facesShot, incomingShot } from "./defense.ts";
+import { finishBuilding, resolveControl, startCyclopsSwing, type Windup } from "./encounters.ts";
+import { afflict, EFFECT_TICKS, moveKnockback, shove, slow, stun, tickAfflictions, type Affliction, type GroundEffect } from "./conditions.ts";
+import { aimTower, incomingShot } from "./defense.ts";
 import { finishTreatments, medicDuty } from "./medic.ts";
 import { nearestEnemy } from "./targeting.ts";
-import { firstArrowImpact, type Arrow } from "./arrows.ts";
-import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import type { Arrow } from "./arrows.ts";
+import { advanceShot, releaseShot } from "./shots.ts";
+import { isHuman, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { ARENA, ARMIES, BASE_RADIUS, TEAMS, type Base, type Team } from "./battlefield.ts";
 export { ARENA, type Team } from "./battlefield.ts";
 
@@ -37,11 +39,20 @@ export interface Unit extends Placement {
   // Archer peeking past cover, or Warrior hearing a friendly shaft pass behind.
   lastAttentionTick: number | null;
   killedBy?: Team;
-  fearId?: number;
-  frightUntil?: number;
+  lastStartleTick?: number;
   lastSqueakTick?: number;
-  barrel?: {since: number; dx: number; dy: number; damage: number};
-  droppedBarrel?: {x: number; y: number; tick: number; side: number};
+  windup?: Windup;
+  lastSmashTick?: number;
+  nextSwallowTick?: number;
+  lastSwallow?: { tick: number; team: Team; kind: UnitKind };
+  swallowedTick?: number;
+  slowUntil?: number;
+  burn?: Affliction;
+  poison?: Affliction;
+  infection?: { team: Team; until: number };
+  rising?: { team: Team; tick: number };
+  raisedTick?: number;
+  knockback?: { x: number; y: number; ticks: number };
   arc?: {tick: number; path: {x: number; y: number}[]};
   runUp?: number;
   lastChargeTick?: number;
@@ -70,13 +81,15 @@ export class Battle {
   arrows: Arrow[];
   bases?: Base[];
   spells?: FieldSpell[];
+  effects?: GroundEffect[];
 
-  constructor(tick: number, units: Unit[], arrows: Arrow[], bases?: Base[], spells?: FieldSpell[]) {
+  constructor(tick: number, units: Unit[], arrows: Arrow[], bases?: Base[], spells?: FieldSpell[], effects?: GroundEffect[]) {
     this.tick = tick;
     this.units = units;
     this.arrows = arrows;
     this.bases = bases;
     if (spells?.length) this.spells = spells;
+    if (effects?.length) this.effects = effects;
   }
 
   // Preserve the Warrior-only view used by the original Node callers.
@@ -122,7 +135,8 @@ function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   unit.aimX = distance > 0 ? dx / distance : ARMIES[unit.team].facing;
   unit.aimY = distance > 0 ? dy / distance : 0;
   if (distance > stopAt) {
-    const step = Math.min(UNIT_DEFINITIONS[unit.kind].speed / TICKS_PER_SECOND, distance - stopAt);
+    const speedFactor = unit.slowUntil === undefined ? 1 : UNIT_DEFINITIONS.frostqueen.speedFactor;
+    const step = Math.min(UNIT_DEFINITIONS[unit.kind].speed * speedFactor / TICKS_PER_SECOND, distance - stopAt);
     unit.x += unit.aimX * step;
     unit.y += unit.aimY * step;
   }
@@ -214,12 +228,13 @@ export function stepBattle(battle: Battle): Battle {
   const damage = new Map<number, number>();
   const sources = new Map<number, Map<Team, number>>();
   let arrows: Arrow[] = [];
-  const stuns = new Map<number, number>();
+  const effects = (battle.effects ?? []).filter(e => tick - e.tick < EFFECT_TICKS);
+  const burns: {id: number; team: Team}[] = [];
+  const bites: {id: number; team: Team}[] = [];
   const braces = new Set<number>();
   const healing = new Map<number, number>();
   const activeMagic = battle.spells?.filter(spell => pulses(spell, tick)) ?? [];
   const winds = activeMagic.filter(spell => spell.kind === "gust");
-  const towers = battle.bases?.map(base => aimTower(base, battle.units, tick, TICKS_PER_SECOND, arrows));
   const targets: readonly Target[] = battle.bases ? [...battle.units, ...battle.bases] : battle.units;
   function hit(target: Target, amount: number, team: Team) {
     damage.set(target.id, (damage.get(target.id) ?? 0) + amount);
@@ -229,10 +244,28 @@ export function stepBattle(battle: Battle): Battle {
     sources.set(target.id, contributors);
   }
 
+  const control = resolveControl(battle.units, targets, tick, hit, effects);
+  const towers = battle.bases?.map(base => {
+    const until = Math.max(base.stunnedUntil ?? 0, control.stuns.get(base.id) ?? 0);
+    if (tick < until) return {...base, stunnedUntil: until, acquiredTick: null, targetId: null};
+    return aimTower(base, battle.units, tick, TICKS_PER_SECOND, arrows);
+  });
+
   // Movement, targeting and releases all start from the same snapshot.
   const units = battle.units.map((unit) => {
     const next = { ...unit };
-    if (unit.hp <= 0) return next;
+    if (unit.hp <= 0) {
+      if (unit.rising && tick >= unit.rising.tick) {
+        delete next.rising;
+        if (!battle.bases || battle.bases.some(b => b.team === unit.rising!.team && b.hp > 0)) {
+          const raised = createBattle([{id: unit.id, kind: "zombie", team: unit.rising.team, x: unit.x, y: unit.y}]).units[0];
+          raised.raisedTick = tick;
+          return raised;
+        }
+      }
+      return next;
+    }
+    if (next.slowUntil !== undefined && tick >= next.slowUntil) delete next.slowUntil;
     if (unit.emberUntil !== undefined) {
       if (tick >= unit.emberUntil) {
         delete next.emberUntil;
@@ -240,8 +273,33 @@ export function stepBattle(battle: Battle): Battle {
         next.lastHatchTick = tick;
       } else return next;
     }
-    if (tick < (unit.stunnedUntil ?? 0)) return next;
-    if (unit.kind === "giant" && giantTurn(next, battle.units, tick, arrows, TICKS_PER_SECOND)) return next;
+    const arc = control.arcs.get(unit.id);
+    if (arc) {
+      const dx = arc.path[1].x - unit.x, dy = arc.path[1].y - unit.y, length = Math.hypot(dx, dy) || 1;
+      next.arc = arc; next.aimX = dx / length; next.aimY = dy / length;
+      next.attackDirection = {x: next.aimX, y: next.aimY};
+      next.targetId = nearestEnemy(unit, targets)!.id;
+      next.lastAttackTick = tick; next.nextAttackTick = tick + UNIT_DEFINITIONS.kirin.cooldownTicks;
+    }
+    if (control.mice.has(unit.id)) next.lastStartleTick = tick;
+    if (control.swallowed.has(unit.id)) { next.swallowedTick = tick; return next; }
+    if (control.finished.has(unit.id)) {
+      delete next.windup;
+      if (unit.windup!.kind === "smash") {
+        next.lastSmashTick = next.lastAttackTick = tick;
+        next.nextAttackTick = tick + UNIT_DEFINITIONS.cyclops.cooldownTicks;
+      } else {
+        const meal = control.meals.get(unit.id);
+        next.nextSwallowTick = tick + (meal ? UNIT_DEFINITIONS.cyclops.swallowCooldown : 12);
+        if (meal) next.lastSwallow = {tick, team: meal.team, kind: meal.kind};
+      }
+    }
+    const interruptedUntil = Math.max(control.stuns.get(unit.id) ?? 0, next.stunnedUntil ?? 0);
+    if (tick < interruptedUntil) {
+      stun(next, interruptedUntil);
+      return next;
+    }
+    if (arc || unit.windup) return next;
     const target = nearestEnemy(unit, targets);
     if (unit.kind === "drone" && unit.burstLeft && tick >= (unit.nextBurstTick ?? 0) && unit.attackDirection) {
       const spec = UNIT_DEFINITIONS.drone, speed = spec.arrowSpeed / TICKS_PER_SECOND;
@@ -287,9 +345,13 @@ export function stepBattle(battle: Battle): Battle {
     const definition = UNIT_DEFINITIONS[unit.kind];
     const reach = definition.reach + (target.kind === "base" ? BASE_RADIUS : 0);
     const targetRadius = target.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[target.kind].radius;
-    const stopAt = definition.attack === "melee" ? definition.radius + targetRadius : reach;
+    const stopAt = definition.attack === "melee" || unit.kind === "cyclops" ? definition.radius + targetRadius : reach;
     const distance = moveToward(next, target.x, target.y, stopAt);
-    if (distance <= reach && tick >= unit.nextAttackTick) {
+    if (unit.kind === "cyclops") {
+      startCyclopsSwing(next, battle.units, target, tick, distance);
+      return next;
+    }
+    if (definition.attack !== "lightning" && distance <= reach && tick >= unit.nextAttackTick) {
       next.nextAttackTick = tick + definition.cooldownTicks;
       next.lastAttackTick = tick;
       next.attackDirection = { x: next.aimX, y: next.aimY };
@@ -298,21 +360,16 @@ export function stepBattle(battle: Battle): Battle {
         if (unit.kind === "lancer" && (unit.runUp ?? 0) >= UNIT_DEFINITIONS.lancer.runUp) {
           next.runUp = 0; next.lastChargeTick = tick;
           const braced = target.kind === "shieldbearer" && target.aimX * next.aimX + target.aimY * next.aimY <= -0.5;
-          if (braced) { stuns.set(unit.id, tick + 18); braces.add(target.id); }
+          if (braced) { stun(next, tick + 18); braces.add(target.id); }
           else amount += UNIT_DEFINITIONS.lancer.bonus;
         }
         hit(target, amount, unit.team);
-      } else if (definition.attack === "lightning") {
-        chainLightning(next, target, battle.units, tick, hit);
+        if (unit.kind === "phoenix" && target.kind !== "base") burns.push({id: target.id, team: unit.team});
+        if (unit.kind === "zombie" && target.kind !== "base" && isHuman(target.kind)) bites.push({id: target.id, team: unit.team});
       } else if (definition.attack === "arrow") {
-        if (shootingPastCover(next, battle.units, distance)) next.lastAttentionTick = tick;
-        const step = definition.arrowSpeed / TICKS_PER_SECOND;
+        if (unit.kind === "archer" && shootingPastCover(next, battle.units, distance)) next.lastAttentionTick = tick;
         if (unit.kind === "drone") { next.burstLeft = 2; next.nextBurstTick = tick + UNIT_DEFINITIONS.drone.burstGap; }
-        arrows.push({
-          ...(unit.kind === "cooper" ? {kind: "barrel" as const} : unit.kind === "drone" || unit.kind === "post" ? {kind: "dart" as const} : {}),
-          x: unit.x, y: unit.y, team: unit.team, releasedTick: tick, damage: definition.damage,
-          vx: step * next.aimX, vy: step * next.aimY,
-        });
+        arrows.push(releaseShot(next, target, tick, TICKS_PER_SECOND));
       }
     }
     return next;
@@ -324,37 +381,30 @@ export function stepBattle(battle: Battle): Battle {
   for (let pass = 0; pass < 4; pass++) {
     if (!separateFootprints(battle.units, units, solid)) break;
   }
-  // Only previously released arrows fly this tick. Each one is consumed by its first hit.
-  applyMagic(activeMagic, units, targets, tick, hit, healing);
   const byId = new Map(units.map(unit => [unit.id, unit]));
-  for (const [i, unit] of units.entries()) {
-    if (unit.fearId !== undefined && battle.units[i].fearId !== unit.fearId) {
-      const mouse = byId.get(unit.fearId);
-      if (mouse) mouse.lastSqueakTick = tick;
-    }
-  }
-  for (const [id, until] of stuns) byId.get(id)!.stunnedUntil = until;
+  for (const mouseId of control.mice.values()) byId.get(mouseId)!.lastSqueakTick = tick;
   for (const id of braces) byId.get(id)!.lastBlockTick = tick;
-  if (winds.length) arrows = arrows.filter(arrow => !blownAway(arrow, winds));
+  for (const [id, impacts] of control.shocks) {
+    const target = byId.get(id)!;
+    for (const point of impacts) shove(target, point.x, point.y, UNIT_DEFINITIONS.cyclops.shove);
+  }
+  for (const unit of units) moveKnockback(unit);
+  for (const {id, team} of burns) afflict(byId.get(id)!, "burn", team, tick);
+  // Only the first team in seat order wins simultaneous bites on one person.
+  bites.sort((a, b) => TEAMS.indexOf(b.team) - TEAMS.indexOf(a.team));
+  for (const {id, team} of bites) byId.get(id)!.infection = {team, until: tick + UNIT_DEFINITIONS.zombie.markTicks};
+  applyMagic(activeMagic, units, targets, tick, hit, healing);
   for (const unit of units) {
+    tickAfflictions(unit, tick, hit);
     if (unit.kind === "shieldbearer" && unit.hp > 0 && incomingShot(unit, battle.arrows)) unit.lastBraceTick = tick;
   }
-  const movedTargets = battle.bases ? [...units, ...battle.bases] : units;
+  if (winds.length) arrows = arrows.filter(arrow => !blownAway(arrow, winds));
+  const movedTargets = towers ? [...units, ...towers] : units;
   for (const arrow of battle.arrows) {
     if (winds.length && blownAway(arrow, winds)) continue;
-    if (arrow.kind !== "barrel") noticeFriendlyArrow(arrow, units, tick);
-    const impact = firstArrowImpact(arrow, targets, movedTargets);
-    if (impact) {
-      if (impact.kind === "giant" && catchBarrel(byId.get(impact.id)!, arrow, tick)) continue;
-      const guard = impact.kind === "shieldbearer" && arrow.kind !== "barrel" ? byId.get(impact.id) : undefined;
-      if (guard && facesShot(guard, arrow)) {
-        guard.lastBraceTick = guard.lastBlockTick = tick;
-        hit(impact, Math.ceil(arrow.damage * UNIT_DEFINITIONS.shieldbearer.damageFraction), arrow.team);
-      } else hit(impact, arrow.damage, arrow.team);
-      continue;
-    }
-    const x = arrow.x + arrow.vx, y = arrow.y + arrow.vy;
-    if (x >= 0 && x <= ARENA.width && y >= 0 && y <= ARENA.height) arrows.push({ ...arrow, x, y });
+    if (!arrow.kind || arrow.kind === "dart") noticeFriendlyArrow(arrow, units, tick);
+    const flying = advanceShot(arrow, tick, targets, movedTargets, byId, hit, effects);
+    if (flying) arrows.push(flying);
   }
   for (const [index, unit] of units.entries()) {
     const from = battle.units[index];
@@ -364,7 +414,7 @@ export function stepBattle(battle: Battle): Battle {
     unit.pace += ((speed ? Math.min(1, distance / speed) : 0) - unit.pace) * .3;
     if (unit.kind === "lancer" && unit.lastChargeTick !== tick) {
       const straight = unit.aimX * from.aimX + unit.aimY * from.aimY > 0.93;
-      unit.runUp = distance > 0.15 && straight && tick >= (unit.stunnedUntil ?? 0) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
+      unit.runUp = distance > 0.15 && straight && !from.knockback && !control.shocks.has(unit.id) && tick >= (unit.stunnedUntil ?? 0) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
     }
     const amount = damage.get(unit.id);
     if (amount === undefined) continue;
@@ -373,6 +423,10 @@ export function stepBattle(battle: Battle): Battle {
     if (!unit.hp && unit.kind === "phoenix" && !unit.reborn) {
       unit.hp = 1; unit.reborn = true; unit.emberUntil = tick + UNIT_DEFINITIONS.phoenix.hatchTicks;
       unit.targetId = null; unit.pace = 0;
+      delete unit.burn; delete unit.poison; delete unit.slowUntil; delete unit.knockback;
+    }
+    if (!unit.hp && unit.infection && !control.swallowed.has(unit.id) && isHuman(unit.kind)) {
+      unit.rising = {team: unit.infection.team, tick: tick + UNIT_DEFINITIONS.zombie.riseTicks};
     }
     const contributors = sources.get(unit.id);
     if (!unit.hp && contributors) {
@@ -391,7 +445,13 @@ export function stepBattle(battle: Battle): Battle {
     return { ...base, hp, lastHitTick: tick };
   });
   if (fallen.size) {
-    for (const unit of units) if (unit.hp && fallen.has(unit.team)) { unit.hp = 0; unit.lastHitTick = tick; }
+    for (const unit of units) {
+      if (unit.rising && fallen.has(unit.rising.team)) delete unit.rising;
+      if (unit.infection && fallen.has(unit.infection.team)) delete unit.infection;
+      if (unit.burn && fallen.has(unit.burn.team)) delete unit.burn;
+      if (unit.poison && fallen.has(unit.poison.team)) delete unit.poison;
+      if (unit.hp && fallen.has(unit.team)) { unit.hp = 0; unit.lastHitTick = tick; }
+    }
   }
   finishTreatments(units, byId, tick, healing);
   const recruits: Placement[] = [];
@@ -401,7 +461,7 @@ export function stepBattle(battle: Battle): Battle {
   }
   if (recruits.length) units.push(...createBattle(recruits).units);
   const spells = battle.spells?.filter(spell => tick - spell.startTick < SPELLS[spell.kind].duration && !fallen.has(spell.team));
-  return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases, spells);
+  return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases, spells, effects);
 }
 
 export function battleOutcome(battle: Battle): Outcome | null {
@@ -415,6 +475,7 @@ export function battleOutcome(battle: Battle): Outcome | null {
     if (survivor && survivor !== unit.team) return null;
     survivor = unit.team;
   }
+  if (battle.units.some(u => u.rising && u.rising.team !== survivor)) return null;
   if (!survivor) return "draw";
   return battle.arrows.some(arrow => arrow.team !== survivor) ? null : survivor;
 }

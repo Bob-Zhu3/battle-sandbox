@@ -1,5 +1,5 @@
 import { ARMIES } from "./battlefield.ts";
-import { INK, line, oval, type Pens } from "./ink.ts";
+import { INK, cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell, type SpellKind } from "./spells.ts";
 
 export function drawSpellIcon(c: Pens, kind: SpellKind) {
@@ -47,6 +47,22 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
       const dy=Math.sin(i*2.4)*r*Math.sqrt((i+1)/12);
       const lift=(tick*2+i*11)%19;
       line(c,dx*sx+2*scale,dy*sy-(20-lift)*scale,dx*sx,dy*sy-(15-lift)*scale,"#6babae",1.5*scale);
+    }
+    const dye=ARMIES[spell.team];
+    for (const pulse of [SPELLS.rain.delay,48,84]) {
+      const elapsed=age-pulse;
+      if(elapsed<0 || elapsed>29) continue;
+      for(let i=0;i<5;i++) {
+        const t=(elapsed-i*1.2)/24;
+        if(t<0 || t>=1) continue;
+        const angle=i*2.4+pulse*.07, distance=r*(i===0?.1:.45+.12*(i%3));
+        const x=Math.cos(angle)*distance*sx, y=Math.sin(angle)*distance*sy;
+        c.save(); c.translate(x+Math.sin(t*3+i)*2*scale,y-(2+22*t)*scale); c.scale(scale,scale);
+        c.globalAlpha=Math.min(1,t*8+.28,(1-t)*4);
+        cut(c,"M-1.6 -5 L1.6 -5 L1.6 -1.6 L5 -1.6 L5 1.6 L1.6 1.6 L1.6 5 L-1.6 5 L-1.6 1.6 L-5 1.6 L-5 -1.6 L-1.6 -1.6Z",dye.coat,1.1);
+        line(c,-.7,-3.6,-.7,-1.5,dye.light,1);
+        c.restore();
+      }
     }
   }
   c.restore();
