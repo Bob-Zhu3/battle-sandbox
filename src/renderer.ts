@@ -1,5 +1,6 @@
-import { ARENA, WARRIOR, boundCenter, type Battle, type Team } from "./simulation.ts";
+import { ARENA, boundCenter, type Battle, type Team } from "./simulation.ts";
 import { teamAt, type ArenaPoint } from "./deployment.ts";
+import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
 const colors = {
   red: { shell: "#e46950", shade: "#af453c", gleam: "#ffb685" },
@@ -13,8 +14,8 @@ function circle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) 
   ctx.arc(x, y, r, 0, TAU);
 }
 
-// Both the brush stamp and each Warrior use the same circular silhouette.
-export function drawWarriorToken(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, side: Team, flash = false) {
+// The brush stamp, placement preview and live unit share a silhouette.
+export function drawUnitToken(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, side: Team, kind: UnitKind, flash = false) {
   const color = colors[side];
   ctx.save();
   ctx.translate(x, y);
@@ -35,6 +36,33 @@ export function drawWarriorToken(ctx: CanvasRenderingContext2D, x: number, y: nu
   ctx.fillStyle = color.shade;
   ctx.fill();
 
+  if (kind === "archer") drawBow(ctx);
+  else drawVisor(ctx, side);
+  ctx.restore();
+}
+
+function drawBow(ctx: CanvasRenderingContext2D) {
+  ctx.beginPath();
+  ctx.moveTo(-4, -10); ctx.lineTo(-9, 0); ctx.lineTo(-4, 10);
+  ctx.strokeStyle = "#fff2c7";
+  ctx.lineWidth = 1.35;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-4, -10);
+  ctx.bezierCurveTo(-1, -8, 5, -9, 6, 0);
+  ctx.bezierCurveTo(5, 9, -1, 8, -4, 10);
+  ctx.strokeStyle = INK; ctx.lineWidth = 4.8; ctx.stroke();
+  ctx.strokeStyle = "#ffd077"; ctx.lineWidth = 2.4; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-9, 0); ctx.lineTo(10, 0);
+  ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(12, 0); ctx.lineTo(7, -2.8); ctx.lineTo(7, 2.8); ctx.closePath();
+  ctx.fillStyle = "#fff2c7"; ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke();
+}
+
+function drawVisor(ctx: CanvasRenderingContext2D, side: Team) {
   // A cream visor with one eye facing the other army reads even at a small size.
   ctx.beginPath();
   ctx.moveTo(-7, -4);
@@ -54,7 +82,7 @@ export function drawWarriorToken(ctx: CanvasRenderingContext2D, x: number, y: nu
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
-  ctx.strokeStyle = color.gleam;
+  ctx.strokeStyle = colors[side].gleam;
   ctx.lineWidth = 2.1;
   ctx.beginPath();
   if (side === "red") {
@@ -64,17 +92,38 @@ export function drawWarriorToken(ctx: CanvasRenderingContext2D, x: number, y: nu
     ctx.moveTo(-1, -9); ctx.lineTo(2, -12);
   }
   ctx.stroke();
+}
+
+function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // The tip is the simulated point of impact.
+  ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(-2, 0);
+  ctx.strokeStyle = INK; ctx.lineWidth = 2.8; ctx.stroke();
+  ctx.strokeStyle = "#ffd073"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-10, 0); ctx.lineTo(-14, -3); ctx.lineTo(-17, -3);
+  ctx.lineTo(-15, 0); ctx.lineTo(-17, 3); ctx.lineTo(-14, 3); ctx.closePath();
+  ctx.fillStyle = colors[side].gleam; ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = .85; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(-5.5, -2.8); ctx.lineTo(-4.3, 0); ctx.lineTo(-5.5, 2.8); ctx.closePath();
+  ctx.fillStyle = "#fff1c6"; ctx.fill(); ctx.stroke();
   ctx.restore();
 }
 
 function projection(w: number, h: number, current: Battle, deploying: boolean) {
-  if (deploying || !current.warriors.length) {
+  if (deploying || !current.units.length) {
     return { sx: w / ARENA.width, sy: h / ARENA.height, ox: 0, oy: 0 };
   }
   // Frame the skirmish with a uniform scale so touching circles also touch on screen.
   // Fallen units retain their last position, keeping the frame steady as ranks fall.
   let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
-  for (const { x, y } of current.warriors) {
+  for (const { x, y } of current.units) {
     left = Math.min(left, x); right = Math.max(right, x);
     top = Math.min(top, y); bottom = Math.max(bottom, y);
   }
@@ -108,20 +157,21 @@ function drawDivider(ctx: CanvasRenderingContext2D, w: number, h: number, empty:
   ctx.restore();
 }
 
-export function drawArena(ctx: CanvasRenderingContext2D, previous: Battle, current: Battle, blend: number, deploying = false, preview: readonly ArenaPoint[] = []) {
+export function drawArena(ctx: CanvasRenderingContext2D, previous: Battle, current: Battle, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior") {
   const w = ctx.canvas.clientWidth, h = ctx.canvas.clientHeight;
   if (!w || !h) return;
   ctx.setTransform(ctx.canvas.width / w, 0, 0, ctx.canvas.height / h, 0, 0);
   ctx.clearRect(0, 0, w, h);
   const { sx, sy, ox, oy } = projection(w, h, current, deploying);
-  const r = WARRIOR.radius * Math.min(sx, sy);
-  if (deploying) drawDivider(ctx, w, h, !current.warriors.length && !preview.length);
+  const scale = Math.min(sx, sy);
+  if (deploying) drawDivider(ctx, w, h, !current.units.length && !preview.length);
 
-  for (const unit of current.warriors) {
+  for (const unit of current.units) {
     if (unit.hp || unit.lastHitTick === null) continue;
     const age = current.tick - unit.lastHitTick;
     if (age >= 24) continue;
     const x = ox + unit.x * sx, y = oy + unit.y * sy;
+    const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
     ctx.save();
     ctx.globalAlpha = .46 * (1 - age / 24);
     ctx.strokeStyle = colors[unit.team].shade;
@@ -133,13 +183,14 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: Battle, curre
     ctx.stroke();
     ctx.restore();
   }
-  for (const [i, unit] of current.warriors.entries()) {
+  for (const [i, unit] of current.units.entries()) {
     if (!unit.hp) continue;
-    const from = previous.warriors[i];
+    const from = previous.units[i];
     const x = ox + (from.x + (unit.x - from.x) * blend) * sx;
     const y = oy + (from.y + (unit.y - from.y) * blend) * sy;
     const age = unit.lastHitTick === null ? Infinity : current.tick - unit.lastHitTick;
-    drawWarriorToken(ctx, x, y, r, unit.team, age < 5);
+    const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
+    drawUnitToken(ctx, x, y, r, unit.team, unit.kind, age < 5);
     if (age < 8) {
       // A brief spark at the visor leaves the circular silhouette readable in a crowd.
       const direction = unit.team === "red" ? 1 : -1;
@@ -158,11 +209,18 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: Battle, curre
       ctx.restore();
     }
   }
+  for (const arrow of current.arrows) {
+    const rewind = arrow.releasedTick === current.tick ? 0 : 1 - blend;
+    const x = ox + (arrow.x - arrow.vx * rewind) * sx;
+    const y = oy + (arrow.y - arrow.vy * rewind) * sy;
+    drawArrow(ctx, x, y, Math.atan2(arrow.vy, arrow.vx), scale, arrow.team);
+  }
   ctx.save();
   ctx.globalAlpha = .55;
+  const radius = UNIT_DEFINITIONS[brush].radius;
   for (const point of preview) {
-    const x = boundCenter(point.x, ARENA.width), y = boundCenter(point.y, ARENA.height);
-    drawWarriorToken(ctx, ox + x * sx, oy + y * sy, r, teamAt(point.x));
+    const x = boundCenter(point.x, ARENA.width, radius), y = boundCenter(point.y, ARENA.height, radius);
+    drawUnitToken(ctx, ox + x * sx, oy + y * sy, radius * scale, teamAt(point.x), brush);
   }
   ctx.restore();
 }

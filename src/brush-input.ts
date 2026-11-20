@@ -1,33 +1,35 @@
 import { PlacementStroke, pointerToArena, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
+import type { UnitKind } from "./units.ts";
 
 interface BrushCallbacks {
   canDraw(): boolean;
-  preview(points: readonly ArenaPoint[]): void;
+  selectedKind?(): UnitKind;
+  preview(points: readonly ArenaPoint[], kind: UnitKind): void;
   commit(command: PlacementCommand): void;
 }
 
 export function attachDeploymentBrush(canvas: HTMLCanvasElement, callbacks: BrushCallbacks) {
-  let active: { pointerId: number; stroke: PlacementStroke } | null = null;
+  let active: { pointerId: number; stroke: PlacementStroke; kind: UnitKind } | null = null;
 
   function cancel() {
     if (!active) return;
-    const { pointerId } = active;
+    const { pointerId, kind } = active;
     active = null;
     if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
-    callbacks.preview([]);
+    callbacks.preview([], kind);
   }
 
   canvas.addEventListener("pointerdown", (event) => {
     if (!callbacks.canDraw() || active || !event.isPrimary || event.button !== 0) return;
     const start = pointerToArena(event.clientX, event.clientY, canvas.getBoundingClientRect());
     canvas.setPointerCapture(event.pointerId);
-    active = { pointerId: event.pointerId, stroke: new PlacementStroke(start) };
-    callbacks.preview(active.stroke.positions);
+    active = { pointerId: event.pointerId, stroke: new PlacementStroke(start), kind: callbacks.selectedKind?.() ?? "warrior" };
+    callbacks.preview(active.stroke.positions, active.kind);
   });
 
   function follow(event: PointerEvent) {
     if (!active || event.pointerId !== active.pointerId) return;
-    const { stroke } = active;
+    const { stroke, kind } = active;
     const rect = canvas.getBoundingClientRect();
     for (const sample of event.getCoalescedEvents?.() ?? []) {
       stroke.extend(pointerToArena(sample.clientX, sample.clientY, rect));
@@ -36,9 +38,9 @@ export function attachDeploymentBrush(canvas: HTMLCanvasElement, callbacks: Brus
 
     if (event.type === "pointerup") {
       cancel();
-      callbacks.commit({ type: "place-warriors", positions: stroke.positions });
+      callbacks.commit({ type: kind === "archer" ? "place-archers" : "place-warriors", positions: stroke.positions });
     } else {
-      callbacks.preview(stroke.positions);
+      callbacks.preview(stroke.positions, kind);
     }
   }
   canvas.addEventListener("pointermove", follow);

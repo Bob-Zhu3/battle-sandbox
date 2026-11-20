@@ -4,7 +4,7 @@ export const BRUSH_SPACING = 24;
 export type ArenaPoint = Pick<Placement, "x" | "y">;
 
 export interface PlacementCommand {
-  type: "place-warriors";
+  type: "place-warriors" | "place-archers";
   positions: readonly ArenaPoint[];
 }
 
@@ -55,8 +55,9 @@ export class PlacementStroke {
 export function battleFromDeployment(commands: readonly PlacementCommand[]) {
   const placements: Placement[] = [];
   for (const command of commands) {
+    const kind = command.type === "place-archers" ? "archer" : "warrior";
     for (const point of command.positions) {
-      placements.push({ id: placements.length + 1, team: teamAt(point.x), ...point });
+      placements.push({ id: placements.length + 1, kind, team: teamAt(point.x), ...point });
     }
   }
   return createBattle(placements);
@@ -74,4 +75,18 @@ export function twentyVsTwenty(): PlacementCommand[] {
     }
   }
   return [{ type: "place-warriors", positions: red }, { type: "place-warriors", positions: blue }];
+}
+
+export function archerScreen(): PlacementCommand[] {
+  const screen: ArenaPoint[] = [], archers: ArenaPoint[] = [], opponents: ArenaPoint[] = [];
+  for (const y of [96, 138, 180, 222, 264]) {
+    archers.push({ x: 322, y: y + 6 });
+    screen.push({ x: 398, y });
+    opponents.push({ x: 543, y: y - 2 }, { x: 655, y: y + 5 });
+  }
+  return [
+    { type: "place-warriors", positions: screen },
+    { type: "place-archers", positions: archers },
+    { type: "place-warriors", positions: opponents },
+  ];
 }

@@ -11,13 +11,13 @@
   <body>
     <main class="game">
       <canvas id="landscape" class="field-layer" aria-hidden="true"></canvas>
-      <canvas id="arena" class="field-layer" width="960" height="360" tabindex="-1" aria-label="Battlefield. Draw red Warriors on the left and blue Warriors on the right." aria-describedby="deploy-hint">
-        The pennants show how many Warriors are alive on each team.
+      <canvas id="arena" class="field-layer" width="960" height="360" tabindex="-1" aria-label="Battlefield. Draw red units on the left and blue units on the right." aria-describedby="deploy-hint">
+        The pennants show how many units are alive on each team.
       </canvas>
 
       <header class="top-hud">
         <h1 class="wordmark" aria-label="Battle Sandbox"><span>Battle</span><span>Sandbox</span></h1>
-        <div class="score" role="group" aria-label="Warriors on the field">
+        <div class="score" role="group" aria-label="Units on the field">
           <div id="red-score" class="pennant red">
             <span class="pennant-name">Red</span><strong id="red-count">0</strong>
             <span class="life-line" aria-hidden="true"><i id="red-bar"></i></span>
@@ -30,9 +30,16 @@
             <span class="sr-only"><span id="blue-hp">0</span> of <span id="blue-max">0</span> HP</span>
           </div>
         </div>
-        <button id="demo" class="demo-button" type="button">
-          <span class="flag-icon" aria-hidden="true"></span><span id="demo-label">20 vs 20 demo</span>
-        </button>
+        <div class="demo-controls">
+          <details id="demo-picker">
+            <summary class="demo-button"><span class="flag-icon" aria-hidden="true"></span>Demos <span aria-hidden="true">▾</span></summary>
+            <div class="demo-options">
+              <button id="demo-archers" type="button">Archer screen</button>
+              <button id="demo-warriors" type="button">20 vs 20 Warriors</button>
+            </div>
+          </details>
+          <button id="demo-back" class="demo-button" type="button" hidden><span class="flag-icon" aria-hidden="true"></span>Back to field</button>
+        </div>
       </header>
 
       <div id="empty-guide" class="empty-guide">
@@ -44,11 +51,14 @@
       </div>
 
       <footer class="bottom-hud">
-        <div class="match-readout"><strong id="match-state" role="status">Deployment</strong><span>Tick <b id="tick">000</b></span></div>
+        <div class="match-readout"><span id="scenario-name" hidden></span><strong id="match-state" role="status">Deployment</strong><span>Tick <b id="tick">000</b></span></div>
         <div class="tools">
           <p id="deploy-hint" class="hint" hidden></p>
           <div class="tool-strip" role="group" aria-label="Battle controls">
-            <span id="brush-tool" class="brush-tool"><canvas id="brush-icon" width="72" height="72" aria-hidden="true"></canvas>Warrior</span>
+            <div id="brush-tool" class="brush-choices" role="group" aria-label="Unit brush">
+              <button id="brush-warrior" class="brush-tool" type="button" aria-pressed="true"><canvas id="icon-warrior" class="brush-icon" width="72" height="72" aria-hidden="true"></canvas>Warrior</button>
+              <button id="brush-archer" class="brush-tool" type="button" aria-pressed="false"><canvas id="icon-archer" class="brush-icon" width="72" height="72" aria-hidden="true"></canvas>Archer</button>
+            </div>
             <button id="undo" class="tool" type="button" aria-label="Undo stroke" title="Undo the last stroke" disabled><i aria-hidden="true">↶</i>Undo</button>
             <button id="clear" class="tool" type="button" disabled><i class="eraser" aria-hidden="true"></i>Clear</button>
             <button id="edit" class="tool" type="button" hidden>Edit formation</button>

@@ -16,7 +16,8 @@
       const button = document.querySelector("#run");
       const report = document.querySelector("#report");
       const commands = [];
-      attachDeploymentBrush(canvas, { canDraw: () => true, preview() {}, commit: (command) => commands.push(command) });
+      let selectedKind = "warrior";
+      attachDeploymentBrush(canvas, { canDraw: () => true, selectedKind: () => selectedKind, preview() {}, commit: (command) => commands.push(command) });
       button.disabled = false;
 
       // A real press supplies an active pointer ID for the browser's native capture API.
@@ -25,7 +26,8 @@
         const expected = [120, 144, 168, 192, 216].map((x) => ({ x, y: 120 }));
         const lines = [];
         try {
-          for (const count of [2, 20]) {
+          for (const [kind, count] of [["warrior", 2], ["warrior", 20], ["archer", 2], ["archer", 20]]) {
+            selectedKind = kind;
             commands.length = 0;
             for (let i = 0; i < count; i++) {
               const last = i === count - 1;
@@ -38,10 +40,10 @@
               }));
               if (!last && commands.length) throw new Error("A stroke committed before pointerup.");
             }
-            if (commands.length !== 1 || JSON.stringify(commands[0].positions) !== JSON.stringify(expected)) {
+            if (commands.length !== 1 || commands[0].type !== "place-" + kind + "s" || JSON.stringify(commands[0].positions) !== JSON.stringify(expected)) {
               throw new Error(`${count} positions produced ${JSON.stringify(commands)}`);
             }
-            lines.push(`PASS — ${count} pointer positions, 1 command, 5 Warriors`);
+            lines.push(`PASS — ${count} pointer positions, 1 command, 5 ${kind === "warrior" ? "Warriors" : "Archers"}`);
           }
           lines.push("Arena x positions: 120, 144, 168, 192, 216. All y positions: 120.");
         } catch (error) {

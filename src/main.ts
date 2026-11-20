@@ -1,8 +1,9 @@
-import { battleOutcome, stepBattle, TICKS_PER_SECOND, WARRIOR } from "./simulation.ts";
-import { battleFromDeployment, twentyVsTwenty, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
+import { battleOutcome, stepBattle, TICKS_PER_SECOND } from "./simulation.ts";
+import { archerScreen, battleFromDeployment, twentyVsTwenty, type ArenaPoint, type PlacementCommand } from "./deployment.ts";
 import { attachDeploymentBrush } from "./brush-input.ts";
 import { drawLandscape } from "./landscape.ts";
-import { drawArena, drawWarriorToken } from "./renderer.ts";
+import { drawArena, drawUnitToken } from "./renderer.ts";
+import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
 function element<T extends HTMLElement = HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -25,11 +26,13 @@ const replay = element<HTMLButtonElement>("replay");
 const edit = element<HTMLButtonElement>("edit");
 const undo = element<HTMLButtonElement>("undo");
 const clear = element<HTMLButtonElement>("clear");
-const demo = element<HTMLButtonElement>("demo");
-const demoLabel = element("demo-label");
+const demoPicker = element<HTMLDetailsElement>("demo-picker");
+const demoBack = element<HTMLButtonElement>("demo-back");
+const scenarioName = element("scenario-name");
 const hint = element("deploy-hint");
 const emptyGuide = element("empty-guide");
 const brushTool = element("brush-tool");
+const brushButtons = { warrior: element<HTMLButtonElement>("brush-warrior"), archer: element<HTMLButtonElement>("brush-archer") };
 const keyAction = element("key-action");
 const playLabel = element("play-label");
 const playIcon = element("play-icon");
@@ -53,8 +56,14 @@ const labels = {
 type Playback = keyof typeof labels;
 
 const formation: PlacementCommand[] = [];
-const demoFormation = twentyVsTwenty();
-let watchingDemo = false;
+const demos = {
+  "20v20": { name: "20 vs 20 Warriors", formation: twentyVsTwenty() },
+  archers: { name: "Archer screen", formation: archerScreen() },
+};
+type Demo = keyof typeof demos;
+let activeDemo: Demo | null = null;
+let selectedKind: UnitKind = "warrior";
+let draftKind: UnitKind = selectedKind;
 let draft: readonly ArenaPoint[] = [];
 let mode: Playback = "deploy";
 let battle = battleFromDeployment(formation);
@@ -64,26 +73,27 @@ let lastTime = 0;
 let frameId = 0;
 
 function updateGuide() {
-  emptyGuide.hidden = mode !== "deploy" || battle.warriors.length > 0 || draft.length > 0;
+  emptyGuide.hidden = mode !== "deploy" || battle.units.length > 0 || draft.length > 0;
 }
 
 function updateScore() {
   tickLabel.textContent = String(battle.tick).padStart(3, "0");
-  const totals = { red: { units: 0, alive: 0, hp: 0 }, blue: { units: 0, alive: 0, hp: 0 } };
-  for (const unit of battle.warriors) {
+  const totals = { red: { units: 0, warrior: 0, archer: 0, hp: 0, max: 0 }, blue: { units: 0, warrior: 0, archer: 0, hp: 0, max: 0 } };
+  for (const unit of battle.units) {
     const team = totals[unit.team];
     team.units++;
-    if (unit.hp > 0) team.alive++;
+    if (unit.hp > 0) team[unit.kind]++;
     team.hp += unit.hp;
+    team.max += UNIT_DEFINITIONS[unit.kind].maxHp;
   }
   for (const side of ["red", "blue"] as const) {
-    const { units, alive, hp } = totals[side];
-    const max = units * WARRIOR.maxHp;
+    const { units, warrior, archer, hp, max } = totals[side];
+    const alive = warrior + archer;
     const display = health[side];
     if (display.count.textContent !== String(alive)) display.count.textContent = String(alive);
     if (display.max.textContent !== String(max)) display.max.textContent = String(max);
     if (display.hp.textContent !== String(hp)) display.hp.textContent = String(hp);
-    display.score.title = alive + " of " + units + " " + side + " Warriors alive · " + hp + "/" + max + " HP";
+    display.score.title = alive + " of " + units + " alive · Warriors " + warrior + " · Archers " + archer + " · " + hp + "/" + max + " HP";
     display.bar.style.transform = "scaleX(" + (max ? hp / max : 0) + ")";
   }
   if (mode === "deploy") {
@@ -91,7 +101,7 @@ function updateScore() {
     play.disabled = !red || !blue;
     undo.disabled = clear.disabled = !formation.length;
     hint.hidden = Boolean(red) === Boolean(blue);
-    hint.textContent = red ? "Place a blue Warrior on the right to start." : "Place a red Warrior on the left to start.";
+    hint.textContent = red ? "Place a blue unit on the right to start." : "Place a red unit on the left to start.";
   }
   updateGuide();
 }
@@ -104,21 +114,23 @@ function setMode(next: Playback) {
   const deploying = mode === "deploy";
   canvas.dataset.deploying = String(deploying);
   canvas.setAttribute("aria-label", deploying
-    ? "Battlefield. Draw red Warriors on the left and blue Warriors on the right."
-    : "Battlefield. The pennants show how many Warriors remain on each side.");
+    ? "Battlefield. Draw red units on the left and blue units on the right."
+    : "Battlefield. The pennants show how many units remain on each side.");
   play.disabled = false;
   undo.hidden = clear.hidden = brushTool.hidden = !deploying;
-  edit.hidden = deploying || watchingDemo;
+  edit.hidden = deploying || activeDemo !== null;
   replay.hidden = mode !== "running" && mode !== "paused";
-  demo.hidden = !deploying && !watchingDemo;
-  demoLabel.textContent = watchingDemo ? "Back to field" : "20 vs 20 demo";
+  demoPicker.hidden = !deploying;
+  demoBack.hidden = activeDemo === null;
+  scenarioName.hidden = activeDemo === null;
+  scenarioName.textContent = activeDemo ? demos[activeDemo].name : "";
   if (!deploying) hint.hidden = true;
   result.hidden = mode !== "finished";
   updateGuide();
 }
 
 function paint(blend = 1) {
-  drawArena(ctx, previous, battle, blend, mode === "deploy", draft);
+  drawArena(ctx, previous, battle, blend, mode === "deploy", draft, draftKind);
 }
 
 function resizeArena() {
@@ -158,7 +170,7 @@ function frame(time: number) {
 function loadFormation(next: "deploy" | "running") {
   cancelAnimationFrame(frameId);
   cancelStroke();
-  battle = battleFromDeployment(watchingDemo ? demoFormation : formation);
+  battle = battleFromDeployment(activeDemo ? demos[activeDemo].formation : formation);
   previous = battle;
   remainder = 0;
   setMode(next);
@@ -182,8 +194,10 @@ function pauseBattle() {
 
 const cancelStroke = attachDeploymentBrush(canvas, {
   canDraw: () => mode === "deploy",
-  preview(points) {
+  selectedKind: () => selectedKind,
+  preview(points, kind) {
     draft = points;
+    draftKind = kind;
     updateGuide();
     paint();
   },
@@ -203,10 +217,17 @@ play.addEventListener("click", () => {
     loadFormation("running");
   }
 });
-demo.addEventListener("click", () => {
-  watchingDemo = !watchingDemo;
-  loadFormation(watchingDemo ? "running" : "deploy");
+function openDemo(name: Demo | null) {
+  activeDemo = name;
+  demoPicker.open = false;
+  loadFormation(name ? "running" : "deploy");
   canvas.focus({ preventScroll: true });
+}
+element("demo-archers").addEventListener("click", () => openDemo("archers"));
+element("demo-warriors").addEventListener("click", () => openDemo("20v20"));
+demoBack.addEventListener("click", () => openDemo(null));
+document.addEventListener("pointerdown", (event) => {
+  if (demoPicker.open && event.target instanceof Node && !demoPicker.contains(event.target)) demoPicker.open = false;
 });
 replay.addEventListener("click", () => loadFormation("running"));
 edit.addEventListener("click", () => loadFormation("deploy"));
@@ -219,7 +240,13 @@ clear.addEventListener("click", () => {
   loadFormation("deploy");
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && demoPicker.open) {
+    demoPicker.open = false;
+    demoPicker.querySelector("summary")?.focus();
+    return;
+  }
   if (event.code !== "Space" || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.target instanceof HTMLElement && event.target.closest("summary")) return;
   if (event.target instanceof HTMLButtonElement && event.target !== play) return;
   event.preventDefault();
   if (!play.disabled) play.click();
@@ -232,9 +259,19 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-drawWarriorToken(contextFor(element<HTMLCanvasElement>("brush-icon")), 36, 36, 31, "red");
-brushTool.title = "Warrior · " + WARRIOR.maxHp + " HP · " + WARRIOR.damage + " damage per hit";
-watchingDemo = new URLSearchParams(location.search).get("demo") === "20v20";
+for (const kind of ["warrior", "archer"] as const) {
+  const definition = UNIT_DEFINITIONS[kind];
+  const button = brushButtons[kind];
+  drawUnitToken(contextFor(element<HTMLCanvasElement>("icon-" + kind)), 36, 36, 31, "red", kind);
+  button.title = definition.name + " · " + definition.maxHp + " HP · " + definition.damage + " damage · " + definition.reach + " reach · " + definition.cooldownTicks + " ticks between attacks";
+  button.addEventListener("click", () => {
+    brushButtons[selectedKind].setAttribute("aria-pressed", "false");
+    selectedKind = kind;
+    button.setAttribute("aria-pressed", "true");
+  });
+}
+const requestedDemo = new URLSearchParams(location.search).get("demo");
+if (requestedDemo === "20v20" || requestedDemo === "archers") activeDemo = requestedDemo;
 resizeArena();
-loadFormation(watchingDemo ? "running" : "deploy");
+loadFormation(activeDemo ? "running" : "deploy");
 new ResizeObserver(resizeArena).observe(canvas);

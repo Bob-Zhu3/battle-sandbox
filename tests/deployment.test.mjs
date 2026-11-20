@@ -5,7 +5,7 @@ import { battleFromDeployment, pointerToArena } from "../src/deployment.ts";
 import { stepBattle } from "../src/simulation.ts";
 
 // Supply pointer samples to the same listeners as the browser, with a known canvas rectangle.
-function inputFixture() {
+function inputFixture(selectedKind) {
   const canvas = new EventTarget();
   const rect = { left: 35, top: 15, width: 480, height: 180 };
   const captures = new Set();
@@ -14,7 +14,7 @@ function inputFixture() {
   canvas.hasPointerCapture = (id) => captures.has(id);
   canvas.releasePointerCapture = (id) => captures.delete(id);
   const commands = [];
-  attachDeploymentBrush(canvas, { canDraw: () => true, preview() {}, commit: (command) => commands.push(command) });
+  attachDeploymentBrush(canvas, { canDraw: () => true, selectedKind, preview() {}, commit: (command) => commands.push(command) });
   function clientPoint(x, y) {
     return { clientX: rect.left + x / 2, clientY: rect.top + y / 2 };
   }
@@ -79,4 +79,22 @@ test("the same relative location maps to the same arena coordinates after resizi
   assert.deepEqual(pointerToArena(130, 170, small), { x: 240, y: 270 });
   assert.deepEqual(pointerToArena(250, 350, large), { x: 240, y: 270 });
   assert.deepEqual(pointerToArena(-10, 600, small), { x: 0, y: 360 });
+});
+
+test("a mixed formation remembers the brush at pointerdown for the entire stroke and replay", () => {
+  let selected = "archer";
+  const { commands, send } = inputFixture(() => selected);
+  send("pointerdown", 432, 100);
+  selected = "warrior";
+  send("pointerup", 528, 100);
+  send("pointerdown", 300, 130);
+  send("pointerup", 300, 130);
+  assert.deepEqual(commands.map(c => [c.type, c.positions.length]), [["place-archers", 5], ["place-warriors", 1]]);
+  const opening = battleFromDeployment(commands);
+  assert.deepEqual(opening.units.map(u => [u.id, u.kind, u.team, u.hp]), [
+    [1, "archer", "red", 20], [2, "archer", "red", 20], [3, "archer", "blue", 20],
+    [4, "archer", "blue", 20], [5, "archer", "blue", 20], [6, "warrior", "red", 30],
+  ]);
+  assert.ok(stepBattle(opening).arrows.length > 0);
+  assert.deepEqual(battleFromDeployment(commands), opening);
 });
