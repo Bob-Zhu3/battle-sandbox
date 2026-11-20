@@ -1,4 +1,5 @@
 import { ARENA, type Battle, type Warrior } from "./simulation.ts";
+import { BRUSH_SPACING, teamAt, type ArenaPoint } from "./deployment.ts";
 
 const colors = {
   red: { fill: "#e25d4b", edge: "#9b392f", light: "#ffab93", letter: "R" },
@@ -10,16 +11,22 @@ function circle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: num
   ctx.arc(x, y, radius, 0, Math.PI * 2);
 }
 
-function drawField(ctx: CanvasRenderingContext2D, width: number, height: number, unitsPerPixel: number) {
+function drawField(ctx: CanvasRenderingContext2D, height: number, unitsPerPixel: number, deploying: boolean) {
+  const width = ARENA.width;
   const midX = width / 2;
   const midY = height / 2;
-  ctx.fillStyle = "#eef2e9";
+  ctx.fillStyle = deploying ? "#f6eee8" : "#eef2e9";
   ctx.fillRect(0, 0, width, height);
+  if (deploying) {
+    ctx.fillStyle = "#ecf1f8";
+    ctx.fillRect(midX, 0, midX, height);
+  }
 
   ctx.fillStyle = "#cbd5c8";
   const dotSize = Math.max(1.3, 0.8 * unitsPerPixel);
-  for (let x = 12; x < width; x += 24) {
-    for (let y = midY % 24; y < height; y += 24) {
+  const rowSpacing = BRUSH_SPACING * height / ARENA.height;
+  for (let x = BRUSH_SPACING / 2; x < width; x += BRUSH_SPACING) {
+    for (let y = midY % rowSpacing; y < height; y += rowSpacing) {
       ctx.fillRect(x, y, dotSize, dotSize);
     }
   }
@@ -103,22 +110,31 @@ function drawWarrior(ctx: CanvasRenderingContext2D, unit: Warrior, x: number, y:
   ctx.restore();
 }
 
-export function drawArena(ctx: CanvasRenderingContext2D, previous: Battle, current: Battle, blend: number) {
-  // Frame the duel more closely in a narrow browser pane.
-  const width = Math.min(ARENA.width, Math.max(680, ctx.canvas.clientWidth * 1.6));
-  const scale = ctx.canvas.width / width;
-  const unitsPerPixel = width / Math.max(1, ctx.canvas.clientWidth);
+export function drawArena(ctx: CanvasRenderingContext2D, previous: Battle, current: Battle, blend: number, deploying = false, preview: readonly ArenaPoint[] = []) {
+  const scale = ctx.canvas.width / ARENA.width;
+  const unitsPerPixel = ARENA.width / Math.max(1, ctx.canvas.clientWidth);
   const height = ctx.canvas.height / scale;
-  const offsetX = (width - ARENA.width) / 2;
-  const offsetY = (height - ARENA.height) / 2;
-  const discScale = Math.max(1, 12.5 * unitsPerPixel / 21);
+  const yScale = height / ARENA.height;
+  const radius = Math.max(11, 5 * unitsPerPixel);
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  drawField(ctx, width, height, unitsPerPixel);
+  drawField(ctx, height, unitsPerPixel, deploying);
   for (const [index, unit] of current.warriors.entries()) {
     // Each simulation step preserves the order of the Warrior records.
     const from = previous.warriors[index];
     const x = from.x + (unit.x - from.x) * blend;
     const y = from.y + (unit.y - from.y) * blend;
-    drawWarrior(ctx, unit, x + offsetX, y + offsetY, current.tick, discScale);
+    drawWarrior(ctx, unit, x, y * yScale, current.tick, radius / 21);
   }
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  for (const point of preview) {
+    const color = colors[teamAt(point.x)];
+    circle(ctx, point.x, point.y * yScale, radius);
+    ctx.fillStyle = color.fill;
+    ctx.fill();
+    ctx.strokeStyle = color.edge;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  ctx.restore();
 }

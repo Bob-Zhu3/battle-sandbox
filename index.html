@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f7f8f5" />
-    <title>Warrior duel · Battle Sandbox</title>
+    <title>Battlefield · Battle Sandbox</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
@@ -16,32 +16,32 @@
       </header>
 
       <div class="match-heading">
-        <h1>Warrior duel</h1>
+        <h1>Battlefield</h1>
         <div class="tick-counter">Tick <span id="tick">000</span></div>
       </div>
 
-      <section class="arena-panel" aria-label="Duel arena">
+      <section class="arena-panel" aria-label="Battle arena">
         <div class="scoreboard">
           <div class="fighter red">
-            <div class="fighter-label">Red Warrior</div>
+            <div class="fighter-heading"><span class="fighter-label">Red team</span><span id="red-count" class="unit-count">0 Warriors</span></div>
             <div class="health-row">
               <span class="health-track" aria-hidden="true"><span id="red-bar"></span></span>
-              <span class="health-number"><b id="red-hp">30</b> / 30 HP</span>
+              <span class="health-number"><b id="red-hp">0</b> / <span id="red-max">0</span> HP</span>
             </div>
           </div>
-          <span class="match-state" id="match-state" role="status">Ready</span>
+          <span class="match-state" id="match-state" role="status">Deployment</span>
           <div class="fighter blue">
-            <div class="fighter-label">Blue Warrior</div>
+            <div class="fighter-heading"><span class="fighter-label">Blue team</span><span id="blue-count" class="unit-count">0 Warriors</span></div>
             <div class="health-row">
               <span class="health-track" aria-hidden="true"><span id="blue-bar"></span></span>
-              <span class="health-number"><b id="blue-hp">30</b> / 30 HP</span>
+              <span class="health-number"><b id="blue-hp">0</b> / <span id="blue-max">0</span> HP</span>
             </div>
           </div>
         </div>
 
         <div class="field">
-          <canvas id="arena" width="960" height="360" aria-label="Flat duel field. Red starts on the left, blue on the right.">
-            The score above the arena shows each Warrior's health.
+          <canvas id="arena" width="960" height="360" aria-label="Battlefield. Deploy red Warriors on the left half and blue Warriors on the right half." aria-describedby="deploy-hint">
+            The scoreboard shows the number of Warriors and health for each team.
           </canvas>
           <div id="result" class="result" role="status" hidden>
             <strong id="result-title"></strong>
@@ -51,10 +51,14 @@
 
         <div class="control-bar">
           <div class="buttons">
-            <button id="play" type="button" class="primary"><span id="play-icon" class="play-icon" aria-hidden="true"></span><span id="play-label">Start duel</span></button>
-            <button id="reset" type="button" class="secondary" disabled><span class="reset-icon" aria-hidden="true">↺</span>Reset</button>
+            <button id="play" type="button" class="primary" disabled><span id="play-icon" class="play-icon" aria-hidden="true"></span><span id="play-label">Start</span></button>
+            <button id="replay" type="button" class="secondary" hidden>Replay</button>
+            <button id="edit" type="button" class="secondary" hidden>Edit formation</button>
+            <button id="undo" type="button" class="secondary" disabled>Undo stroke</button>
+            <button id="clear" type="button" class="secondary" disabled>Clear</button>
           </div>
-          <div class="rules"><span>Hit <b id="damage">10</b> HP</span><span>Cooldown <b id="cooldown">30</b> ticks</span></div>
+          <p id="deploy-hint" class="deploy-hint">Click or drag on each half to deploy.</p>
+          <div id="rules" class="rules" hidden><span>Hit <b id="damage">10</b> HP</span><span>Cooldown <b id="cooldown">30</b> ticks</span></div>
         </div>
       </section>
     </main>

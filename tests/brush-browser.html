@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deployment brush check</title>
+  </head>
+  <body>
+    <h1>Deployment brush check</h1>
+    <button id="run" type="button" disabled>Run pointer check</button>
+    <pre id="report" role="status">Click or tap to run both sample streams.</pre>
+    <canvas width="760" height="285" aria-label="Test arena"></canvas>
+    <script type="module">
+      import { attachDeploymentBrush } from "../src/brush-input.ts";
+
+      const canvas = document.querySelector("canvas");
+      const button = document.querySelector("#run");
+      const report = document.querySelector("#report");
+      const commands = [];
+      attachDeploymentBrush(canvas, { canDraw: () => true, preview() {}, commit: (command) => commands.push(command) });
+      button.disabled = false;
+
+      // A real press supplies an active pointer ID for the browser's native capture API.
+      button.addEventListener("pointerdown", (press) => {
+        const rect = canvas.getBoundingClientRect();
+        const expected = [120, 144, 168, 192, 216].map((x) => ({ x, y: 120 }));
+        const lines = [];
+        try {
+          for (const count of [2, 20]) {
+            commands.length = 0;
+            for (let i = 0; i < count; i++) {
+              const last = i === count - 1;
+              const type = i === 0 ? "pointerdown" : last ? "pointerup" : "pointermove";
+              const x = 120 + 96 * i / (count - 1);
+              canvas.dispatchEvent(new PointerEvent(type, {
+                pointerId: press.pointerId, pointerType: press.pointerType, isPrimary: true,
+                buttons: last ? 0 : 1, button: type === "pointermove" ? -1 : 0,
+                clientX: rect.left + x * rect.width / 960, clientY: rect.top + 120 * rect.height / 360,
+              }));
+              if (!last && commands.length) throw new Error("A stroke committed before pointerup.");
+            }
+            if (commands.length !== 1 || JSON.stringify(commands[0].positions) !== JSON.stringify(expected)) {
+              throw new Error(`${count} positions produced ${JSON.stringify(commands)}`);
+            }
+            lines.push(`PASS — ${count} pointer positions, 1 command, 5 Warriors`);
+          }
+          lines.push("Arena x positions: 120, 144, 168, 192, 216. All y positions: 120.");
+        } catch (error) {
+          lines.push(`FAIL — ${error.message}`);
+        }
+        report.textContent = lines.join("\n");
+      });
+    </script>
+  </body>
+</html>
