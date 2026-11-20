@@ -11,6 +11,8 @@
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build",
     "start": "node server/start.ts",
     "demo:room": "node scripts/demo-room.mjs",
+    "predemo:retry": "npm run build --silent",
+    "demo:retry": "node scripts/demo-room.mjs --retry",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test"
   },

@@ -9,29 +9,34 @@ import { chromium } from "playwright";
 import { createGameServer } from "../server/http.ts";
 import { ROOM_SOCKET } from "../src/room-protocol.ts";
 import { ARENA } from "../src/simulation.ts";
+import { runRetryDemo } from "./demo-retry.mjs";
 
 const { values } = parseArgs({ options: {
   headed: { type: "boolean" }, "keep-open": { type: "boolean" }, channel: { type: "string" },
   output: { type: "string" }, url: { type: "string" },
+  retry: { type: "boolean" }, headless: { type: "boolean" },
 } });
-const headed = values.headed || values["keep-open"] || false;
+const headed = !values.headless && (values.retry || values.headed || values["keep-open"] || false);
+const channel = values.channel ?? (values.retry ? (existsSync(chromium.executablePath()) ? "chromium" : "chrome") : undefined);
 const output = values.output && resolve(values.output);
 if (output) await mkdir(output, { recursive: true });
 let ownedServer;
 let url = values.url;
+if (values.retry && url) throw Error("The retry demo uses its own empty room. Omit --url.");
 if (!url) {
   if (!existsSync(new URL("../dist/index.html", import.meta.url))) throw Error("Run npm run build first.");
   ownedServer = createGameServer();
   ownedServer.http.listen(0, "127.0.0.1");
   await once(ownedServer.http, "listening");
   url = "http://127.0.0.1:" + ownedServer.http.address().port + "/room";
+  if (values.retry) url += "?ids=1";
 }
 const browsers = [], captures = [];
 const teams = ["red", "blue"];
 
-async function openPlayer(team, width, height, left) {
+async function openPlayer(team, width, height, left, prepare) {
   const args = headed ? ["--force-device-scale-factor=1", "--window-position=" + left + ",40", "--window-size=" + (width + 16) + "," + (height + 92)] : [];
-  const browser = await chromium.launch({ channel: values.channel, headless: !headed, args });
+  const browser = await chromium.launch({ channel, headless: !headed, args });
   browsers.push(browser);
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   const frames = [], errors = [];
@@ -44,8 +49,10 @@ async function openPlayer(team, width, height, left) {
       if (event.type === "error") errors.push(event.message);
     });
   });
+  await prepare?.(page);
   await page.goto(url);
-  await page.waitForFunction(team => document.querySelector(".game")?.dataset.team === team, team);
+  await page.waitForFunction(team => document.querySelector(".game")?.dataset.team === team &&
+    document.querySelector("#arena")?.dataset.deploying === "true", team);
   await page.evaluate(() => {
     // Observe real input from the two browser windows, without altering the game.
     window.roomDemoPresses = [];
@@ -118,7 +125,7 @@ async function checkCanvas(player, units) {
   assert.deepEqual(missing, [], player.team + " failed to paint these units at their projected coordinates");
 }
 
-try {
+async function runBattleDemo() {
   const red = await openPlayer("red", 960, 600, 8);
   const blue = await openPlayer("blue", 600, 480, 992);
   const players = [red, blue];
@@ -182,6 +189,20 @@ try {
     console.log("Both windows are open on the restored formation at " + url);
     await Promise.all(players.map(p => p.page.waitForEvent("close", { timeout: 0 })));
   }
+}
+
+try {
+  if (values.retry) {
+    const { players, proof } = await runRetryDemo({ openPlayer, move, checkCanvas, capture, headed });
+    if (output) {
+      await writeFile(join(output, "retry-proof.json"), JSON.stringify(proof, null, 2) + "\n");
+      await writeFile(join(output, "frames.json"), JSON.stringify(captures));
+    }
+    if (headed) {
+      console.log("Close either demo window to finish.");
+      await Promise.race(players.map(({ page }) => page.waitForEvent("close", { timeout: 0 })));
+    }
+  } else await runBattleDemo();
 } finally {
   await Promise.all(browsers.map(b => b.close()));
   if (ownedServer) {

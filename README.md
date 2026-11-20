@@ -12,9 +12,15 @@ Open `/room` in two browser windows on the same server. The first connection get
 
 **Ready** locks a player's formation after they place at least one unit. When both players are ready, the Node server runs the existing simulation at 60 fixed ticks per second. It sends both clients the same full world every three ticks and immediately on deployment changes, start and finish. Each browser projects the shared 960 × 360 arena onto its own canvas. The server assigns unit IDs and computes movement, arrows, damage and the result.
 
-The server checks stroke type, length, finite coordinates, arena bounds, team half and the 100-unit budget per player before committing any part of a stroke. Each command carries a round and a per-connection sequence number. Duplicate commands and commands from an earlier round cannot place units twice. A third window sees **Room full**. **New round** restores both starting formations. If a player leaves, their seat opens and their opponent keeps their own formation for the next round.
+The server checks stroke type, length, finite coordinates, arena bounds, team half and the 100-unit budget per player before committing any part of a stroke. Each player numbers their strokes starting at 1 each round. The browser saves each stroke before sending it. The server records the exact unit IDs it assigned and returns them in a receipt. If the browser reconnects before receiving that receipt, it resends the same stroke. A matching retry gets the original IDs, even after Undo or Ready. Reusing the number for a different stroke or sending a stroke from an older round produces an error.
+
+After a dropped connection the server holds the player's seat and formation for 60 seconds. The tab reconnects automatically using its private seat token. Refreshing the page or reopening the room in the same browser profile within that minute also works. A fresh tab can take the other seat while the first player is connected. The room and its receipts live in the Node process. **Leave room** releases a seat immediately, and an expired seat also opens for a new player. In either case the remaining player keeps their formation in the next round. **New round** after a battle restores both starting formations.
 
 ## Verify the room
+
+Run `npm run demo:retry` for the lost-confirmation demo. It builds the game and opens two differently sized browser windows in a fresh local room. Red draws five Warriors. The demo drops the server's first receipt at Red's browser and disconnects Red. Blue keeps the squad on screen. Red automatically rejoins and retries. Only Red presses Ready, so both windows still show deployment at tick zero. The demo checks the original receipt, every unit's coordinates, the painted discs, and the five visible ID labels in both windows. It prints **PASS** and leaves the result visible. Close either window to finish.
+
+For an unattended run use `npm run demo:retry -- --headless`. The demo uses a Playwright Chromium installation when available, otherwise installed Chrome. Pass `--channel msedge` to select Edge. Add `--output <directory>` to save the two views and the receipt record.
 
 `npm test` includes a real WebSocket match that compares both clients' snapshots against the original Node simulation through the simultaneous tick-61 duel.
 

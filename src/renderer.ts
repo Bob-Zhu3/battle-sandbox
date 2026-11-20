@@ -158,16 +158,16 @@ function drawDivider(ctx: CanvasRenderingContext2D, w: number, h: number, empty:
   ctx.restore();
 }
 
-export function drawArena(ctx: CanvasRenderingContext2D, previous: World, current: World, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior", ownTeam?: Team) {
+export function drawArena(ctx: CanvasRenderingContext2D, previous: World, current: World, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior", view: { ownTeam?: Team; showIds?: boolean } = {}) {
   const w = ctx.canvas.clientWidth, h = ctx.canvas.clientHeight;
   if (!w || !h) return;
   ctx.setTransform(ctx.canvas.width / w, 0, 0, ctx.canvas.height / h, 0, 0);
   ctx.clearRect(0, 0, w, h);
   const { sx, sy, ox, oy } = projection(w, h, current, deploying);
   const scale = Math.min(sx, sy);
-  if (deploying && ownTeam) {
+  if (deploying && view.ownTeam) {
     ctx.fillStyle = "rgba(52, 68, 51, .10)";
-    ctx.fillRect(ownTeam === "red" ? w / 2 : 0, 0, w / 2, h);
+    ctx.fillRect(view.ownTeam === "red" ? w / 2 : 0, 0, w / 2, h);
   }
   if (deploying) drawDivider(ctx, w, h, !current.units.length && !preview.length);
 
@@ -196,6 +196,18 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const age = unit.lastHitTick === null ? Infinity : current.tick - unit.lastHitTick;
     const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
     drawUnitToken(ctx, x, y, r, unit.team, unit.kind, age < 5);
+    if (deploying && view.showIds) {
+      ctx.save();
+      ctx.font = '800 16px "Barlow Condensed", sans-serif';
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3;
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#f8f3df";
+      ctx.fillStyle = INK;
+      ctx.strokeText("#" + unit.id, x + r + 4, y);
+      ctx.fillText("#" + unit.id, x + r + 4, y);
+      ctx.restore();
+    }
     if (age < 8) {
       // A brief spark at the visor leaves the circular silhouette readable in a crowd.
       const direction = unit.team === "red" ? 1 : -1;
