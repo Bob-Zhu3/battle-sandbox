@@ -18,6 +18,8 @@ After a dropped connection the server holds the player's seat and formation for 
 
 ## Verify the room
 
+Run `npm run demo:reconnect` for a disconnect during a live battle. It builds the game, opens Red and Blue in separate windows and starts a Warrior duel. Blue drops after the first hit on tick 90. On tick 120 Red sees Warriors #1 and #2 at 10 HP each while Blue's screen still shows 20 HP. Blue automatically rejoins its original team during combat. The demo checks every shared snapshot and both canvases' ID and HP labels from rejoin through the draw on tick 150. It prints **PASS** and holds both result screens until you close either window. Use `-- --headless` for an unattended run or `-- --output <directory>` to save the views and the comparison.
+
 Run `npm run demo:retry` for the lost-confirmation demo. It builds the game and opens two differently sized browser windows in a fresh local room. Red draws five Warriors. The demo drops the server's first receipt at Red's browser and disconnects Red. Blue keeps the squad on screen. Red automatically rejoins and retries. Only Red presses Ready, so both windows still show deployment at tick zero. The demo checks the original receipt, every unit's coordinates, the painted discs, and the five visible ID labels in both windows. It prints **PASS** and leaves the result visible. Close either window to finish.
 
 For an unattended run use `npm run demo:retry -- --headless`. The demo uses a Playwright Chromium installation when available, otherwise installed Chrome. Pass `--channel msedge` to select Edge. Add `--output <directory>` to save the two views and the receipt record.

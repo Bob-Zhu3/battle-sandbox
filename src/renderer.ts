@@ -196,18 +196,6 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const age = unit.lastHitTick === null ? Infinity : current.tick - unit.lastHitTick;
     const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
     drawUnitToken(ctx, x, y, r, unit.team, unit.kind, age < 5);
-    if (deploying && view.showIds) {
-      ctx.save();
-      ctx.font = '800 16px "Barlow Condensed", sans-serif';
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 3;
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "#f8f3df";
-      ctx.fillStyle = INK;
-      ctx.strokeText("#" + unit.id, x + r + 4, y);
-      ctx.fillText("#" + unit.id, x + r + 4, y);
-      ctx.restore();
-    }
     if (age < 8) {
       // A brief spark at the visor leaves the circular silhouette readable in a crowd.
       const direction = unit.team === "red" ? 1 : -1;
@@ -231,6 +219,26 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const x = ox + (arrow.x - arrow.vx * rewind) * sx;
     const y = oy + (arrow.y - arrow.vy * rewind) * sy;
     drawArrow(ctx, x, y, Math.atan2(arrow.vy, arrow.vx), scale, arrow.team);
+  }
+  if (view.showIds) {
+    ctx.save();
+    ctx.font = '800 16px "Barlow Condensed", sans-serif';
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#f8f3df";
+    ctx.fillStyle = INK;
+    for (const unit of current.units) {
+      const left = !deploying && unit.team === "red";
+      const offset = UNIT_DEFINITIONS[unit.kind].radius * scale + 5;
+      const x = ox + unit.x * sx + (left ? -offset : offset);
+      const y = oy + unit.y * sy;
+      const label = "#" + unit.id + (deploying ? "" : " · " + unit.hp + " HP");
+      ctx.textAlign = left ? "right" : "left";
+      ctx.strokeText(label, x, y);
+      ctx.fillText(label, x, y);
+    }
+    ctx.restore();
   }
   ctx.save();
   ctx.globalAlpha = .55;

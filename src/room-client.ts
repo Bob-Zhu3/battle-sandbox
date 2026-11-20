@@ -67,8 +67,8 @@ function updateInterface() {
   if (team) game.dataset.team = team;
   for (const color of ["red", "blue"] as const) {
     const seat = snapshot?.seats[color];
-    seatLabels[color].hidden = closed || !deploy;
     const offline = seat?.reserved || (reconnecting && color === team);
+    seatLabels[color].hidden = closed || (!deploy && !offline);
     seatLabels[color].textContent = offline ? "Reconnecting" : seat?.ready ? "Ready" : seat?.connected ? "Drawing" : "Open seat";
   }
   element("brush-tool").hidden = undo.hidden = clear.hidden = !edit;

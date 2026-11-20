@@ -69,7 +69,7 @@ button:disabled { cursor: default; }
 .empty-guide { top: 46%; transform: translate(-50%, -50%) rotate(-2deg); width: min(88%, 420px); }
 .empty-guide h2 { font: italic 900 clamp(2rem, 3.9vw, 3.75rem)/.95 var(--display); text-transform: uppercase; letter-spacing: -.025em; color: #405a39; }
 .empty-guide p { margin-top: 9px; font-size: clamp(.92rem, 1.2vw, 1.1rem); color: #455a3b; }
-.result { top: 24%; transform: translate(-50%, -50%) rotate(-3deg); padding: 9px 24px 11px; background: var(--gold); border: 2px solid var(--ink); box-shadow: 3px 4px 0 var(--ink); border-radius: 2px 7px 3px 5px; white-space: nowrap; }
+.result { top: calc(100% + 26px); transform: translateX(-50%) rotate(-3deg); padding: 9px 24px 11px; background: var(--gold); border: 2px solid var(--ink); box-shadow: 3px 4px 0 var(--ink); border-radius: 2px 7px 3px 5px; white-space: nowrap; }
 .result strong { display: block; font: italic 900 clamp(2rem, 3.55vw, 3.25rem)/.95 var(--display); text-transform: uppercase; }
 .result span { display: block; margin-top: 3px; font-size: .88rem; }
 
@@ -128,5 +128,4 @@ kbd { padding: 2px 5px; border: 1px solid #799066; border-bottom-width: 2px; bor
   .wordmark span { font-size: 1.75rem; }
   .bottom-hud { padding-bottom: 10px; }
   .brush-tool, .tool, .play { min-height: 37px; padding-block: 3px; }
-  .result { top: 30%; }
 }

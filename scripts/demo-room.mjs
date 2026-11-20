@@ -10,45 +10,71 @@ import { createGameServer } from "../server/http.ts";
 import { ROOM_SOCKET } from "../src/room-protocol.ts";
 import { ARENA } from "../src/simulation.ts";
 import { runRetryDemo } from "./demo-retry.mjs";
+import { runBattleReconnect } from "./demo-reconnect.mjs";
 
 const { values } = parseArgs({ options: {
   headed: { type: "boolean" }, "keep-open": { type: "boolean" }, channel: { type: "string" },
   output: { type: "string" }, url: { type: "string" },
-  retry: { type: "boolean" }, headless: { type: "boolean" },
+  retry: { type: "boolean" }, reconnect: { type: "boolean" }, headless: { type: "boolean" },
 } });
-const headed = !values.headless && (values.retry || values.headed || values["keep-open"] || false);
-const channel = values.channel ?? (values.retry ? (existsSync(chromium.executablePath()) ? "chromium" : "chrome") : undefined);
+const recoveryDemo = values.retry || values.reconnect;
+const headed = !values.headless && (recoveryDemo || values.headed || values["keep-open"] || false);
+const channel = values.channel ?? (recoveryDemo ? (existsSync(chromium.executablePath()) ? "chromium" : "chrome") : undefined);
 const output = values.output && resolve(values.output);
 if (output) await mkdir(output, { recursive: true });
 let ownedServer;
 let url = values.url;
-if (values.retry && url) throw Error("The retry demo uses its own empty room. Omit --url.");
+if (recoveryDemo && url) throw Error("The disconnect demos use their own empty room. Omit --url.");
 if (!url) {
   if (!existsSync(new URL("../dist/index.html", import.meta.url))) throw Error("Run npm run build first.");
   ownedServer = createGameServer();
   ownedServer.http.listen(0, "127.0.0.1");
   await once(ownedServer.http, "listening");
   url = "http://127.0.0.1:" + ownedServer.http.address().port + "/room";
-  if (values.retry) url += "?ids=1";
+  if (recoveryDemo) url += "?ids=1";
 }
 const browsers = [], captures = [];
 const teams = ["red", "blue"];
+
+// Observe the actual arena labels. Keep combat paints by tick so differently sized
+// windows can be compared at the same point even after the match has finished.
+async function observeArenaLabels(page) {
+  await page.addInitScript(() => {
+    window.arenaLabels = [];
+    window.battleLabels = {};
+    const proto = CanvasRenderingContext2D.prototype;
+    const clear = proto.clearRect, write = proto.fillText;
+    proto.clearRect = function (...args) {
+      if (this.canvas.id === "arena") window.arenaLabels = [];
+      return clear.apply(this, args);
+    };
+    proto.fillText = function (label, ...args) {
+      if (this.canvas.id === "arena" && /^#\d+/.test(label)) {
+        window.arenaLabels.push(label);
+        if (label.endsWith(" HP")) window.battleLabels[Number(document.getElementById("tick").textContent)] = window.arenaLabels;
+      }
+      return write.call(this, label, ...args);
+    };
+  });
+}
 
 async function openPlayer(team, width, height, left, prepare) {
   const args = headed ? ["--force-device-scale-factor=1", "--window-position=" + left + ",40", "--window-size=" + (width + 16) + "," + (height + 92)] : [];
   const browser = await chromium.launch({ channel, headless: !headed, args });
   browsers.push(browser);
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
-  const frames = [], errors = [];
+  const frames = [], errors = [], connections = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("websocket", socket => {
     if (new URL(socket.url()).pathname !== ROOM_SOCKET) return;
+    connections.push(socket);
     socket.on("framereceived", ({ payload }) => {
       const event = JSON.parse(String(payload));
       if (event.type === "snapshot") frames.push(event);
       if (event.type === "error") errors.push(event.message);
     });
   });
+  if (recoveryDemo) await observeArenaLabels(page);
   await prepare?.(page);
   await page.goto(url);
   await page.waitForFunction(team => document.querySelector(".game")?.dataset.team === team &&
@@ -65,7 +91,7 @@ async function openPlayer(team, width, height, left, prepare) {
   const box = await page.locator("#arena").boundingBox();
   assert.equal(Math.round(box.width), width);
   assert.equal(Math.round(box.height), height);
-  return { team, page, width, height, box, frames, errors };
+  return { team, page, width, height, box, frames, errors, connections };
 }
 
 async function capture(players, caption, duration) {
@@ -192,10 +218,12 @@ async function runBattleDemo() {
 }
 
 try {
-  if (values.retry) {
-    const { players, proof } = await runRetryDemo({ openPlayer, move, checkCanvas, capture, headed });
+  if (recoveryDemo) {
+    const demo = values.reconnect ? runBattleReconnect : runRetryDemo;
+    const { players, proof } = await demo({ openPlayer, move, checkCanvas, capture, headed });
     if (output) {
-      await writeFile(join(output, "retry-proof.json"), JSON.stringify(proof, null, 2) + "\n");
+      const filename = values.reconnect ? "battle-reconnect-proof.json" : "retry-proof.json";
+      await writeFile(join(output, filename), JSON.stringify(proof, null, 2) + "\n");
       await writeFile(join(output, "frames.json"), JSON.stringify(captures));
     }
     if (headed) {

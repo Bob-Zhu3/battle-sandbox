@@ -2,31 +2,13 @@ import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import { ROOM_SOCKET } from "../src/room-protocol.ts";
 
-// Record ID labels drawn by the real arena on its most recent paint.
-async function observeLabels(page) {
-  await page.addInitScript(() => {
-    window.paintedUnitIds = [];
-    const proto = CanvasRenderingContext2D.prototype;
-    const clear = proto.clearRect, write = proto.fillText;
-    proto.clearRect = function (...args) {
-      if (this.canvas.id === "arena") window.paintedUnitIds = [];
-      return clear.apply(this, args);
-    };
-    proto.fillText = function (label, ...args) {
-      if (this.canvas.id === "arena" && /^#\d+$/.test(label)) window.paintedUnitIds.push(Number(label.slice(1)));
-      return write.call(this, label, ...args);
-    };
-  });
-}
-
 export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, headed }) {
   const attempts = [], delivered = [], joins = [], redSnapshots = [];
   const allowRejoin = Promise.withResolvers();
   let dropped, held;
-  let connections = 0, blueConnections = 0;
+  let connections = 0;
 
   async function interceptRed(page) {
-    await observeLabels(page);
     await page.routeWebSocket(url => url.pathname === ROOM_SOCKET, route => {
       const connection = ++connections;
       const server = route.connectToServer();
@@ -56,10 +38,7 @@ export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, hea
   }
 
   const red = await openPlayer("red", 960, 600, 8, interceptRed);
-  const blue = await openPlayer("blue", 600, 480, 992, async page => {
-    page.on("websocket", socket => { if (new URL(socket.url()).pathname === ROOM_SOCKET) blueConnections++; });
-    await observeLabels(page);
-  });
+  const blue = await openPlayer("blue", 600, 480, 992);
   const players = [red, blue];
   const ids = [1, 2, 3, 4, 5];
   const points = [120, 144, 168, 192, 216].map(y => ({ x: 312, y }));
@@ -113,7 +92,7 @@ export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, hea
   await Promise.all(players.map(p => p.page.waitForFunction(() => document.querySelector("#red-seat").textContent === "Ready" &&
     document.querySelector("#red-count").textContent === "5" && document.querySelector("#blue-count").textContent === "0", null, timeout)));
   const final = blue.frames.at(-1);
-  assert.equal(blueConnections, 1);
+  assert.equal(blue.connections.length, 1);
   assert.deepEqual(redSnapshots.at(-1), final);
   assert.deepEqual(units(final), expected);
   assert.deepEqual([final.round, final.phase, final.world.tick], [1, "deploy", 0]);
@@ -128,7 +107,7 @@ export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, hea
   const paintedIds = {};
   for (const p of players) {
     await checkCanvas(p, expected);
-    paintedIds[p.team] = await p.page.evaluate(() => window.paintedUnitIds);
+    paintedIds[p.team] = await p.page.evaluate(() => window.arenaLabels.map(label => Number(label.slice(1))));
     assert.deepEqual(paintedIds[p.team], ids);
     assert.deepEqual(p.errors, []);
   }
@@ -138,7 +117,7 @@ export async function runRetryDemo({ openPlayer, move, checkCanvas, capture, hea
     round: final.round, phase: final.phase, tick: final.world.tick,
     player: "red", commandId: dropped.commandId, strokeSends: attempts,
     joinedTeams: joins.map(event => event.team), droppedConfirmation: dropped, receivedConfirmations: delivered,
-    observerIdsDuringDisconnect: held.world.units.map(unit => unit.id), observerConnections: blueConnections,
+    observerIdsDuringDisconnect: held.world.units.map(unit => unit.id), observerConnections: blue.connections.length,
     viewports: players.map(({ team, width, height }) => ({ team, width, height })),
     bothCanvases: paintedIds, units: units(final),
   } };

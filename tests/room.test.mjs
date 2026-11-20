@@ -195,6 +195,51 @@ test("a superseded connection cannot release a seat, and expiry invalidates its 
   assert.notEqual(joined.resumeToken, seat.resumeToken);
 });
 
+test("Blue misses a hit while disconnected, rejoins the live duel, and gets the same final result as Red", async t => {
+  const url = await serve(t);
+  const red = client(url);
+  await red.wait(e => e.type === "joined");
+  const blue = client(url);
+  const seat = await blue.wait(e => e.type === "joined");
+  assert.equal(seat.team, "blue");
+  const { round } = await red.wait(e => e.type === "snapshot" && e.seats.blue.connected);
+  red.send(1, round, place(at(325)));
+  await blue.wait(e => e.type === "snapshot" && e.world.units.length === 1);
+  blue.send(1, round, place(at(640)));
+  await red.wait(e => e.type === "snapshot" && e.world.units.length === 2);
+  red.send(1, round, { type: "ready" });
+  blue.send(1, round, { type: "ready" });
+
+  function checkWarriors(frame, hp, hitTick) {
+    assert.equal(frame.round, round);
+    assert.deepEqual(frame.world.units.map(u => [u.id, u.team, u.hp, u.lastHitTick]),
+      [[1, "red", hp, hitTick], [2, "blue", hp, hitTick]]);
+  }
+  const hit = await blue.wait(e => e.type === "snapshot" && e.world.units.some(u => u.lastHitTick !== null));
+  checkWarriors(hit, 20, 90);
+  blue.socket.terminate();
+  const reserved = await red.wait(e => e.type === "snapshot" && e.seats.blue.reserved);
+  checkWarriors(reserved, 20, 90);
+  const missed = await red.wait(e => e.type === "snapshot" && e.seats.blue.reserved && e.world.tick > reserved.world.tick && e.world.units[0].hp === 10);
+  assert.deepEqual([missed.phase, missed.seats.blue.connected, missed.seats.red.connected], ["running", false, true]);
+  checkWarriors(missed, 10, 120);
+
+  const returned = client(url, { resumeToken: seat.resumeToken });
+  assert.deepEqual(await returned.wait(e => e.type === "joined"), seat);
+  const catchUp = await returned.wait(e => e.type === "snapshot");
+  assert.equal(catchUp.phase, "running");
+  assert.ok(catchUp.world.tick >= missed.world.tick);
+  assert.deepEqual(catchUp.seats.blue, { connected: true, reserved: false, ready: true });
+  checkWarriors(catchUp, 10, 120);
+  const finished = e => e.type === "snapshot" && e.phase === "finished";
+  const [a, b] = await Promise.all([red.wait(finished), returned.wait(finished)]);
+  assert.deepEqual(a, b);
+  assert.deepEqual([a.outcome, a.world.tick], ["draw", 150]);
+  checkWarriors(a, 0, 150);
+  const shared = e => e.type === "snapshot" && e.revision >= catchUp.revision;
+  assert.deepEqual(returned.messages.filter(shared), red.messages.filter(shared));
+});
+
 test("two WebSockets receive the same deployment, authoritative battle ticks and simultaneous duel result", async (t) => {
   const url = await serve(t);
   const red = client(url);
