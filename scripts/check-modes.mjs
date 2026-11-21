@@ -187,6 +187,25 @@ async function browseRoster(url) {
       }
     }
     assert.equal(portraits.size,25);assert.equal(placed,22);
+    const panel=page.getByRole("region",{name:"Troops and spells"});
+    for(const team of TEAMS) {
+      await page.getByRole("button",{name:ARMIES[team].name+" army",exact:true}).click();
+      await page.getByRole("button",{name:"Roster",exact:true}).click();
+      for(const shelf of ["People","Machines","Mythical"]) {
+        await panel.getByRole("button",{name:shelf,exact:true}).click();
+        const clipped=await panel.locator(".roster-card canvas").evaluateAll(canvases=>canvases.flatMap(canvas=>{
+          const {width,height}=canvas;
+          const ink=canvas.getContext("2d").getImageData(0,0,width,height).data;
+          for(let y=0;y<height;y++) for(let x=0;x<width;x++) {
+            if(x>=2 && x<width-2 && y>=2 && y<height-2) continue;
+            if(ink[(y*width+x)*4+3]>32) return [canvas.parentElement.getAttribute("aria-label")];
+          }
+          return [];
+        }));
+        assert.deepEqual(clipped,[],team+" portraits need space around each silhouette");
+      }
+      await panel.getByRole("button",{name:"Close roster",exact:true}).click();
+    }
     await selectFromRoster(page,"Machines","Mouse Workshop");
     for(const width of [375,601,790,1024]) {
       await page.setViewportSize({width,height:650});
@@ -197,7 +216,7 @@ async function browseRoster(url) {
       assert.deepEqual(outside,[],"Controls outside the field at "+width+"px");
     }
     assert.equal(await page.locator("#gold-balance").textContent(),"∞");
-    console.log("Roster: every entry has a distinct portrait, all 22 pieces place, and all three spells cast in the playground.");
+    console.log("Roster: every entry has a distinct portrait, each troop fits its card in all four colors, all 22 pieces place, and all three spells cast.");
   } finally {await page.context().close();}
 }
 

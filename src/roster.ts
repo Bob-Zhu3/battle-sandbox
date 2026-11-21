@@ -39,9 +39,9 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
       drawUnitToken(c, 36 + ARMIES[team].facing * 9.5, 49, 13.5, team, key);
     } else {
       const myth = key === "cyclops" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
-      const longWeapon = key === "musketeer" || key === "lancer";
+      const longWeapon = key === "musketeer" || key === "lancer" || key === "miner";
       const size = myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
-      const shift = longWeapon || key === "cyclops" ? -4 : 0;
+      const shift = key === "reaper" || key === "miner" ? -7 : longWeapon || key === "cyclops" ? -4 : 0;
       drawUnitToken(c,36 + ARMIES[team].facing * shift,myth ? 49 : 44,size,team,key);
     }
     return art;

@@ -6,131 +6,144 @@ import { ARMIES } from "./battlefield.ts";
 const bone = "#f8eacb", plum = "#6c426e", brass = "#d6a452";
 
 function shoes(c: Pens, p: CharacterPose, color: string, wide = 1) {
-  for (const side of [-1,1]) {
-    const x = side*3.8, step = x+side*p.step*2.6;
-    limb(c,x,1,step,6,color,2.4);
-    oval(c,step+1,7,3.1*wide,1.9,INK);
+  for (const side of [-1, 1]) {
+    const x = side * 3.8, step = x + side * p.step * 2.6;
+    limb(c, x, 1, step, 6, color, 2.4);
+    oval(c, step + 1, 7, 3.1 * wide, 1.9, INK);
   }
 }
-function star(c: Pens,x: number,y: number,size: number,color: string) {
-  c.save(); c.translate(x,y); c.scale(size,size);
-  cut(c,"M0 -3 L1 -1 L3 0 L1 1 L0 3 L-1 1 L-3 0 L-1 -1Z",color,.65); c.restore();
-}
-
-export function minerArt(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
-  const hit=eventFade(tick,u?.lastAttackTick,18), rise=eventFade(tick,u?.emergedTick,12);
-  c.translate(-p.hurt*1.5,4*rise-p.lift);
-  shoes(c,p,"#815f45");
-  cut(c,"M-8 -4 Q-3 -8 4 -5 L7 4 L3 6 L-6 5Z",d.coat);
-  cut(c,"M-5 -6 L-3 -6 L-1 -1 L3 -1 L4 -5 L6 -4 L5 4 L-4 4Z","#666e68",1);
-  line(c,-4,3,5,2,brass,1.4);
-  cut(c,"M-4 -13 Q1 -17 6 -13 L8 -9 L7 -6 L4 -4 L-3 -5 L-6 -9Z",FACE);
-  cut(c,"M-3 -7 Q-1 -5 2 -6 L3 -4 L5 -6 L7 -7 L6 -3 L2 -1 L-2 -3Z","#705640",1);
-  oval(c,4.4,-9,1.05,1.2,INK);
-  cut(c,"M-8 -11 Q-7 -19 1 -19 Q6 -19 8 -14 L10 -12 L5 -11 L-6 -9Z","#d6a653");
-  cut(c,"M-7 -12 L8 -15 L9 -12 L-7 -10Z",d.hem,1);
-  oval(c,5,-15.3,3.2,3,INK); oval(c,5,-15.3,2.2,2.15,"#fff09d"); oval(c,5.5,-16,.85,.7,"#fffbe0");
-  c.save(); c.translate(8+1.5*hit,-p.ready*2); c.rotate(.19-.72*p.ready+hit*1.3+p.step*.07);
-  limb(c,-2,4,4,-11,WOOD,1.8);
-  cut(c,"M-4 -8 Q0 -17 7 -14 L12 -10 Q7 -12 5 -11 Q0 -12 -4 -8Z",IRON,1.15);
-  limb(c,-3,1,0,0,FACE,1.6); oval(c,0,0,2,1.8,FACE); c.restore();
-}
-
-export function balloon(c: Pens,x: number,y: number,size: number) {
-  c.save(); c.translate(x,y); c.scale(size,size);
-  cut(c,"M0 5 C-2 3 -5 1 -4.4 -2.5 Q-4 -6 0 -6 Q5 -6 5 -2 Q5 2 1 5 L2 7 L-1 7Z","#bd80b3",1.1);
-  cut(c,"M-3 -3 Q0 -5 4 -4 L5 -2 Q1 -3 -3 0Z","#e7dc8e",0);
-  oval(c,-2,-3,.8,1,"#fff5df"); c.restore();
-}
-export function clownArt(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
-  const beat = tick*.095 + (u?.id??0), toss=eventFade(tick,u?.lastAttackTick,18);
-  shoes(c,p,"#704a62",1.35); c.translate(2.3*toss-p.ready,-p.lift-p.breath*.45);
-  c.rotate(.035*Math.sin(beat)-.16*p.ready+.17*toss);
-  cut(c,"M-6 -5 Q1 -8 6 -4 L8 3 L5 6 L1 3 L-2 6 L-7 4Z",d.coat);
-  cut(c,"M-7 -6 L-2 -8 L0 -6 L4 -8 L7 -6 L4 -2 L1 -4 L-3 -2Z",bone,.95);
-  oval(c,0,0,1.2,1.2,"#ffd66b"); oval(c,1,3,1,1,"#ffd66b");
-  for(const side of [-1,1]) {
-    oval(c,side*5.5,-10,3.7,3.7,INK); oval(c,side*5.8,-10,2.9,2.8,"#6da89f");
-  }
-  cut(c,"M-5 -12 Q-5 -17 1 -16 Q7 -16 7 -12 L6 -8 Q3 -4 -1 -6 Q-5 -7 -5 -12Z","#fff4df");
-  cut(c,"M-7 -13 L-9 -21 Q-5 -20 -1 -15 L2 -21 L6 -15 L6 -13Z",d.hem,1.15);
-  oval(c,-9,-21,1.7,1.7,"#f3c35d"); oval(c,2,-21,1.3,1.3,"#f3c35d");
-  cut(c,"M0 -13 L1 -15 L2 -12Z","#614966",.65);
-  oval(c,4.5,-12,1,1.25,INK); oval(c,6.9,-10.3,2.4,2.1,INK); oval(c,7,-10.6,1.85,1.6,"#db584e");
-  line(c,.4,-8.7,3,-8,"#95525f",1.1);
-  const catchX=-10.5+3*Math.cos(beat), hop=Math.abs(Math.sin(beat));
-  limb(c,-4,-2,catchX,-2-2*hop,FACE,1.7);
-  const handX=9-8*p.ready+4*toss, handY=-4-6*p.ready-4*toss;
-  limb(c,4,-2,handX,handY,FACE,1.8);
-  balloon(c,catchX,-7-8*hop,.63);
-  if (toss<.45) balloon(c,handX+1.7,handY-3,.69);
-}
-
-export function reaperArt(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
-  const beat=tick*.08+(u?.id??0), swing=eventFade(tick,u?.lastAttackTick,17), soul=eventFade(tick,u?.soul?.tick,34);
-  c.translate(3.3*swing-1.5*p.ready,-2-Math.sin(beat)*1.75);
-  c.rotate(.1*p.pace-.13*p.ready+.13*swing);
-  c.save();c.translate(-3,-6);c.rotate(.12*Math.sin(beat-.6)+.20*p.pace-.13*swing);c.translate(3,6);
-  cut(c,"M-7 -10 Q-12 -2 -14 7 L-9 6 L-10 10 L-4 8 L1 10 L4 6 L9 7 L7 -4Z","#393a4d");
+function star(c: Pens, x: number, y: number, size: number, color: string) {
+  c.save(); c.translate(x, y); c.scale(size, size);
+  cut(c, "M0 -3.4 Q.7 -1 3.1 0 Q.8 .65 0 3.25 Q-.75 .65 -3.2 0 Q-.7 -.8 0 -3.4Z", color, .7);
   c.restore();
-  cut(c,"M-5 -7 Q-2 -5 2 -7 L5 5 L0 7 L-3 5 L-8 7Z",d.hem,1.1);
-  cut(c,"M-9 -11 Q-9 -20 -2 -23 Q3 -23 7 -16 L9 -11 L6 -5 L-3 -6Z","#565169",1.6);
-  cut(c,"M-5 -12 Q-3 -18 1 -19 Q6 -17 6 -12 L5 -7 L2 -7 L0 -6 L-3 -8Z",INK,.7);
-  cut(c,"M-3 -13 Q0 -16 5 -14 L6 -11 L4 -10 L3 -8 L0 -8 L-1 -10 L-3 -10Z",bone,.65);
-  cut(c,"M-3 -13 L0 -12 L-1 -10 L-3 -11Z M2 -12 L5 -13 L4 -10 L2 -10Z",INK,0);
-  line(c,-4,-5,3,-4,d.light,1.35);
-  c.save(); c.translate(-6-2*soul,-2*soul); c.rotate(.28*Math.sin(beat-.5)+.43*swing-.28*soul);
-  line(c,0,-2,-2,1,brass,1.15);cut(c,"M-5 2 L1 1 L2 6 L-2 8 L-5 6Z","#718d86",1);
-  oval(c,-1.5,4.6,1.4+soul*.6,2.1,"#a7efcf");c.restore();
-  c.save();c.translate(8.5+1.8*swing,-.8-p.ready*1.8);c.rotate(.13-.67*p.ready+swing*1.45+p.pitch*.2);
-  limb(c,-1,9,5,-19,"#987a57",1.55);
-  cut(c,"M4 -19 Q-1 -25 -12 -20 Q-9 -27 -1 -27 Q7 -26 8 -20 L8 -15Z","#c4ded2",1.05);
-  line(c,-5,-24,1,-23,"#effced",.95);
-  limb(c,-3,1,2,-3,bone,1.55);c.restore();
 }
 
-export function witchArt(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
-  const cast=eventFade(tick,u?.lastAttackTick,24);
-  c.translate(1.8*cast-p.ready,-p.lift*.85-p.breath*.6); c.rotate(-.065*p.ready+.09*cast);
-  shoes(c,p,"#58465c");
-  cut(c,"M-4 -9 Q-3 -5 -6 0 L-10 6 Q-6 9 -2 6 L1 8 L7 5 L4 -5Z",d.hem);
-  cut(c,"M-2 -5 L3 -6 L6 4 L1 6 L-4 4Z",d.coat,1);
-  cut(c,"M-8 -13 Q-4 -20 2 -16 Q6 -16 6 -11 L9 -10 L7 -8 L4 -8 L3 -5 L-2 -6 L-5 -9Z",FACE);
-  cut(c,"M-8 -13 Q-9 -6 -4 -5 L-6 -9 Q-1 -5 0 -9 L-2 -13Z","#aa7ab3",1.05);
-  line(c,2,-12,5,-12.8,INK,1.1);oval(c,4.2,-11,1,1,INK);
-  c.save();c.translate(0,-13);c.rotate(.065*p.step-.15*cast+.06*p.ready);c.translate(0,13);
-  cut(c,"M-13 -13 Q-8 -15 -5 -16 L-4 -23 L-8 -26 Q-3 -30 1 -26 L4 -21 L7 -16 Q12 -16 13 -13 Q2 -10 -13 -13Z","#514559",1.55);
-  cut(c,"M-4 -18 L4 -19 L6 -16 L-5 -15Z",d.coat,.7);
-  cut(c,"M-1 -18 L3 -18.7 L3.6 -15.7 L-.5 -15.3Z","#f8c867",.65);line(c,.3,-17,1.8,-17.3,plum,.65);
+export function minerArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
+  const strike = eventFade(tick, u?.lastAttackTick, 18), rise = eventFade(tick, u?.emergedTick, 12);
+  c.translate(-p.hurt * 1.5, 4 * rise - p.lift);
+  shoes(c, p, "#815f45");
+  cut(c, "M-7.7 -3.5 Q-7.4 -7.2 -.8 -7.4 Q4.9 -7.5 6.2 -3.6 L7 3.1 Q6.2 6 -1.1 6 Q-6.6 6.1 -7.5 3.8Z", d.coat);
+  cut(c, "M-4.4 -6.25 L-2.75 -6.55 L-1.45 -2.05 Q.6 -1.1 2.8 -2 L3.7 -5.85 L5.35 -5.1 L4.75 3.7 Q1.4 5 -4.6 4.1Z", "#67716c", 1);
+  line(c, -4, 2.7, 4.75, 2.4, brass, 1.1);
+  cut(c, "M-5.4 -10.1 Q-5.85 -16.15 1.1 -16 Q6.45 -16.05 7 -11.75 L8.55 -9.1 Q8.25 -7.75 6.8 -7.6 Q5.85 -4.6 1.75 -4.3 Q-3.8 -4.15 -5.4 -10.1Z", FACE, 1.15);
+  cut(c, "M-4.9 -8.3 Q-2.45 -6.35 -.65 -6.8 Q1.25 -8.1 3.05 -6.85 Q4.8 -7.75 6.75 -7.3 Q6.55 -3.55 2.8 -2.45 Q-.6 -1.7 -3.15 -4 Q-5.3 -4.7 -4.9 -8.3Z", "#805d43", .9);
+  oval(c, 4.45, -9.95, 1, 1.25, INK);
+  cut(c, "M-7.75 -11.4 C-7.9 -16.4 -4.45 -19.25 .7 -19.3 Q7 -19.1 8.05 -13.9 Q10.4 -13.65 10.8 -12.55 Q9.45 -11.25 5.7 -11.6 Q-.1 -11.85 -5.8 -9.95 Q-7.8 -9.6 -7.75 -11.4Z", "#dfaf62", 1.35);
+  cut(c, "M-7.15 -12.55 Q-1.05 -14.65 6.85 -14.35 L7.45 -12.8 Q.15 -12.9 -6.9 -10.9Z", d.hem, .7);
+  oval(c, 4.65, -15.8, 3, 2.85, INK); oval(c, 4.65, -15.8, 2.1, 1.95, "#ffe893"); oval(c, 5.05, -16.35, .72, .65, "#fff8da");
+  c.save(); c.translate(7.5 + 1.5 * strike, -.4 - p.ready * 2); c.rotate(.19 - .72 * p.ready + strike * 1.3 + p.step * .07);
+  limb(c, -2, 4, 3.8, -11, WOOD, 1.9);
+  cut(c, "M-4.5 -8.3 C-3.65 -12.25 .2 -15.2 4.2 -15.1 Q9.2 -14.9 11.7 -9.65 Q7.5 -12.55 4.6 -11.8 Q.2 -12 -4.5 -8.3Z", IRON, 1.05);
+  limb(c, -3, 1, .35, -.25, FACE, 1.75); c.restore();
+}
+
+export function balloon(c: Pens, x: number, y: number, size: number) {
+  c.save(); c.translate(x, y); c.scale(size, size);
+  cut(c, "M0 5 C-2 3 -5 1 -4.4 -2.5 Q-4 -6 0 -6 Q5 -6 5 -2 Q5 2 1 5 L2 6.8 Q.3 7.45 -1 6.7Z", "#bd80b3", 1.1);
+  cut(c, "M-3 -3 Q0 -5 4 -4 L5 -2 Q1 -3 -3 0Z", "#e7dc8e", 0);
+  oval(c, -2, -3, .8, 1, "#fff5df"); c.restore();
+}
+
+export function clownArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
+  const beat = tick * .095 + (u?.id ?? 0), toss = eventFade(tick, u?.lastAttackTick, 18);
+  shoes(c, p, "#704a62", 1.35); c.translate(2.3 * toss - p.ready, -p.lift - p.breath * .45);
+  c.rotate(.035 * Math.sin(beat) - .16 * p.ready + .17 * toss);
+  cut(c, "M-5.9 -4.65 Q0 -8.1 5.8 -4.4 Q8.65 -.2 7 4.4 Q6.2 6.3 2.95 5.4 Q.75 4.3 -.45 3.8 Q-2.1 6.7 -5.15 5.8 Q-8.25 4.7 -7.7 1.3Z", d.coat);
+  cut(c, "M-7.7 -6.4 Q-3.7 -8.7 .1 -6.85 Q4 -8.4 7.6 -6.35 Q7.15 -3.65 4.3 -3.6 Q3.85 -1.1 .9 -2.4 L-.7 -3.25 Q-3.8 -.8 -5.05 -3.5 Q-7.9 -3.2 -7.7 -6.4Z", bone, .95);
+  oval(c, .1, -.05, 1.25, 1.25, "#f8cd71"); oval(c, .9, 3, .86, .86, "#f8cd71");
+  cut(c, "M-4 -12.5 Q-5.7 -15.15 -7.55 -13.3 Q-10.2 -13 -9.2 -10.45 Q-10.05 -7.8 -7.15 -7.55 Q-4.95 -6.45 -3.6 -9Z M4.4 -13 Q7.2 -15.05 8.6 -12.9 Q10.5 -12.6 9.45 -10.55 Q10.2 -8.15 7.75 -8Z", "#77ada3", 1);
+  cut(c, "M-5.4 -11.7 Q-5.65 -16.55 .9 -16.4 Q7.3 -16.4 7.3 -11.5 Q7.1 -7.5 3.2 -5.9 Q.45 -4.8 -2.7 -6.55 Q-5.4 -8.05 -5.4 -11.7Z", "#fff3dd", 1.15);
+  c.save(); c.translate(0, -13); c.rotate(-.07 * Math.sin(beat - .3) - .13 * toss);
+  cut(c, "M-6.8 .35 Q-6.4 -3.8 -8.7 -6.15 Q-10.3 -7.6 -11.3 -5.1 Q-11.95 -9.4 -8.25 -9.65 Q-4.25 -9.85 -1.2 -4.2 Q.2 -10 4.05 -9.2 Q7.2 -8.5 6.46 -4.7 Q4.55 -7.35 3.6 -5.35 Q2.9 -3.25 6.0 .05 Q.1 -1.2 -6.8 .35Z", d.hem, 1.1);
+  oval(c, -11.4, -4.9, 1.45, 1.4, brass); oval(c, 6.65, -4.4, 1.3, 1.25, brass); c.restore();
+  cut(c, "M-.8 -12.1 Q.25 -13 .8 -14.35 Q1.8 -13.1 2.15 -11.8 Q.7 -11.25 -.8 -12.1Z", plum, 0);
+  oval(c, 4.3, -11.85, .92, 1.13, INK); oval(c, 6.85, -10, 2.28, 2.05, INK); oval(c, 6.95, -10.2, 1.7, 1.49, "#d75b51");
+  line(c, .3, -8.65, 2.85, -7.95, "#9b5461", 1);
+  const catchX = -10.5 + 3 * Math.cos(beat), hop = Math.abs(Math.sin(beat));
+  limb(c, -4, -2, catchX, -2 - 2 * hop, FACE, 1.7);
+  const handX = 9 - 8 * p.ready + 4 * toss, handY = -4 - 6 * p.ready - 4 * toss;
+  limb(c, 4, -2, handX, handY, FACE, 1.8);
+  balloon(c, catchX, -7 - 8 * hop, .63);
+  if (toss < .45) balloon(c, handX + 1.7, handY - 3, .69);
+}
+
+export function reaperArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
+  const beat = tick * .08 + (u?.id ?? 0), swing = eventFade(tick, u?.lastAttackTick, 17);
+  const soul = eventFade(tick, u?.soul?.tick, 34);
+  c.translate(3.3 * swing - 1.5 * p.ready, -2 - Math.sin(beat) * 1.75);
+  c.rotate(.1 * p.pace - .13 * p.ready + .13 * swing);
+  c.save(); c.translate(-3, -6); c.rotate(.13 * Math.sin(beat - .6) + .20 * p.pace - .13 * swing); c.translate(3, 6);
+  cut(c, "M-7.35 -11 C-11 -8.6 -10.2 -.5 -14.75 4.7 Q-16.1 6 -17.2 6.2 Q-15.3 9 -10.35 6.6 Q-9.55 8.65 -11.3 10.5 Q-5.6 10.2 -2.55 6.8 Q1.65 9.4 6.6 6.3 Q10 3.45 7.3 -2.65 L4.1 -9Z", "#494657", 1.4);
+  cut(c, "M-5.8 -7 C-7.4 -3.15 -8.7 3.05 -12.45 5.45 Q-7.5 4.15 -5.3 1.25 Q-4.9 2.85 -5.6 4.35 Q-2.2 1.75 -.8 -4.45Z", "#615d72", 0);
   c.restore();
-  cut(c,"M-8 1 L-4 0 L-3 5 L-7 6Z",plum,.9);
-  limb(c,4,-3,8,-4-3*cast,FACE,1.8);
-  c.save();c.translate(8,-5-3*cast);c.rotate(-.15-.8*p.ready+1.08*cast);
-  limb(c,-1,4,3,-8,WOOD,1.2);star(c,3,-9,1.1,"#f8b9e0");c.restore();
+  cut(c, "M-4.8 -6.65 Q.35 -4.4 4 -7.15 Q4.4 -2.7 7.2 3.9 Q5.3 6.5 1.45 5.95 Q-.1 8.3 -2.85 8.35 Q-4.85 6.7 -4.35 4.6 Q-6.25 5.9 -8.05 5.55 Q-5.25 .8 -4.8 -6.65Z", d.hem, 1.1);
+  cut(c, "M-9.5 -10.2 C-10 -17.05 -5.9 -22.15 -.2 -23.4 Q4.3 -24.1 5.6 -21.6 Q3.7 -21.65 3.7 -20.1 Q7.75 -17.7 8.7 -12.45 Q9.6 -8.1 6.05 -5.35 Q1.9 -2.75 -2.85 -4.9 Q-8.95 -5.55 -9.5 -10.2Z", "#60586e", 1.5);
+  cut(c, "M-5.6 -10.15 Q-5.5 -16.45 .7 -19.65 Q5.5 -17.8 6.8 -13.6 Q7.45 -10.45 5.45 -7.7 Q1.15 -5.6 -3.15 -7.3 Q-5.4 -8.2 -5.6 -10.15Z", INK, 0);
+  cut(c, "M-3.55 -12.25 C-3.6 -16.4 3.25 -17.35 5.35 -14.05 Q6.55 -11.9 4.4 -10.2 L3.65 -8.55 Q.8 -7.8 -.75 -9.1 L-1.25 -10.1 Q-3.6 -10.45 -3.55 -12.25Z", bone, .55);
+  cut(c, "M-2.6 -13.2 Q-1.25 -13.45 .65 -12 Q.15 -10.6 -1.2 -10.65 Q-2.8 -10.85 -2.6 -13.2Z M1.95 -12.25 Q3.2 -13.3 4.7 -13.9 Q5.25 -12.2 3.95 -11.4 Q2.65 -10.65 1.95 -12.25Z", INK, 0);
+  cut(c, "M.65 -10.65 L1.4 -11.45 L1.9 -10.37Z", INK, 0);
+  cut(c, "M-5.15 -5.7 Q-.2 -4.8 4.4 -6 Q3.7 -4.4 .55 -3.7 Q-3.55 -3.8 -5.15 -5.7Z", d.light, .55);
+
+  c.save(); c.translate(-6.5 - 1.8 * soul, -1.2 * soul); c.rotate(.25 * Math.sin(beat - .5) + .43 * swing - .28 * soul);
+  limb(c, -.2, -4, -2.7, -1.7, bone, 1.35);
+  c.strokeStyle = brass; c.lineWidth = 1; c.beginPath(); c.arc(-3, .85, 1.65, Math.PI, 2 * Math.PI); c.stroke();
+  cut(c, "M-6.3 1.8 Q-3.45 -.25 .15 1.45 L-.4 5.85 Q-1.25 8.1 -3.2 8.4 Q-5.35 7.6 -5.8 5.85Z", "#75988f", .95);
+  oval(c, -3, 4.65, 1.3 + .45 * soul, 1.85 + .2 * soul, "#aef0cc");
+  line(c, -5.9, 2.05, -.3, 1.9, brass, .9); c.restore();
+
+  // The blade hooks forward of the skull. It clears the face on the backswing.
+  c.save(); c.translate(9.2 + 1.8 * swing, -.85 - p.ready * 1.8); c.rotate(.055 - .45 * p.ready + 1.32 * swing + p.pitch * .16);
+  limb(c, -1.35, 8.9, 3.95, -18.8, "#987b57", 1.65);
+  cut(c, "M2.55 -17.3 Q3.05 -21.4 5.2 -22.2 C11.5 -24.9 19.5 -21.6 20.35 -14.6 C16 -19.35 10.5 -19.75 6 -17 Q4.75 -15.9 4.15 -14.7Z", "#bcd5cb", 1.15);
+  cut(c, "M6.35 -21.35 C11 -23.2 16 -21.55 18.25 -18.3 Q12.9 -21.9 6.1 -19.95Z", "#eff5df", 0);
+  limb(c, -4, .4, 1.5, -2.35, bone, 1.6); c.restore();
 }
 
-export function pigArt(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
-  const buck=eventFade(tick,u?.lastAttackTick,11);
-  c.translate(2*buck,-p.lift*1.6);c.rotate(-.07+.17*buck);
-  for (const side of [-1,1]) limb(c,side*5,2,side*(5+p.step*2.8),6.5,"#9f655e",1.6);
-  c.beginPath();c.moveTo(-7,0);c.bezierCurveTo(-15,-2,-12,-8,-9,-5);c.quadraticCurveTo(-8,-2,-11,-3);
-  c.strokeStyle=INK;c.lineWidth=1.35;c.stroke();
-  cut(c,"M-9 0 Q-10 -6 -3 -8 Q3 -9 7 -7 L10 -5 L9 2 Q5 6 -1 5 Q-7 6 -9 0Z","#edaa99",1.4);
-  cut(c,"M2 -7 L1 -13 L6 -10 L7 -6Z","#de958e",1);
-  cut(c,"M-5 -7 L-1 -8 L1 -3 L-2 0 L-4 -3 L-6 -1Z",d.coat,1);
-  oval(c,7,-4,1.2,1.45,INK);cut(c,"M8 -3 Q14 -5 14 0 Q13 3 8 2Z","#d78584",1);
-  oval(c,11,-.5,.65,1,INK);oval(c,13,-1,.55,.85,INK);
+export function witchArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
+  const cast = eventFade(tick, u?.lastAttackTick, 24);
+  c.translate(1.7 * cast - p.ready, -p.lift * .85 - p.breath * .6); c.rotate(-.065 * p.ready + .09 * cast);
+  shoes(c, p, "#58465c");
+  cut(c, "M-4.45 -8.3 Q.35 -9.05 3.55 -6.65 Q4 -1.5 7.45 4.95 Q5.45 7.4 1.8 6.65 Q-.75 8.65 -3.3 7 Q-6.25 8.6 -10.9 6.45 Q-7 3.7 -6.05 .4Z", d.hem, 1.25);
+  cut(c, "M-2.85 -6.7 Q.3 -7.5 3 -6.65 Q3.55 -1 5.6 3.45 Q3.6 5.1 .7 5.25 Q1.55 2.2 .6 .7 Q-1.55 3.5 -5.1 3.55 Q-2.6 -1.9 -2.85 -6.7Z", d.coat, .8);
+  cut(c, "M-6.7 -11.6 Q-7.1 -17.7 .6 -17.35 Q6.45 -17.05 6.6 -12.1 Q6.9 -10.55 8.9 -10.2 Q8.65 -8.55 6.35 -8.65 Q5.2 -5.75 1 -5.45 Q-4.4 -5.65 -6.7 -11.6Z", FACE, 1.15);
+  cut(c, "M-7.7 -13.45 Q-4.75 -15.45 -.45 -13.65 Q-2.75 -12.45 -2.55 -9.85 Q-2.5 -7.8 -.75 -7.8 Q-2.1 -5.45 -4.15 -6.6 Q-6 -7.2 -5.55 -9.6 Q-7.7 -7.8 -7.2 -6.35 Q-9.95 -8.95 -7.7 -13.45Z", "#ab80ad", .95);
+  line(c, 1.8, -12.25, 5.05, -12.9, INK, 1); oval(c, 4.15, -11.2, .92, 1.2, INK);
+  c.save(); c.translate(0, -13); c.rotate(.06 * p.step - .14 * cast + .06 * p.ready);
+  cut(c, "M-13.3 -.65 Q-9.65 -.75 -6.25 -3.25 C-5.3 -7.15 -4.55 -11.5 -8.5 -12.45 Q-6.9 -15.3 -3.15 -14.65 Q.2 -14.05 1.35 -10.35 Q2.8 -5.75 6.05 -3.3 Q10.1 -3.25 13.15 -1.65 Q11.7 1.25 4.5 .85 Q-2.75 .05 -8.2 1.25 Q-12 1.55 -13.3 -.65Z", "#584c62", 1.4);
+  cut(c, "M-5.2 -5.2 Q-.95 -6.15 3.45 -5.15 L5.3 -3.55 Q.05 -4.1 -5.65 -3.15Z", d.coat, .7);
+  cut(c, "M-.95 -5.6 Q.45 -6 1.9 -5.65 L2.5 -3.35 L-.55 -3.15Z", "#ecc271", .58);
+  line(c, .1, -4.8, 1.35, -4.9, plum, .6); c.restore();
+  c.save(); c.translate(4.2, -3.2); c.rotate(-.3 * p.ready + .28 * cast);
+  cut(c, "M-1.6 -2.15 Q1.75 -2.45 4.45 -.85 L4.2 2.45 Q.1 2.8 -1.9 .9Z", d.coat, .9);
+  limb(c, 3.7, .05, 6.25, -.8 - 2.6 * cast, FACE, 1.55);
+  c.translate(6.25, -2 - 2.6 * cast); c.rotate(.16 - .65 * p.ready + .95 * cast);
+  limb(c, -.6, 3.55, 4, -8.5, WOOD, 1.18); star(c, 4.1, -9.45, 1, "#efb2d8"); c.restore();
 }
-export function oldHeadgear(c: Pens,u: NonNullable<Unit["zombified"]>) {
-  const dye=ARMIES[u.team];
-  if (u.kind==="clown") { oval(c,7,-8.5,1.8,1.5,"#d85753"); oval(c,-7,-12,2.2,2.2,"#68a295"); return; }
-  if (u.kind==="medic" || u.kind==="archer" || u.kind==="scout" || u.kind==="musketeer") {
-    cut(c,"M-8 -13 L-5 -17 L2 -17 L6 -14 L8 -13 L2 -13 L-1 -14Z",dye.hem,1);
-    cut(c,"M-4 -15 Q-10 -23 -12 -19 L-9 -16Z","#debb7c",.75);
+
+export function pigArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
+  const buck = eventFade(tick, u?.lastAttackTick, 11);
+  c.translate(2 * buck, -p.lift * 1.6); c.rotate(-.07 + .17 * buck);
+  for (const side of [-1, 1]) limb(c, side * 5, 2, side * (5 + p.step * 2.8), 6.5, "#9f655e", 1.75);
+  c.beginPath(); c.moveTo(-7.8, .1); c.bezierCurveTo(-14.3, .05, -14.2, -7.25, -10.65, -5.6); c.bezierCurveTo(-8.25, -4.15, -10.8, -2.4, -12, -3.8);
+  c.strokeStyle = INK; c.lineWidth = 1.25; c.stroke();
+  cut(c, "M-9.55 -.9 C-9.5 -6.8 -3.4 -9.0 1.95 -7.85 Q8 -9.15 10.15 -4.35 Q12.1 1.9 6.25 4.25 Q2.55 5.7 -.85 5 Q-8.4 6 -9.55 -.9Z", "#edaa99", 1.35);
+  cut(c, "M1.75 -7 Q.35 -11.6 2.25 -12.9 Q5.65 -11.85 6.45 -7.15 Q5.3 -5.8 4 -5.9Z", "#df948c", .95);
+  cut(c, "M-5.6 -6.9 Q-3.85 -8.05 -1.25 -7.85 Q-1.1 -4.75 .55 -3.35 Q-.7 -.95 -2.75 -.55 L-4.65 -3.9 L-6.55 -2.05Z", d.coat, .9);
+  oval(c, 7.15, -4.05, 1.1, 1.35, INK);
+  cut(c, "M8.25 -2.7 Q9.8 -4.4 12.15 -3.75 Q14.35 -3.15 14.15 -.7 Q13.9 1.9 11 2.25 Q8.5 2.2 8.05 .25Z", "#da8b83", .95);
+  oval(c, 10.75, -.65, .55, .85, INK); oval(c, 12.75, -1.05, .5, .8, INK);
+}
+
+export function oldHeadgear(c: Pens, u: NonNullable<Unit["zombified"]>) {
+  const dye = ARMIES[u.team];
+  if (u.kind === "clown") { oval(c, 7, -8.5, 1.8, 1.5, "#d85753"); oval(c, -7, -12, 2.2, 2.2, "#68a295"); return; }
+  if (u.kind === "medic" || u.kind === "archer" || u.kind === "scout" || u.kind === "musketeer") {
+    cut(c, "M-8.2 -13 Q-7.45 -17.9 -.55 -18 Q3.8 -18.3 6 -14.9 Q7.6 -14.8 8.5 -13.6 Q5.45 -12.5 1.65 -13.7 Q-3.25 -14.9 -8.2 -13Z", dye.hem, .95);
+    cut(c, "M-3.25 -15.3 Q-9.7 -22.6 -12.2 -18.7 Q-9.25 -18.9 -8.4 -16.85 Q-6.05 -15.05 -3.25 -15.3Z", "#e5bb7b", .7);
   } else {
-    cut(c,"M-7 -12 L-7 -15 Q-4 -19 2 -18 L6 -15 L8 -14 L5 -13 L1 -15 L-2 -13Z",IRON,1.05);
-    line(c,-7,-12,-2,-14,dye.hem,1.35);
-    if(u.kind==="miner" || u.kind==="engineer") oval(c,4,-16,1.7,1.6,"#ffe58b");
-    if(u.kind==="lancer") cut(c,"M0 -18 Q-4 -23 -9 -20 L-5 -19Z",dye.light,.85);
+    cut(c, "M-7.5 -12.8 Q-7.75 -18 0 -18.35 Q4.45 -18.55 6.35 -15.3 Q8 -14.8 8.4 -13.6 Q6.35 -12.8 3.25 -13.6 Q-2.05 -15 -7.5 -12.8Z", IRON, 1);
+    line(c, -7.1, -12.65, -2, -14, dye.hem, 1.25);
+    if (u.kind === "miner" || u.kind === "engineer") oval(c, 4, -16, 1.7, 1.6, "#ffe58b");
+    if (u.kind === "lancer") cut(c, "M.7 -17.4 Q-3 -22.15 -8.75 -20.2 Q-6.7 -17.9 -3.1 -18Z", dye.light, .8);
   }
 }

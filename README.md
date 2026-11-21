@@ -35,7 +35,7 @@ npm run demo:encounters
 
 A friendly Warrior standing between an Archer and its target ducks as the arrow passes its shoulder. The Archer rises to follow the shot. [Watch the Archer and Warrior](media/over-the-shoulder.mp4)
 
-Run `npm run demo:motion` to watch the Phoenix glide, strike with its talons and climb away. Three more encounters show a Lancer charging a Cyclops, a Musketeer reloading as a Reaper closes, and a Storm Kirin rearing under the Frost Queen's staff. It then leaves you with a blue lineup. Place the selected Red Shieldbearer in front of the Phoenix to draw a strike. A troop flashes white for seven ticks when damage lands, including each pulse of poison or fire. [Watch the same fights before and after](media/troops-in-motion.mp4)
+Run `npm run demo:motion` to watch the Phoenix glide, strike with its talons and climb away. Three more encounters show a Lancer charging a Cyclops, a Musketeer reloading as a Reaper closes, and a Storm Kirin rearing under the Frost Queen's staff. The demo then leaves eight blue troops on the field. Place the selected Red Shieldbearer near the Phoenix for a talon strike, or beside the Cyclops to see it lift its club. A troop flashes white for seven ticks when damage lands, including each pulse of poison or fire. [Watch the same fights before and after](media/troops-in-motion.mp4)
 
 Place a Zombie beside an enemy Archer. The Archer turns at the first bite, keeps its feathered cap and can infect the next human it reaches. [See the same Archer before and after the bite](media/zombie-bite.png)
 
@@ -51,6 +51,8 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 ### The roster
 
 ![Eight roster portraits showing the Cyclops, Storm Kirin, Frost Queen, Phoenix, Bomber, Musketeer, Venom Scout and Zombie](media/mythical-roster.png)
+
+The Kirin folds its front legs as lightning fires. The Cyclops lifts its club above its eye before a smash. [Watch eight troops idle and meet an enemy before and after the redraw](media/roster-redraw.mp4)
 
 | Troop or building | Gold | Bounty | What to watch |
 | --- | ---: | ---: | --- |

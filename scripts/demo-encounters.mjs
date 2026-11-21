@@ -149,8 +149,10 @@ try {
   if(!values.headless) {
     await clear();
     if(values.motion){
-      await place("Blue","Phoenix",391,181);await place("Blue","Warrior",467,185);
+      await place("Blue","Phoenix",391,181);await place("Blue","Warrior",464,184);
       await place("Blue","Storm Kirin",538,181);await place("Blue","Frost Queen",616,181);
+      await place("Blue","Lancer",435,234);await place("Blue","Cyclops",509,234);
+      await place("Blue","Reaper",581,234);await place("Blue","Witch",653,234);
       await brush("Red","Shieldbearer");
     }
     else if(values.oddities){await place("Red","Zombie",397,166);await brush("Blue","Archer");}

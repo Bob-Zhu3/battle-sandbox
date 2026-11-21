@@ -11,21 +11,21 @@ export const palette = ARMIES;
 // All cut shapes are drawn in the same small profile, facing right, with the
 // center of the footprint at (0,0). The two characters have different skeletons.
 const shapes = {
-  coat: new Path2D("M-6 -4 Q-2 -7 4 -4 L6 0 L5 5 Q0 7 -7 4 Z"),
-  skirt: new Path2D("M-6 2 Q0 4 5 2 L6 6 L-7 6 Z"),
-  helmet: new Path2D("M-8 -2 Q-9 -11 -3 -13 Q3 -15 7 -9 L9 -5 L6 -2 Z"),
-  brim: new Path2D("M-10 -4 Q-3 -5 7 -7 Q10 -7 11 -5 Q7 -2 -8 -1 Z"),
-  faceplate: new Path2D("M-6 -4 Q-1 -6 7 -5 L7 1 Q5 5 -1 4 Q-6 3 -6 -4Z"),
-  shield: new Path2D("M-4 -6 Q0 -9 5 -7 L6 -1 Q6 5 1 8 Q-4 6 -5 1 Z"),
-  shieldStripe: new Path2D("M-3 -6 L-1 -7 L4 5 L2 7 Z"),
+  coat: new Path2D("M-6.45 -3.5 Q-5.65 -7 -.65 -6.15 Q3.8 -6.2 5.6 -2.7 Q7.15 .6 5.4 4.9 Q.5 7.35 -6.7 4.55Z"),
+  skirt: new Path2D("M-6 1.95 Q-.3 3.8 5.15 1.8 L6.05 5.4 Q2.3 7.05 -.6 6.1 Q-4.5 7.05 -7.1 5.6Z"),
+  helmet: new Path2D("M-8.35 -2.65 C-9.85 -8.4 -7.0 -12.75 -2.55 -13.5 Q3.6 -15.05 6.8 -9.7 Q8.35 -7.95 8.9 -5.55 Q6.6 -2.85 2.7 -2.7 Q-4.5 -.95 -8.35 -2.65Z"),
+  brim: new Path2D("M-10.1 -3.7 Q-9.5 -5.25 -6 -5.15 Q-.6 -5.25 5.65 -7.05 Q9.1 -8.1 11.05 -5.7 Q9.55 -3.65 5.95 -3.15 Q-2.55 -1.4 -7.9 -1.3 Q-10.25 -1.35 -10.1 -3.7Z"),
+  faceplate: new Path2D("M-6.25 -4 Q-.45 -6.25 6.75 -5.1 Q7.9 -3.45 7.25 -1.4 L7.7 -.35 Q6.8 2.35 3.55 3.55 Q-2.05 5.45 -5.65 1.55Z"),
+  shield: new Path2D("M-4.65 -5.8 Q-1.25 -8.75 4.3 -7.25 Q5.7 -7 5.7 -4.95 L6.15 -.55 Q6.4 4.8 1.0 8.15 Q-4.8 6.15 -5.25 1.3Z"),
+  shieldStripe: new Path2D("M-3.55 -5.8 Q-2.4 -6.65 -.95 -6.6 L3.85 4.8 Q3 6.05 1.65 6.75Z"),
   blade: new Path2D("M-1.8 0 L-1.5 -11 L.7 -16 L2.5 -11 L1.6 0 Z"),
-  cloak: new Path2D("M-4 -5 Q1 -7 4 -3 L4 2 L7 5 Q0 8 -7 5 L-6 1 Z"),
-  hood: new Path2D("M-10 -9 L-5 -10 Q-1 -17 4 -13 Q7 -12 9 -6 L7 -2 Q2 3 -5 1 Q-7 0 -7 -5 Z"),
-  hoodFace: new Path2D("M0 -7 Q4 -9 8 -7 L7 -3 Q5 0 2 -1 Q0 -3 0 -7Z"),
-  feather: new Path2D("M-3 -10 Q-9 -11 -10 -17 Q-5 -17 -2 -12 Z"),
-  quiver: new Path2D("M-9 -6 L-5 -7 L-3 2 Q-3 4 -6 4 Z"),
+  cloak: new Path2D("M-4.8 -4.3 Q.35 -7.6 4.15 -3.5 Q3.9 .3 5.0 2.15 Q5.75 4.05 7.25 4.75 Q4.95 6.8 1.25 6.45 Q-1.75 7.6 -4.5 5.85 Q-6 6.35 -7.45 5.45 Q-5.6 1.1 -4.8 -4.3Z"),
+  hood: new Path2D("M-10.45 -9.6 Q-7.65 -9.65 -5.65 -11.35 Q-2.6 -15.6 1.5 -14.2 Q5.65 -14.3 7.65 -9.45 L9.05 -6.6 Q8.75 -3 5.9 -.8 Q.65 2.95 -4.55 1.3 Q-7.85 .55 -7.3 -3.9 Q-7.65 -7.15 -10.45 -9.6Z"),
+  hoodFace: new Path2D("M-.05 -6.9 Q3.8 -9.2 7.85 -7.15 Q8 -3.9 5.75 -1.85 Q3.45 -.35 1.75 -1.65 Q.15 -3.25 -.05 -6.9Z"),
+  feather: new Path2D("M-2.6 -9.95 C-6.75 -11 -10.65 -12.15 -11.3 -16.85 Q-7.0 -17.85 -3.9 -14.25 Q-2.35 -12.6 -2.6 -9.95Z"),
+  quiver: new Path2D("M-9.35 -6.15 Q-7.9 -7.4 -5 -7.1 L-2.9 1.95 Q-2.8 4.25 -5.2 4.7 Q-6.8 4.85 -7.1 3.4Z"),
   bow: new Path2D("M-3 -11 C-3 -8 3 -7 3 0 C3 7 -3 8 -3 11"),
-  scarf: new Path2D("M-4 -1 L-4 2 Q-9 5 -13 2 Q-8 2 -7 -1Z"),
+  scarf: new Path2D("M-4.0 -1.15 L-3.8 1.65 Q-5.8 4.7 -9.15 4.25 Q-12.1 4.35 -13.65 2 Q-9.55 2.8 -7.65 .15 Q-6.3 -1.15 -4.0 -1.15Z"),
 };
 function feet(c: Pens, p: CharacterPose, compact: boolean) {
   const stride = p.step * (compact ? 3.3 : 4.6);
