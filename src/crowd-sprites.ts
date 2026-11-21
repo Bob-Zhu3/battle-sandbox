@@ -22,9 +22,12 @@ let previousTick = -1;
 let pixelsPerCssPixel = 1;
 
 export function prepareCrowd(count: number, tick: number, ratio: number) {
-  if (count < 48 || tick < previousTick || ratio !== pixelsPerCssPixel) stamps.clear();
+  // Dense fights reserve the screen's native pixels for movement, trails,
+  // projectiles and labels. The body tile still draws at its exact CSS size.
+  const rasterRatio = count >= 128 ? Math.min(1, ratio) : ratio;
+  if (count < 48 || tick < previousTick || rasterRatio !== pixelsPerCssPixel) stamps.clear();
   previousTick = tick;
-  pixelsPerCssPixel = ratio;
+  pixelsPerCssPixel = rasterRatio;
   if (count < 48) return false;
   frameTicks = count >= 128 ? 8 : 4;
   for (const [id, stamp] of stamps) if (stamp.lastSeen < frame) stamps.delete(id);
