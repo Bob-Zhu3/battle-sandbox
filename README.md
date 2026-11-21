@@ -1,6 +1,6 @@
 # Battle Sandbox
 
-Draw a squad into a meadow and watch it fight. The illustrated row along the bottom holds twenty-five troops and buildings and nine spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
+Draw a squad onto the white field and watch it fight. The illustrated row along the bottom holds twenty-five troops and buildings and nine spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
 **Play online.** Open the game, choose **Play modes**, then **Duel** or **Free-for-all**. Click **Copy invite** and send the link to the other players. Each match has its own field. Everyone can join from a phone or computer, draw a starting army, and press **Ready**. [Open Battle Sandbox](https://bob-zhu3.github.io/battle-sandbox/)
 

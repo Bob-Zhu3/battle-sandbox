@@ -1,4 +1,3 @@
-import { drawLandscape } from "./landscape.ts";
 import { maxHealth } from "./transformations.ts";
 import { createRoster } from "./roster.ts";
 import { createBattleSound } from "./battle-sound.ts";
@@ -20,9 +19,7 @@ function contextFor(canvas: HTMLCanvasElement) {
 
 export function createField(mode?: MatchMode) {
   const canvas = element<HTMLCanvasElement>("arena");
-  const landscape = element<HTMLCanvasElement>("landscape");
   const ctx = contextFor(canvas);
-  const ground = contextFor(landscape);
   const roster = createRoster(element("brush-tool"), !!mode);
   const sides = mode ? MATCHES[mode].teams : TEAMS;
   const score = element("score");
@@ -46,11 +43,8 @@ export function createField(mode?: MatchMode) {
       const ratio = window.devicePixelRatio || 1;
       const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
       const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
-      for (const layer of [landscape, canvas]) {
-        layer.width = width;
-        layer.height = height;
-      }
-      drawLandscape(ground);
+      canvas.width = width;
+      canvas.height = height;
       paint();
     }
     resize();
