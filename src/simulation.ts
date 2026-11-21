@@ -168,13 +168,40 @@ function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   return distance;
 }
 
+// At this cell width, overlapping circles can only occupy the same cell or
+// adjacent cells. Rebuild after each separation pass because bodies move.
+const contactCell = 2 * Math.max(...Object.values(UNIT_DEFINITIONS).map(def => def.radius));
+const contactCols = Math.ceil(ARENA.width / contactCell);
+const contactRows = Math.ceil(ARENA.height / contactCell);
+
+function contactNeighborhoods(units: readonly Unit[], solid: readonly boolean[]) {
+  const cells: number[][] = Array.from({length: contactCols * contactRows}, () => []);
+  const homes = new Int32Array(units.length);
+  for (let i = 0; i < units.length; i++) {
+    if (!solid[i]) continue;
+    const col = Math.max(0, Math.min(contactCols - 1, Math.floor(units[i].x / contactCell)));
+    const row = Math.max(0, Math.min(contactRows - 1, Math.floor(units[i].y / contactCell)));
+    homes[i] = row * contactCols + col;
+    // Append in the original pair order to preserve floating-point sums on replay.
+    for (let y = Math.max(0, row - 1); y <= Math.min(contactRows - 1, row + 1); y++) {
+      for (let x = Math.max(0, col - 1); x <= Math.min(contactCols - 1, col + 1); x++) cells[y * contactCols + x].push(i);
+    }
+  }
+  return {cells, homes};
+}
+
 function separateFootprints(previous: readonly Unit[], next: Unit[], solid: readonly boolean[]) {
   const push = next.map(() => ({ x: 0, y: 0 }));
+  const grid = next.length >= 64 ? contactNeighborhoods(next, solid) : undefined;
   let overlapping = false;
   for (let i = 0; i < next.length; i++) {
     const a = next[i];
     if (!solid[i]) continue;
-    for (let j = i + 1; j < next.length; j++) {
+    const neighbors = grid?.cells[grid.homes[i]];
+    const count = neighbors ? neighbors.length : next.length;
+    for (let index = neighbors ? 0 : i + 1; index < count; index++) {
+      const j = neighbors ? neighbors[index] : index;
+      if (j <= i) continue;
       const b = next[j];
       if (!solid[j]) continue;
       const dx = b.x - a.x;

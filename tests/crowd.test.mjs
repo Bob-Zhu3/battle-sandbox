@@ -7,6 +7,21 @@ function separation(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+test("crowd cells preserve exact pair corrections across borders, corners and coincident centers", () => {
+  const cluster = [[79,78],[80,82],[94,78],[79,78],[1,1],[22,22]]
+    .map(([x,y],i) => ({id:i+1, team:"red", kind:i%2 ? "warrior" : "cyclops", x,y}));
+  const distant = Array.from({length:64}, (_,i) => ({
+    id:100+i, team:"red", x:410 + i%8*32, y:40 + Math.floor(i/8)*37,
+  }));
+  let small = createBattle(cluster), crowd = createBattle([...cluster, ...distant]);
+  for (let tick = 0; tick < 36; tick++) {
+    small = stepBattle(small);
+    crowd = stepBattle(crowd);
+    assert.deepEqual(crowd.units.slice(0,cluster.length), small.units);
+  }
+  assert.ok(separation(small.units[0],small.units[3]) > 20);
+});
+
 test("two allies on the exact same point separate and keep pursuing their opponent", () => {
   const opening = createBattle([
     { id: 1, team: "red", x: 180, y: 180 },
