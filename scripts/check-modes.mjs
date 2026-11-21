@@ -124,6 +124,16 @@ async function pausePlayground(url) {
     assert.ok(resumed > Number(frozen) && resumed <= Number(frozen) + 10);
     assert.notEqual(await pixels(), newPose);
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor), "rgb(255, 255, 255)");
+    await page.goto(url + "/?demo=crowd");
+    await page.getByRole("button", {name: "Resume playground"}).waitFor();
+    for (const side of ["red", "blue"]) assert.equal(await page.locator("#" + side + "-count").textContent(), "100");
+    await page.getByRole("button", {name: "Resume playground"}).click({force:true});
+    await page.clock.runFor(200);
+    await page.getByRole("button", {name: "Pause playground"}).click({force:true});
+    const crowdPose = await pixels();
+    await page.clock.runFor(500);
+    assert.equal(await pixels(), crowdPose);
+    assert.ok(Number(await tick()) > 0);
     await page.goto(url+"/room");
     await page.locator("#play").waitFor();
     assert.ok(await page.locator("#playground-pause").isHidden());

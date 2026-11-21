@@ -1,6 +1,7 @@
 import { attachDeploymentBrush, attachSpellBrush } from "./brush-input.ts";
 import { ARMIES, TEAMS, type Team } from "./battlefield.ts";
 import { createField, element } from "./field.ts";
+import { crowdFormation } from "./crowd-formation.ts";
 import { Playground } from "./playground.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
@@ -23,7 +24,8 @@ let lastTime = performance.now(), remainder = 0;
 let lastBlend = 1;
 let animation = 0;
 const tickMs = 1000 / TICKS_PER_SECOND;
-const demo=new URLSearchParams(location.search).get("demo");
+const query = new URLSearchParams(location.search);
+const demo = query.get("demo");
 let soundHint=demo==="sound";
 
 game.dataset.mode = "playground";
@@ -73,6 +75,12 @@ if (demo === "siege") {
   play.place("red",{type:"place-lancers",positions:[{x:359,y:177}]});
   previous=play.world;
   choose("blue");field.armBrush("cyclops");
+} else if (demo === "crowd") {
+  for (const {team,kind,x,y} of crowdFormation(query.get("size") === "80" ? 80 : 200)) {
+    play.place(team, {type:UNIT_DEFINITIONS[kind].command, positions:[{x,y}]});
+  }
+  previous = play.world;
+  play.paused = true;
 } else if (demo === "expressions") {
   const cast: [Team, RecruitKind, number, number][] = [
     ["red","archer",170,115], ["red","warrior",197,115], ["blue","warrior",286,115],
