@@ -115,6 +115,7 @@ async function demo(fault) {
     peers.push(await player(browsers[1], "blue", url));
     const title = fault === "before" ? "Case 1 · Kill before the save" : "Case 2 · Kill after the save, before the reply";
     await caption(peers, title, "Red draws five Warriors at 12 gold each.");
+    if (!headless) await delay(700);
     await red.page.bringToFront();
     await red.page.getByRole("button", {name:"Warrior", exact:true}).click();
     const box = await red.page.locator("#arena").boundingBox();
@@ -130,7 +131,6 @@ async function demo(fault) {
     await red.page.mouse.move(box.x + 200, box.y + box.height / 2);
     await red.page.mouse.down();
     await red.page.mouse.move(box.x + 296, box.y + box.height / 2, {steps: 8});
-    if (!headless) await delay(700);
     const boundary = message(original.child, "boundary");
     await red.page.mouse.up();
     const stopped = await boundary.catch(async error => {
@@ -153,28 +153,30 @@ async function demo(fault) {
     await caption(peers, title, "Recovered from disk · " + disk.ids.length + " Warriors · " + disk.gold + " red gold · " + disk.receipts.length + " saved receipts");
     if (!headless) await delay(1700);
     retry.resolve();
+    const ackDeadline = Date.now() + 12_000;
+    while (!red.events.some(e => e.type === "placement-ack") && Date.now() < ackDeadline) await delay(40);
+    const ack = red.events.find(e => e.type === "placement-ack");
+    assert.ok(ack, "The buyer receives a purchase receipt after retry");
+    const state = message(restarted.child, "state");
+    restarted.child.send("inspect");
+    assert.deepEqual((await state).value, paid, "Durable balance, army and receipt after retry");
+    assert.deepEqual(ack, {type:"placement-ack", round:attempts[0].round, commandId:attempts[0].commandId, unitIds:ids});
     for (const [index, {page}] of peers.entries()) {
       await page.waitForFunction(gold => document.querySelector("#red-count").textContent === "5" &&
         document.querySelector("#gold-balance").textContent === gold &&
         window.paintedIds?.slice().sort((a,b) => a-b).join(",") === "1,2,3,4,5", index ? "120" : "60");
     }
-    const recorded = () => red.events.some(e => e.type === "placement-ack") &&
-      peers.every(peer => peer.events.some(e => e.type === "snapshot" && e.world.units.length === 5));
+    const recorded = () => peers.every(peer => peer.events.some(e => e.type === "snapshot" && e.world.units.length === 5));
     const until = Date.now() + 8000;
     while (!recorded() && Date.now() < until) await delay(40);
     assert.ok(attempts.length >= 2, "The actual browser resent the purchase");
     for (const attempt of attempts.slice(1)) assert.deepEqual(attempt, attempts[0]);
-    const ack = red.events.find(e => e.type === "placement-ack");
-    assert.deepEqual(ack, {type:"placement-ack", round:attempts[0].round, commandId:attempts[0].commandId, unitIds:ids});
     for (const {events} of peers) {
       const snap = events.findLast(event => event.type === "snapshot" && event.world.units.length === 5);
       assert.ok(snap);
       assert.deepEqual(snap.world.units.map(u => [u.id, u.team, u.kind]), ids.map(id => [id,"red","warrior"]));
       assert.equal(snap.gold.red, 60);
     }
-    const state = message(restarted.child, "state");
-    restarted.child.send("inspect");
-    assert.deepEqual((await state).value, paid);
     console.log("   PASS  Red automatically retried round " + ack.round + ", command " + ack.commandId +
       ". Both browsers drew Warriors 1–5. Red has 60 gold. One purchase receipt on disk.");
     await caption(peers, title, "Retry verified · Warrior IDs " + ack.unitIds.join(", ") + " · " + paid.gold + " red gold");
