@@ -35,11 +35,13 @@ export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
   let seq = 0;
   let backoff = 350;
   let retryTimer: number | undefined;
-  const url = new URL(MATCHES[mode].socket, location.href);
+  const onlineConfig = document.querySelector<HTMLMetaElement>('meta[name="battle-online"]');
+  const service = new URL(onlineConfig?.content || "/", location.origin);
+  const url = new URL(MATCHES[mode].socket, service);
   if (id !== null) url.searchParams.set("match",id);
-  url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  const hosted = !!document.querySelector('meta[name="battle-online"]');
-  const api = new URL("/api/matches/"+mode+"/"+(id ?? "lobby"),location.origin);
+  url.protocol = service.protocol === "https:" ? "wss:" : "ws:";
+  const hosted = !!onlineConfig;
+  const api = new URL("/api/matches/"+mode+"/"+(id ?? "lobby"),service);
   let useHttp = false;
 
   function save() {

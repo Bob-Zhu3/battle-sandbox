@@ -16,7 +16,7 @@ const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
 function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key); }
 
 export function createRoster(strip: HTMLElement, priced: boolean) {
-  const storageKey = "battle.palette." + location.pathname;
+  const storageKey = "battle.palette." + (location.pathname.replace(/\/$/, "") || "/");
   let selected: Brush = "warrior", shelf = 0, team: Team = "red";
   let balance: number | undefined, casting = !priced;
   try {

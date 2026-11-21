@@ -316,7 +316,7 @@ async function playground(url) {
   await page.waitForFunction(()=>document.querySelector("#violet-count").textContent==="0");
   await page.locator("#clear").click();
   await page.getByText("Play modes",{exact:false}).first().click();
-  assert.deepEqual(await page.locator(".demo-options a").evaluateAll(links=>links.map(a=>a.getAttribute("href"))),["/","/room?new","/ffa?new"]);
+  assert.deepEqual(await page.locator(".demo-options a").evaluateAll(links=>links.map(a=>a.getAttribute("href"))),["/","/room/?new","/ffa/?new"]);
   await page.context().close();
   console.log("Playground: idle animation, same-side enemies, live pointer-down fighting, unlimited purchases, grouped undo and continued play.");
 }

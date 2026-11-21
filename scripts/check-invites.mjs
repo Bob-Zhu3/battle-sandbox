@@ -8,7 +8,7 @@ import { createGameServer } from "../server/http.ts";
 const args=process.argv.slice(2),remote=args.find(a=>!a.startsWith("--"));
 const server=remote?null:createGameServer();
 if(server){server.http.listen(0,"127.0.0.1");await once(server.http,"listening");}
-const origin=remote?new URL(remote).origin:"http://127.0.0.1:"+server.http.address().port;
+const home=new URL(remote ?? "http://127.0.0.1:"+server.http.address().port);
 const browser=await chromium.launch({channel:existsSync(chromium.executablePath())?undefined:"chrome"});
 const sessions=[],errors=[];
 async function player(width,height) {
@@ -33,12 +33,16 @@ async function wait(check,why,ms=20000) {
 }
 const side=(p,team)=>p.page.waitForFunction(t=>document.querySelector(".game")?.dataset.team===t,team,{timeout:25000});
 async function create(p,name) {
-  await p.page.goto(origin);await p.page.locator("#demo-picker summary").click();
+  await p.page.goto(home.href);await p.page.locator("#demo-picker summary").click();
   await p.page.getByRole("link",{name:new RegExp("^"+name)}).click();
   await side(p,"red");await p.page.getByRole("button",{name:"Copy invite"}).click();
   const manual=p.page.locator("#invite-url");
   const link=await manual.isVisible()?await manual.inputValue():await p.page.evaluate(()=>navigator.clipboard.readText());
-  assert.match(link,/\?match=[a-f0-9]{20}$/);assert.equal(link,p.page.url());return link;
+  assert.match(link,/\?match=[a-f0-9]{20}$/);assert.equal(link,p.page.url());
+  const invite=new URL(link);
+  assert.equal(invite.origin,home.origin);
+  assert.equal(invite.pathname,new URL(name==="Duel"?"room/":"ffa/",home).pathname);
+  return link;
 }
 async function draw(p,x,y,ey=y) {
   const box=await p.page.locator("#arena").boundingBox();
@@ -57,6 +61,8 @@ try{
   await wait(()=>[red,blue].every(p=>p.frames.some(f=>f.world.units.length===8)),"both screens receive all eight troops");
   const formation=p=>p.frames.find(f=>f.world.units.length===8).world.units.map(({id,team,x,y})=>[id,team,x,y]);
   assert.deepEqual(formation(red),formation(blue));assert.equal(other.frames.at(-1).world.units.length,0);
+  await other.page.getByRole("link",{name:"Leave match"}).click();
+  await other.page.waitForURL(home.href);
   await Promise.all([ready(red),ready(blue)]);
   await wait(()=>blue.frames.some(f=>f.world.units.some(u=>u.lastHitTick!=null)),"first hit in the public match",30000);
   const oldToken=blue.joins.at(-1).resumeToken;

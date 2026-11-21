@@ -5,6 +5,19 @@ import { readFileSync } from "node:fs";
 import { matchDatabase } from "../server/match-database.ts";
 import { exchange } from "../server/online-match.ts";
 import { CLOSE } from "../src/room-protocol.ts";
+import { matchLink, matchMode } from "../src/match-link.ts";
+
+test("an invite keeps its game directory and shares only the match ID", () => {
+  const home = "https://bob-zhu3.github.io/battle-sandbox/";
+  const id = "1234567890abcdef1234";
+  for (const [route, mode] of [["room/", "duel"], ["ffa/", "ffa"]]) {
+    assert.equal(matchMode(new URL(route, home).pathname), mode);
+    assert.equal(matchMode("/" + route.slice(0,-1)), mode);
+    assert.equal(matchLink(home + route + "?ids=1&match=" + id + "#field").href, home + route + "?match=" + id);
+  }
+  assert.equal(matchMode(new URL(home).pathname), undefined);
+  assert.equal(matchLink(home + "room/?ids=1").href, home + "room/");
+});
 
 function field() {
   const sqlite = new DatabaseSync(":memory:");

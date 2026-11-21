@@ -2,7 +2,7 @@
 
 Draw a squad into a meadow and watch it fight. The illustrated row along the bottom holds twenty-five troops and buildings and nine spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
-**Play online.** Open the game, choose **Play modes**, then **Duel** or **Free-for-all**. Click **Copy invite** and send the link to the other players. Each match has its own field. Everyone can join from a phone or computer, draw a starting army, and press **Ready**. [Open Battle Sandbox](https://battle-sandbox.zhubob3.chatgpt.site/)
+**Play online.** Open the game, choose **Play modes**, then **Duel** or **Free-for-all**. Click **Copy invite** and send the link to the other players. Each match has its own field. Everyone can join from a phone or computer, draw a starting army, and press **Ready**. [Open Battle Sandbox](https://bob-zhu3.github.io/battle-sandbox/)
 
 ![Four armies in a live free-for-all, with a base in each corner and recruitment controls below the field](media/free-for-all.png)
 
@@ -130,6 +130,8 @@ The browser playground and Node match server share a deterministic 60-tick simul
 
 The server validates territory and funds, assigns IDs and sends snapshots of the same 960 × 360 arena to every browser. The local Node server broadcasts over WebSockets. The hosted game also supports HTTPS when a network blocks the socket connection. The invite identifies the field. Each browser stores its own separate seat token for that match.
 
-The hosted server saves the world, seat reservations and purchase receipts together in a database. Each update checks the previous version before committing, so purchases from two players can land together. When a match wakes, the shared simulation advances by the elapsed number of ticks. Expired room records are reclaimed as new matches are created. Run `npm run build:site` to build the hosted game and its database migration.
+GitHub Pages serves the game, artwork, and sound. Pushing to `main` runs the tests, builds the public pages with `npm run build:pages`, and publishes them. To check a release, run `npm run check:invites -- https://bob-zhu3.github.io/battle-sandbox/`. Add `--http --duel-only` to exercise the backup connection.
+
+The separate match server saves the world, seat reservations and purchase receipts together in a database. Each update checks the previous version before committing, so purchases from two players can land together. When a match wakes, the shared simulation advances by the elapsed number of ticks. Expired room records are reclaimed as new matches are created. Run `npm run build:site` to build the match server and its database migration. When changing shared rules or the multiplayer protocol, deploy that server with the matching client release.
 
 For a local development server on loopback, use `npm run dev`. To serve the production build, run `npm run build` and `npm start`. The Node server defaults to `127.0.0.1:4173` and accepts `HOST` and `PORT`.

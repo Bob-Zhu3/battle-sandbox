@@ -7,7 +7,7 @@ const types = {".html":"text/html; charset=utf-8",".js":"text/javascript; charse
 const assets = {};
 for (const file of ["index.html",...(await readdir("dist/assets")).map(name => "assets/"+name)]) {
   let bytes = await readFile(join("dist",file));
-  if (file === "index.html") bytes = Buffer.from(bytes.toString().replace("<head>",'<head><meta name="battle-online" content="1">'));
+  if (file === "index.html") bytes = Buffer.from(bytes.toString().replace("<head>",'<head><meta name="battle-online" content="/">'));
   assets["/"+file] = {type:types[extname(file)] ?? "application/octet-stream",data:bytes.toString("base64")};
 }
 await build({

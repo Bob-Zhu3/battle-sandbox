@@ -1,7 +1,6 @@
-import { newMatchId } from "./match-link.ts";
+import { matchMode, newMatchId } from "./match-link.ts";
 
-const path = location.pathname.replace(/\/$/, "");
-if (path === "/room" || path === "/ffa") {
+if (matchMode(location.pathname)) {
   const url = new URL(location.href);
   if (url.searchParams.has("new") && !url.searchParams.has("match")) {
     url.searchParams.delete("new");

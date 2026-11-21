@@ -8,9 +8,9 @@ import { connectRoom, type ConnectionState } from "./room-connection.ts";
 import type { RoomAction, Snapshot, World } from "./room-protocol.ts";
 import { bountyFor } from "./transformations.ts";
 import { UNIT_DEFINITIONS, placementKind, type RecruitKind } from "./units.ts";
-import { matchLink } from "./match-link.ts";
+import { matchLink, matchMode } from "./match-link.ts";
 
-const mode: MatchMode = location.pathname.replace(/\/$/, "") === "/ffa" ? "ffa" : "duel";
+const mode: MatchMode = matchMode(location.pathname)!;
 const match = MATCHES[mode];
 const field = createField(mode);
 const game = document.querySelector<HTMLElement>(".game")!;
@@ -38,8 +38,7 @@ const invite = element<HTMLButtonElement>("room-invite"), manualInvite = element
 invite.hidden = false;
 let inviteTimer = 0;
 invite.addEventListener("click",async () => {
-  const id = new URL(location.href).searchParams.get("match");
-  const link = matchLink(location.origin,mode,id).href;
+  const link = matchLink(location.href).href;
   try {
     await navigator.clipboard.writeText(link);
     invite.textContent = "Copied!";
