@@ -105,6 +105,7 @@ async function demo(fault) {
       const command = route.request().postDataJSON()?.commands?.find(c => c.action?.type === "place-warriors");
       if (command) {
         attempts.push(command);
+        if (attempts.length === 1) console.log("   Red sent round " + command.round + ", command " + command.commandId + " (" + command.action.positions.length + " Warriors).");
         // Let the new server report the on-disk state before the browser's own retry arrives.
         if (attempts.length > 1) await retry.promise;
       }
@@ -114,14 +115,31 @@ async function demo(fault) {
     peers.push(await player(browsers[1], "blue", url));
     const title = fault === "before" ? "Case 1 · Kill before the save" : "Case 2 · Kill after the save, before the reply";
     await caption(peers, title, "Red draws five Warriors at 12 gold each.");
+    await red.page.bringToFront();
+    await red.page.getByRole("button", {name:"Warrior", exact:true}).click();
     const box = await red.page.locator("#arena").boundingBox();
+    const fieldAtStart = await red.page.evaluate(({x,y}) => document.elementFromPoint(x,y)?.id,
+      {x:box.x+200, y:box.y+box.height/2});
+    assert.equal(fieldAtStart, "arena", "Red's pointer starts on the arena");
+    await red.page.evaluate(() => {
+      window.demoStroke = [];
+      for (const name of ["pointerdown","pointerup","pointercancel","lostpointercapture"]) {
+        window.addEventListener(name,e=>window.demoStroke.push([name,e.target.id,e.clientX,e.clientY]),true);
+      }
+    });
     await red.page.mouse.move(box.x + 200, box.y + box.height / 2);
     await red.page.mouse.down();
     await red.page.mouse.move(box.x + 296, box.y + box.height / 2, {steps: 8});
     if (!headless) await delay(700);
     const boundary = message(original.child, "boundary");
     await red.page.mouse.up();
-    const stopped = await boundary;
+    const stopped = await boundary.catch(async error => {
+      console.error("Stroke diagnostic", await red.page.evaluate(() => ({
+        input:window.demoStroke, phase:document.getElementById("match-state").textContent,
+        hint:document.getElementById("deploy-hint").textContent,
+      })), red.events.filter(e => e.type === "error").map(e => e.message));
+      throw error;
+    });
     assert.equal(stopped.fault, fault);
     assert.equal(attempts[0].action.positions.length, 5);
     assert.equal(red.events.some(e => e.type === "placement-ack"), false);
@@ -140,7 +158,10 @@ async function demo(fault) {
         document.querySelector("#gold-balance").textContent === gold &&
         window.paintedIds?.slice().sort((a,b) => a-b).join(",") === "1,2,3,4,5", index ? "120" : "60");
     }
-    for (let i = 0; i < 100 && !red.events.some(e => e.type === "placement-ack"); i++) await delay(40);
+    const recorded = () => red.events.some(e => e.type === "placement-ack") &&
+      peers.every(peer => peer.events.some(e => e.type === "snapshot" && e.world.units.length === 5));
+    const until = Date.now() + 8000;
+    while (!recorded() && Date.now() < until) await delay(40);
     assert.ok(attempts.length >= 2, "The actual browser resent the purchase");
     for (const attempt of attempts.slice(1)) assert.deepEqual(attempt, attempts[0]);
     const ack = red.events.find(e => e.type === "placement-ack");
@@ -168,7 +189,8 @@ async function demo(fault) {
 
 try {
   for (const [index, width] of [960, 610].entries()) browsers.push(await chromium.launch({channel, headless,
-    args: ["--window-position=" + (index ? 955 : 0) + ",35", "--window-size=" + (width + 16) + ",690"]}));
+    args: ["--force-device-scale-factor=1", "--disable-backgrounding-occluded-windows",
+      "--window-position=" + (index ? 955 : 0) + ",35", "--window-size=" + (width + 16) + ",690"]}));
   await demo("before");
   await demo("after");
   console.log("\nBoth crash boundaries passed.");
