@@ -45,6 +45,8 @@ async function create(p,name) {
   return link;
 }
 async function draw(p,x,y,ey=y) {
+  // The team is assigned before the first world snapshot enables deployment.
+  await p.page.locator("#brush-tool").waitFor({state:"visible"});
   const box=await p.page.locator("#arena").boundingBox();
   const px=box.x+x*box.width/960,py=v=>box.y+v*box.height/360;
   await p.page.mouse.move(px,py(y));await p.page.mouse.down();
