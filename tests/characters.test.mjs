@@ -137,6 +137,9 @@ test("an Archer recoils as a living opponent closes under the bow and still foll
     previous = pose.cornered;
   }
   assert.equal(previous, 1);
+  const [watcher, threat] = battle.units;
+  assert.equal(characterPose(watcher, { ...threat, hp: 0 }, battle.tick).cornered, 0);
+  assert.equal(characterPose(watcher, { ...threat, kind: "phoenix", emberUntil: battle.tick + 80 }, battle.tick).cornered, 0);
   battle.units[0].nextAttackTick = battle.tick + 1;
   battle = stepBattle(battle);
   const shot = poseOf(battle, battle.units[0]);

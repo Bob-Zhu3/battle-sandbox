@@ -13,6 +13,7 @@ import { drawKeep } from "./keeps.ts";
 import { ARMIES, campFor, type MatchMode } from "./battlefield.ts";
 import { characterPose, HIT_FLASH_TICKS, restingPose } from "./character-pose.ts";
 import { drawFallen, drawUnitToken, INK, palette } from "./characters.ts";
+import { drawCrowdUnit, prepareCrowd } from "./crowd-sprites.ts";
 
 function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team, length: number) {
   ctx.save();
@@ -75,6 +76,8 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
 
   const tick = previous.tick + (current.tick - previous.tick) * blend;
+  const visible = current.units.reduce((n, u) => n + Number(u.hp > 0 || (u.lastHitTick !== null && tick - u.lastHitTick < 48)), 0);
+  const crowd = prepareCrowd(visible, tick, ctx.canvas.width / w);
   for (const unit of current.units) drawTrail(ctx,unit,tick,sx,sy);
   for (const effect of current.effects ?? []) drawGroundEffect(ctx, effect, tick, sx, sy);
   for (const spell of current.spells ?? []) drawFieldSpell(ctx, spell, tick, sx, sy);
@@ -108,7 +111,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     if (!patient || !patient.hp || patient.team !== unit.team) continue;
     const progress = Math.min(1,(tick-unit.wrappingSince+1)/16);
     const ex = x+(patient.x*sx-x)*progress, ey = y+(patient.y*sy-y)*progress;
-    ctx.save(); ctx.strokeStyle = unit.kind === "engineer" ? "#b78c4a" : "#fff6db";
+    ctx.save(); ctx.strokeStyle = unit.kind === "engineer" ? "#b78c4a" : "#b39369";
     ctx.lineWidth=2.8*scale;ctx.setLineDash([4*scale,2*scale]);ctx.beginPath();
     ctx.moveTo(x,y-2*scale);ctx.quadraticCurveTo((x+ex)/2,(y+ey)/2+5*scale,ex,ey-2*scale);ctx.stroke();ctx.restore();
   }
@@ -123,7 +126,8 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       const combatKill = !current.bases || unit.killedBy !== undefined;
       if (combatKill && age < HIT_FLASH_TICKS) {
         const pose = characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, unit.walkDistance, from.lastHitTick);
-        drawUnitToken(ctx, x, y, radius, unit.team, unit.kind, pose, unit, tick);
+        if (crowd) drawCrowdUnit(ctx, x, y, radius, pose, unit, tick);
+        else drawUnitToken(ctx, x, y, radius, unit.team, unit.kind, pose, unit, tick);
       } else {
         const fallAge = combatKill ? (age - HIT_FLASH_TICKS) * 48 / (48 - HIT_FLASH_TICKS) : age;
         drawFallen(ctx, x, y, radius, unit.team, unit.kind, side, fallAge);
@@ -145,7 +149,8 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       const lift = Math.max(0, Math.min(1, (tick-hand.windup!.since-3)/(UNIT_DEFINITIONS.cyclops.swallowTicks-3)));
       const mouthX = hand.x*sx + (hand.aimX<0?-1:1)*9*scale, mouthY = hand.y*sy-12*scale;
       drawUnitToken(ctx,x+(mouthX-x)*lift,y+(mouthY-y)*lift-12*scale*Math.sin(Math.PI*lift),r*(1-.82*lift),unit.team,unit.kind,pose,unit,tick);
-    } else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, bodyTick);
+    } else if (crowd) drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick);
+    else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, bodyTick);
     if (frozen) iceShell(ctx,x,y,r,unit.frozenUntil!-tick);
     if (unit.hex || unit.unhexedTick !== undefined || unit.zombified) drawChange(ctx,unit,x,y,scale,tick);
     if (unit.soul) drawSoul(ctx,unit,x,y,tick,sx,sy);

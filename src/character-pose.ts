@@ -96,7 +96,8 @@ export function characterPose(unit: Unit, target: Target | undefined, tick: numb
     pose.lookX = Math.abs(dx);
     pose.lookY = dy;
   }
-  if (kind === "archer" && target && target.team !== unit.team && target.kind !== "base") {
+  if (kind === "archer" && target && target.kind !== "base" && target.team !== unit.team &&
+      target.hp > 0 && !target.tunnel && target.emberUntil === undefined) {
     const opponent = UNIT_DEFINITIONS[target.kind];
     if (opponent.speed > 0) {
       const gap = range - definition.radius - opponent.radius;
