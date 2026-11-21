@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { matchDatabase } from "../server/match-database.ts";
+import { sqliteBinding } from "../scripts/sqlite-binding.mjs";
 import { exchange } from "../server/online-match.ts";
 import { CLOSE } from "../src/room-protocol.ts";
 import { matchLink, matchMode } from "../src/match-link.ts";
@@ -22,13 +23,7 @@ test("an invite keeps its game directory and shares only the match ID", () => {
 function field() {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(readFileSync(new URL("../drizzle/0000_online_rooms.sql",import.meta.url),"utf8"));
-  const db = {prepare(sql) {
-    const stmt = sqlite.prepare(sql);
-    return {bind(...args) {
-      const values = args.map(v=>v instanceof ArrayBuffer ? new Uint8Array(v) : v);
-      return {async first(){return stmt.get(...values) ?? null;},async run(){return {meta:stmt.run(...values)};}};
-    }};
-  }};
+  const db = sqliteBinding(sqlite);
   let now=10_000;
   return {
     skip(ms){now+=ms;}, db,

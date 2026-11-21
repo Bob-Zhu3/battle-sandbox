@@ -33,6 +33,8 @@
     "demo:retry": "node scripts/demo-room.mjs --retry",
     "predemo:reconnect": "npm run build --silent",
     "demo:reconnect": "node scripts/demo-room.mjs --reconnect",
+    "predemo:crash": "npm run build:site --silent",
+    "demo:crash": "node scripts/demo-crash.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test"
   },
