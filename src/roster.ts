@@ -7,9 +7,10 @@ import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 type Brush = RecruitKind | SpellKind;
 const shelves: {name: string; items: Brush[]}[] = [
   {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","miner","clown","engineer"]},
-  {name: "Machines", items: ["mouse","drone","workshop","post"]},
+  {name: "Machines", items: ["mouse","drone"]},
+  {name: "Towers", items: ["post","workshop","lobber","sunlens","belltower"]},
   {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","reaper","witch","zombie"]},
-  {name: "Spells", items: ["gust","meteor","rain"]},
+  {name: "Spells", items: ["gust","meteor","rain","fault","briar","mirror"]},
 ];
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
 function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key); }
@@ -21,7 +22,8 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   try {
     const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
     if (saved && shelves.some(group => group.items.includes(saved.brush))) selected = saved.brush;
-    const index = shelves.findIndex(group => group.name === saved?.shelf);
+    const savedShelf = saved?.shelf === "Machines" && (saved.brush === "post" || saved.brush === "workshop") && saved.version !== 2 ? "Towers" : saved?.shelf;
+    const index = shelves.findIndex(group => group.name === savedShelf);
     if (index >= 0) shelf = index;
   } catch { /* The palette works without storage. */ }
 
@@ -49,7 +51,7 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     return art;
   }
   function remember() {
-    try { sessionStorage.setItem(storageKey,JSON.stringify({brush:selected, shelf:shelves[shelf].name})); }
+    try { sessionStorage.setItem(storageKey,JSON.stringify({version:2, brush:selected, shelf:shelves[shelf].name})); }
     catch { /* Use the in-memory selection. */ }
   }
   function refresh() {
@@ -166,6 +168,10 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   return {
     selectedKind: (): RecruitKind => isSpell(selected) ? "warrior" : selected,
     selectedSpell: (): SpellKind | undefined => isSpell(selected) && casting ? selected : undefined,
+    armBrush(kind: Brush) {
+      browse(shelves.findIndex(group => group.items.includes(kind)));
+      choose(kind); reveal(cards.get(kind)!);
+    },
     colorBrush(color: Team) {
       if (team === color) return;
       team = color;

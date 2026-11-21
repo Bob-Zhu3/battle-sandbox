@@ -87,6 +87,21 @@ const recruits = {
     name: "Watchpost", command: "place-watchposts", description: "A fixed lookout that shoots bolts. Engineers can repair its frame.",
     cost: 15, bounty: 7, attack: "arrow", radius: 12, maxHp: troopHealth(37), speed: 0, reach: 135, damage: 6, cooldownTicks: 65, arrowSpeed: 280,
   },
+  lobber: {
+    name: "Stone Lobber", command: "place-lobbers", description: "Slings a boulder at the marked patch of ground. Rush inside its blind spot or fly over the splash.",
+    cost: 24, bounty: 12, attack: "arrow", radius: 16, maxHp: troopHealth(43), speed: 0, reach: 218, minimumRange: 65,
+    damage: 16, cooldownTicks: 100, arrowSpeed: 215, blastRadius: 35,
+  },
+  sunlens: {
+    name: "Sun Lens", command: "place-sun-lenses", description: "Focuses sunlight on one enemy. Each lit facet strengthens its beam. Enemy Healing Rain fogs the glass.",
+    cost: 27, bounty: 13, attack: "beam", radius: 14, maxHp: troopHealth(44), speed: 0, reach: 148,
+    damage: 3, cooldownTicks: 18, focusTicks: 12, tierTicks: 36, focusedDamage: 6, fullDamage: 10, fogTicks: 27,
+  },
+  belltower: {
+    name: "Bell Tower", command: "place-bell-towers", description: "Tolls when ground troops come close. The sound shoves them outward and interrupts a Lancer's charge.",
+    cost: 19, bounty: 9, attack: "toll", radius: 14, maxHp: troopHealth(40), speed: 0, reach: 65,
+    damage: 4, cooldownTicks: 90, shove: 32, stunTicks: 10,
+  },
   drone: {
     name: "Bolt Drone", command: "place-drones", description: "Hovers and fires three bolts along one sight line. A moving target can slip past the last shots.",
     cost: 15, bounty: 7, attack: "arrow", radius: 9, maxHp: troopHealth(22), speed: 82, reach: 128, damage: 4, cooldownTicks: 64, arrowSpeed: 315, burstGap: 7,
@@ -109,10 +124,11 @@ export type RecruitKind = keyof typeof recruits;
 export type UnitKind = keyof typeof UNIT_DEFINITIONS;
 export const RECRUIT_KINDS = Object.keys(recruits) as RecruitKind[];
 export const UNIT_KINDS = Object.keys(UNIT_DEFINITIONS) as UnitKind[];
-export const isMachine = (kind: UnitKind) => kind === "mouse" || kind === "drone" || kind === "post" || kind === "workshop";
+export const isBuilding = (kind: UnitKind) => kind === "workshop" || kind === "post" || kind === "lobber" || kind === "sunlens" || kind === "belltower";
+export const isMachine = (kind: UnitKind) => kind === "mouse" || kind === "drone" || isBuilding(kind);
+export const airborne = (target: {kind: UnitKind | "base"; emberUntil?: number}) => target.kind === "drone" || (target.kind === "phoenix" && target.emberUntil === undefined);
 export const isHuman = (kind: UnitKind) => kind === "warrior" || kind === "archer" || kind === "shieldbearer" ||
   kind === "medic" || kind === "lancer" || kind === "bomber" || kind === "engineer" || kind === "musketeer" || kind === "scout" || kind === "miner" || kind === "clown";
-export const isBuilding = (kind: UnitKind) => kind === "workshop" || kind === "post";
 export type PlacementType = (typeof recruits)[RecruitKind]["command"];
 
 export function placementKind(type: PlacementType): RecruitKind;

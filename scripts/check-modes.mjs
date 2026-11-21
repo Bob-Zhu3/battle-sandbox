@@ -132,7 +132,7 @@ async function paletteAndMeteor(url) {
       const bar=page.locator("#brush-tool"), panel=page.getByRole("tabpanel");
       const pick=(scope,name)=>scope.getByRole("button",{name,exact:true}).click({force:true});
       const tab=name=>bar.getByRole("tab",{name,exact:true});
-      assert.deepEqual(await bar.getByRole("tab").allTextContents(),["People","Machines","Mythical","Spells"]);
+      assert.deepEqual(await bar.getByRole("tab").allTextContents(),["People","Machines","Towers","Mythical","Spells"]);
       assert.equal(await panel.getByRole("button").count(),11);
       assert.equal(await page.getByRole("button",{name:"Roster",exact:true}).count(),0);
       const track=bar.locator("#palette-track");
@@ -147,7 +147,7 @@ async function paletteAndMeteor(url) {
       await tab("Spells").click({force:true}); assert.ok(await tab("Mythical").evaluate(el=>el.hasAttribute("data-armed")));
       await tab("People").focus(); await page.keyboard.press("Home"); await page.keyboard.press("ArrowRight");
       assert.equal(await tab("Machines").getAttribute("aria-selected"),"true");
-      await pick(page,"Blue army");await pick(panel,"Watchpost");
+      await pick(page,"Blue army");await tab("Towers").click({force:true});await pick(panel,"Watchpost");
       const groundY=224;
       await page.mouse.click(...point(targetX,groundY));await page.clock.runFor(32);
       await pick(page,"Red army");await tab("Spells").click({force:true});await pick(panel,"Meteor");
@@ -293,9 +293,10 @@ async function browseRoster(url) {
   try {
     const catalog={
       People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Miner","Clown","Engineer"],
-      Machines:["Clockmouse","Bolt Drone","Mouse Workshop","Watchpost"],
+      Machines:["Clockmouse","Bolt Drone"],
+      Towers:["Watchpost","Mouse Workshop","Stone Lobber","Sun Lens","Bell Tower"],
       Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Reaper","Witch","Zombie"],
-      Spells:["Gust","Meteor","Healing Rain"],
+      Spells:["Gust","Meteor","Healing Rain","Fault Line","Briar Snare","Mirror Ward"],
     };
     const portraits=new Set();
     let placed=0;
@@ -317,11 +318,11 @@ async function browseRoster(url) {
         }
       }
     }
-    assert.equal(portraits.size,25);assert.equal(placed,22);
+    assert.equal(portraits.size,31);assert.equal(placed,25);
     const panel=page.getByRole("region",{name:"Troops and spells"});
     for(const team of TEAMS) {
       await page.getByRole("button",{name:ARMIES[team].name+" army",exact:true}).click();
-      for(const shelf of ["People","Machines","Mythical"]) {
+      for(const shelf of Object.keys(catalog)) {
         await panel.getByRole("tab",{name:shelf,exact:true}).click();
         const clipped=await panel.locator(".palette-card canvas").evaluateAll(canvases=>canvases.flatMap(canvas=>{
           const {width,height}=canvas;
@@ -335,7 +336,7 @@ async function browseRoster(url) {
         assert.deepEqual(clipped,[],team+" portraits need space around each silhouette");
       }
     }
-    await chooseCard(page,"Machines","Mouse Workshop");
+    await chooseCard(page,"Towers","Mouse Workshop");
     for(const width of [320,375,390,601,790,1024]) {
       await page.setViewportSize({width,height:650});
       const outside=await page.locator(".tool-strip button:visible:not(.palette-card)").evaluateAll(buttons=>buttons.filter(button=>{
@@ -346,12 +347,12 @@ async function browseRoster(url) {
       const slots=await page.locator(".palette-card").evaluateAll(cards=>cards.map(card=>{
         const {width,height,bottom}=card.getBoundingClientRect();return {width,height,bottom};
       }));
-      assert.equal(slots.length,4);
+      assert.equal(slots.length,5);
       assert.ok(slots.every(s=>s.width>=44 && s.height>=44 && Math.abs(s.bottom-slots[0].bottom)<=3.5),
         "Portraits form one horizontally scrollable, tappable row at "+width+"px");
     }
     assert.equal(await page.locator("#gold-balance").textContent(),"∞");
-    console.log("Roster: every entry has a distinct portrait, each troop fits its card in all four colors, all 22 pieces place, and all three spells cast.");
+    console.log("Roster: all 31 portraits fit their cards in four colors, all 25 troops and buildings place, and all six spells cast.");
   } finally {await page.context().close();}
 }
 
@@ -405,6 +406,55 @@ async function magicDuel(url) {
   } finally {await Promise.all([red,blue].map(p=>p.page.context().close()));}
 }
 
+async function siegeDuel(url) {
+  const red=await open(url+"/room",1024,660),blue=await open(url+"/room",390,700);
+  const players=[red,blue];
+  try {
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue");
+    const formation=[[red,"Bell Tower",439,179],[red,"Sun Lens",360,103],[red,"Stone Lobber",265,219],
+      [blue,"Watchpost",545,179],[blue,"Bell Tower",500,97]];
+    for(const [i,[player,name,x,y]] of formation.entries()) {
+      await chooseCard(player.page,"Towers",name);
+      await player.page.mouse.click(...player.point(x,y));await player.waitForUnits(i+1);
+    }
+    assert.equal(Number(await red.page.locator("#gold-balance").textContent()),50);
+    await red.page.getByRole("tab",{name:"Spells"}).click();
+    assert.equal(await red.page.locator("#brush-mirror").isEnabled(),false);
+    await Promise.all(players.map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
+    await red.page.getByText("Live",{exact:true}).waitFor();
+    await chooseCard(red.page,"Spells","Mirror Ward");await red.page.mouse.click(...red.point(443,179));
+    const rebounded=f=>f.world.spells?.some(s=>s.kind==="mirror" && s.reflection?.count>=1);
+    const timeout=Date.now()+4500;
+    while(!blue.frames.some(rebounded) && Date.now()<timeout)await delay(15);
+    const first=blue.frames.find(rebounded);
+    assert.ok(first,"the Watchpost shot should reach the ward");
+    assert.equal(first.world.units.find(u=>u.kind==="sunlens").targetId,5);
+    await blue.page.reload({waitUntil:"domcontentloaded"});
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue");
+    const limit=Date.now()+3000;
+    while((!blue.frames.some(f=>f.revision>first.revision && rebounded(f)) || blue.joins.length<2) && Date.now()<limit)await delay(15);
+    assert.equal(blue.joins[1].resumeToken,blue.joins[0].resumeToken);
+    const frame=blue.frames.at(-1);
+    assert.ok(rebounded(frame),"the returning phone still sees the spent pane");
+    while(!red.frames.some(f=>f.revision===frame.revision) && Date.now()<limit)await delay(10);
+    assert.deepEqual(red.frames.find(f=>f.revision===frame.revision)?.world,frame.world);
+    console.log("Siege duel: three towers bought on desktop, a Watchpost bolt reflected, and the returning phone saw the same spent pane and Sun Lens lock.");
+  } finally {await Promise.all(players.map(p=>p.page.context().close()));}
+}
+
+async function siegePlayground(url) {
+  const {page,point}=await open(url+"/?demo=siege",390,700,true);
+  try {
+    assert.equal(await page.locator("#blue-count").textContent(),"3");
+    assert.equal(await page.locator("#brush-fault").getAttribute("aria-pressed"),"true");
+    await page.mouse.click(...point(442,178));await page.clock.runFor(880);
+    assert.equal(await page.locator("#blue-hp").textContent(),String(defs.lobber.maxHp+defs.sunlens.maxHp+defs.belltower.maxHp-48));
+    await page.reload();await page.getByRole("button",{name:"Fault Line",exact:true}).waitFor();
+    assert.equal(await page.locator("#blue-hp").textContent(),String(defs.lobber.maxHp+defs.sunlens.maxHp+defs.belltower.maxHp));
+    console.log("Siege playground: the direct link opens three towers, two towers take both tremors, and reload restores the lineup.");
+  } finally {await page.context().close();}
+}
+
 async function stormDuel(url) {
   const red=await open(url+"/room",1040,620),blue=await open(url+"/room",640,510);
   try {
@@ -414,7 +464,7 @@ async function stormDuel(url) {
     await red.page.mouse.click(...red.point(438,165));await red.waitForUnits(1);
     await chooseCard(blue.page,"People","Lancer");
     await blue.page.mouse.click(...blue.point(666,165));await blue.waitForUnits(2);
-    await chooseCard(blue.page,"Machines","Watchpost");
+    await chooseCard(blue.page,"Towers","Watchpost");
     for(const [i,x] of [660,716,772].entries()) {
       await blue.page.mouse.click(...blue.point(x,190));await blue.waitForUnits(3+i);
     }
@@ -457,7 +507,7 @@ async function turncoatDuel(url) {
     await chooseCard(red.page,"Mythical","Zombie");await red.page.mouse.click(...red.point(462,270));await red.waitForUnits(3);
     await blue.page.getByRole("button",{name:"Archer",exact:true}).click();await blue.page.mouse.click(...blue.point(488,270));await blue.waitForUnits(4);
     await chooseCard(blue.page,"People","Shieldbearer");await blue.page.mouse.click(...blue.point(516,105));await blue.waitForUnits(5);
-    await chooseCard(blue.page,"Machines","Watchpost");await blue.page.mouse.click(...blue.point(585,92));
+    await chooseCard(blue.page,"Towers","Watchpost");await blue.page.mouse.click(...blue.point(585,92));
     await Promise.all(players.map(p=>p.waitForUnits(6)));
     const destination=red.frames.at(-1).world.units[0].tunnel;
     assert.deepEqual([destination.toX,destination.toY].map(Math.round),[700,245]);
@@ -572,7 +622,9 @@ try {
   await withField(touchAndSound);
   await withField(playground);
   await withField(browseRoster);
+  await withField(siegePlayground);
   await withField(magicDuel);
+  await withField(siegeDuel);
   await withField(stormDuel);
   await withField(turncoatDuel);
   await withField(url=>match(url,3));

@@ -15,6 +15,8 @@
     "demo:encounters": "node scripts/demo-encounters.mjs",
     "predemo:motion": "npm run build --silent",
     "demo:motion": "node scripts/demo-encounters.mjs --motion",
+    "predemo:siege": "npm run build --silent",
+    "demo:siege": "node scripts/demo-encounters.mjs --siege",
     "predemo:room": "npm run build --silent",
     "demo:room": "node scripts/demo-room.mjs",
     "predemo:oddities": "npm run build --silent",

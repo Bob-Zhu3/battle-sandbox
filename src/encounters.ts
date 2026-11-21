@@ -2,7 +2,7 @@ import { ARENA, BASE_RADIUS } from "./battlefield.ts";
 import type { GroundEffect, Hit } from "./conditions.ts";
 import type { Unit, Target, Placement } from "./simulation.ts";
 import { nearestEnemy } from "./targeting.ts";
-import { isHuman, isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { airborne, isBuilding, isHuman, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Windup { kind: "smash" | "swallow"; since: number; x: number; y: number; targetId: number }
 const club = UNIT_DEFINITIONS.cyclops;
@@ -37,7 +37,12 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
   const finished = new Set<number>();
   const meals = new Map<number, Unit>();
   const swallowed = new Set<number>();
-  const shocks = new Map<number, Windup[]>();
+  const shocks = new Map<number, {x: number; y: number; distance: number}[]>();
+  const bells = new Map<number,number>();
+  function push(id: number, source: {x: number; y: number}, distance: number) {
+    const list = shocks.get(id) ?? [];
+    list.push({x:source.x,y:source.y,distance}); shocks.set(id,list);
+  }
   const disable = (id: number, duration: number) => stuns.set(id, Math.max(stuns.get(id) ?? 0, tick + duration));
   for (const u of units) {
     if (u.hp <= 0 || (u.stunnedUntil ?? 0) > tick) continue;
@@ -68,6 +73,17 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
     arcs.set(u.id, {tick, path});
   }
 
+  const bell = UNIT_DEFINITIONS.belltower;
+  for (const tower of units) {
+    if (tower.kind !== "belltower" || tower.hp <= 0 || tick < tower.nextAttackTick || tick < (tower.stunnedUntil ?? 0) || stuns.has(tower.id)) continue;
+    const nearby = units.filter(u => u.hp > 0 && u.team !== tower.team && !u.tunnel && !isBuilding(u.kind) && !airborne(u) && u.emberUntil === undefined && within(tower,u,bell.reach));
+    if (!nearby.length) continue;
+    bells.set(tower.id,nearestEnemy(tower,nearby)!.id);
+    effects.push({kind:"toll",team:tower.team,x:tower.x,y:tower.y,tick,radius:bell.reach});
+    for (const enemy of nearby) {
+      hit(enemy,bell.damage,tower.team); disable(enemy.id,bell.stunTicks); push(enemy.id,tower,bell.shove);
+    }
+  }
   const ready = units.filter(u => u.hp > 0 && u.windup && tick >= (u.stunnedUntil ?? 0) &&
     tick - u.windup.since >= (u.windup.kind === "smash" ? club.windup : club.swallowTicks));
   ready.sort((a, b) => a.windup!.since - b.windup!.since || a.id - b.id);
@@ -81,11 +97,7 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
       if (target.team === caster.team || target.hp <= 0 || (!base && target.tunnel) || !within(swing, target, club.blastRadius + (base ? BASE_RADIUS : 0))) continue;
       hit(target, base ? 10 : club.damage, caster.team);
       disable(target.id, club.stunTicks);
-      if (!base) {
-        const list = shocks.get(target.id) ?? [];
-        list.push(swing);
-        shocks.set(target.id, list);
-      }
+      if (!base) push(target.id,swing,club.shove);
     }
   }
   for (const caster of ready) {
@@ -99,7 +111,7 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
     swallowed.add(meal.id);
     hit(meal, meal.hp, caster.team);
   }
-  return {stuns, arcs, mice, finished, shocks, meals, swallowed};
+  return {stuns, arcs, mice, finished, shocks, meals, swallowed, bells};
 }
 
 export function finishBuilding(unit: Unit, tick: number): Placement | undefined {

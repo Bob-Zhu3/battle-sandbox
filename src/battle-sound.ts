@@ -44,6 +44,13 @@ function instrument(ctx: AudioContext, output: AudioNode) {
       case "block": tone(1050,875,.09,.082,"triangle"); tone(560,390,.10,.13); break;
       case "thunder": noise(4900,960,.12,.24); noise(3100,480,.085,.17,.004,.047); break;
       case "smash": tone(153,59,.22,.26); noise(800,230,.16,.22); break;
+      case "toll": tone(325,307,.48,.17); tone(823,787,.28,.083); tone(1214,1184,.14,.04); break;
+      case "lens": tone(520,760,.12,.065,"triangle"); tone(1030,1460,.085,.03); break;
+      case "sling": noise(800,2200,.10,.15); tone(244,125,.12,.085,"triangle"); break;
+      case "fault": noise(760,160,.31,.24,.02); tone(110,45,.29,.21); break;
+      case "briar": noise(1900,960,.12,.13); tone(305,540,.10,.075,"triangle"); break;
+      case "mirror": tone(750,980,.22,.065); tone(1100,1440,.18,.04,"sine",.04); break;
+      case "reflect": tone(1440,980,.19,.105); tone(870,1290,.095,.07,"triangle"); break;
       case "rain": tone(870,690,.15,.072); tone(1190,960,.13,.056,"sine",.075); break;
       case "gust": noise(530,2450,.25,.19,.076); break;
       case "fall":

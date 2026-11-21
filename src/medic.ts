@@ -1,6 +1,6 @@
 import type { Unit, Target } from "./simulation.ts";
 import { maxHealth } from "./transformations.ts";
-import { isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 const kit = UNIT_DEFINITIONS.medic;
 
@@ -10,7 +10,7 @@ export function medicDuty(medic: Unit, units: readonly Unit[], enemy: Target | u
   for (const ally of units) {
     if (ally.team !== medic.team || ally.id === medic.id || ally.hp <= 0 || ally.tunnel) continue;
     const distance = (ally.x - medic.x) ** 2 + (ally.y - medic.y) ** 2;
-    if (ally.kind !== "medic" && ally.kind !== "workshop" && ally.kind !== "post" && (distance < escortDistance || (distance === escortDistance && ally.id < escort!.id))) {
+    if (ally.kind !== "medic" && !isBuilding(ally.kind) && (distance < escortDistance || (distance === escortDistance && ally.id < escort!.id))) {
       escort = ally;
       escortDistance = distance;
     }

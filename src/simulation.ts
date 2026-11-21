@@ -1,7 +1,9 @@
 import { collectSouls, hasSoul, hunt, releaseHex, resolveConversions, type Conversion, type Harvest, type Hex } from "./transformations.ts";
 import { advanceTunnel, digFromHome, type Tunnel } from "./tunnels.ts";
 import { recordTrail, type TrailMark } from "./trails.ts";
-import { applyMagic, blownAway, pulses, SPELLS, type FieldSpell } from "./spells.ts";
+import { applyMagic, blownAway, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
+import { reflectAtWards } from "./mirror.ts";
+import { focusLens, pickTowerTarget } from "./siege.ts";
 import { finishBuilding, resolveControl, startCyclopsSwing, type Windup } from "./encounters.ts";
 import { afflict, effectLifetime, moveKnockback, shove, slow, stun, tickAfflictions, type Affliction, type GroundEffect } from "./conditions.ts";
 import { aimTower, incomingShot } from "./defense.ts";
@@ -50,6 +52,10 @@ export interface Unit extends Placement {
   lastSwallow?: { tick: number; team: Team; kind: UnitKind };
   swallowedTick?: number;
   slowUntil?: number;
+  rootedUntil?: number;
+  focusSince?: number;
+  fogUntil?: number;
+  beam?: {tick: number; x: number; y: number; level: number};
   burn?: Affliction;
   poison?: Affliction;
   zombified?: { kind: UnitKind; team: Team; tick: number };
@@ -143,7 +149,7 @@ function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   const distance = Math.hypot(dx, dy);
   unit.aimX = distance > 0 ? dx / distance : ARMIES[unit.team].facing;
   unit.aimY = distance > 0 ? dy / distance : 0;
-  if (distance > stopAt) {
+  if (distance > stopAt && unit.rootedUntil === undefined) {
     const speedFactor = unit.slowUntil === undefined ? 1 : UNIT_DEFINITIONS.frostqueen.speedFactor;
     const step = Math.min(UNIT_DEFINITIONS[unit.kind].speed * speedFactor / TICKS_PER_SECOND, distance - stopAt);
     unit.x += unit.aimX * step;
@@ -196,7 +202,7 @@ function separateFootprints(previous: readonly Unit[], next: Unit[], solid: read
     const dy = unit.y - from.y + push[i].y;
     const distance = Math.hypot(dx, dy);
     const { speed, radius } = UNIT_DEFINITIONS[unit.kind];
-    const walkStep = speed / TICKS_PER_SECOND;
+    const walkStep = unit.rootedUntil === undefined ? speed / TICKS_PER_SECOND : 0;
     const fraction = distance > walkStep ? walkStep / distance : 1;
     unit.x = boundCenter(from.x + dx * fraction, ARENA.width, radius);
     unit.y = boundCenter(from.y + dy * fraction, ARENA.height, radius);
@@ -245,12 +251,14 @@ export function stepBattle(battle: Battle): Battle {
   const healing = new Map<number, number>();
   const activeMagic = battle.spells?.filter(spell => pulses(spell, tick)) ?? [];
   const winds = activeMagic.filter(spell => spell.kind === "gust");
-  // An expired hex belongs to its original army before anyone selects a target.
-  const starting = battle.units.some(u => u.hp > 0 && u.hex && tick >= u.hex.until) ? battle.units.map(u => {
-    if (!u.hp || !u.hex || tick < u.hex.until) return u;
-    const restored = {...u};
-    releaseHex(restored,tick);
-    return restored;
+  const fieldChanges = activeMagic.filter(s => s.kind === "briar" || s.kind === "fault" || s.kind === "rain");
+  // Restore allegiances first so spells and target acquisition see the same teams.
+  const starting = fieldChanges.length || battle.units.some(u => u.hp > 0 && u.hex && tick >= u.hex.until) ? battle.units.map(u => {
+    if (!u.hp) return u;
+    const ready = {...u};
+    if (u.hex && tick >= u.hex.until) releaseHex(ready,tick);
+    if (fieldChanges.length) prepareFieldMagic(ready,fieldChanges,tick);
+    return ready;
   }) : battle.units;
   const targets: readonly Target[] = battle.bases ? [...starting, ...battle.bases] : starting;
   function hit(target: Target, amount: number, team: Team) {
@@ -273,7 +281,10 @@ export function stepBattle(battle: Battle): Battle {
     const next = { ...unit };
     if (unit.hp <= 0) return next;
     if (unit.tunnel) { advanceTunnel(next,tick); return next; }
+    if (unit.emergedTick === tick) return next;
     if (next.slowUntil !== undefined && tick >= next.slowUntil) delete next.slowUntil;
+    if (next.fogUntil !== undefined && tick >= next.fogUntil) delete next.fogUntil;
+    if (next.rootedUntil !== undefined && tick >= next.rootedUntil) delete next.rootedUntil;
     if (unit.emberUntil !== undefined) {
       if (tick >= unit.emberUntil) {
         delete next.emberUntil;
@@ -308,7 +319,14 @@ export function stepBattle(battle: Battle): Battle {
       return next;
     }
     if (arc || unit.windup) return next;
-    const target = (unit.kind === "reaper" && hunt(unit, targets)) || nearestEnemy(unit, targets);
+    if (unit.kind === "belltower") {
+      next.targetId = control.bells.get(unit.id) ?? null;
+      if (next.targetId !== null) { next.lastAttackTick = tick; next.nextAttackTick = tick+UNIT_DEFINITIONS.belltower.cooldownTicks; }
+      return next;
+    }
+    const target = unit.kind === "lobber" || unit.kind === "sunlens" ? pickTowerTarget(unit,targets) :
+      (unit.kind === "reaper" && hunt(unit, targets)) || nearestEnemy(unit, targets);
+    if (unit.kind === "sunlens") { focusLens(next,target,tick,hit); return next; }
     if (unit.kind === "drone" && unit.burstLeft && tick >= (unit.nextBurstTick ?? 0) && unit.attackDirection) {
       const spec = UNIT_DEFINITIONS.drone, speed = spec.arrowSpeed / TICKS_PER_SECOND;
       arrows.push({kind: "dart", casterId: unit.id, team: unit.team, x: unit.x, y: unit.y, vx: unit.attackDirection.x * speed,
@@ -396,7 +414,7 @@ export function stepBattle(battle: Battle): Battle {
   for (const id of braces) byId.get(id)!.lastBlockTick = tick;
   for (const [id, impacts] of control.shocks) {
     const target = byId.get(id)!;
-    for (const point of impacts) shove(target, point.x, point.y, UNIT_DEFINITIONS.cyclops.shove);
+    for (const point of impacts) shove(target, point.x, point.y, point.distance);
   }
   for (const unit of units) moveKnockback(unit);
   for (const {id, team} of burns) afflict(byId.get(id)!, "burn", team, tick);
@@ -407,8 +425,14 @@ export function stepBattle(battle: Battle): Battle {
   }
   if (winds.length) arrows = arrows.filter(arrow => !blownAway(arrow, winds));
   const movedTargets = towers ? [...units, ...towers] : units;
-  for (const arrow of battle.arrows) {
-    if (winds.length && blownAway(arrow, winds)) continue;
+  const spells = battle.spells?.filter(spell => tick-spell.startTick < SPELLS[spell.kind].duration)
+    .map(spell => spell.kind === "mirror" ? {...spell} : spell);
+  const wards = spells?.filter(s => s.kind === "mirror" && tick-s.startTick >= SPELLS.mirror.delay) ?? [];
+  const incoming = winds.length ? battle.arrows.filter(arrow => !blownAway(arrow,winds)) : battle.arrows;
+  const reflected = reflectAtWards(incoming,wards,targets,movedTargets,tick);
+  for (const arrow of incoming) {
+    const returned = reflected.get(arrow);
+    if (returned) { arrows.push(returned); continue; }
     if (!arrow.kind || arrow.kind === "dart") noticeFriendlyArrow(arrow, units, tick);
     const flying = advanceShot(arrow, tick, targets, movedTargets, byId, hit, effects, conversions);
     if (flying) arrows.push(flying);
@@ -467,8 +491,8 @@ export function stepBattle(battle: Battle): Battle {
     if (child) recruits.push(child);
   }
   if (recruits.length) units.push(...createBattle(recruits).units);
-  const spells = battle.spells?.filter(spell => tick - spell.startTick < SPELLS[spell.kind].duration && !fallen.has(spell.team));
-  return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases, spells, effects);
+  return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases,
+    fallen.size ? spells?.filter(s => !fallen.has(s.team)) : spells, effects);
 }
 
 export function battleOutcome(battle: Battle): Outcome | null {

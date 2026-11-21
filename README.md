@@ -1,6 +1,6 @@
 # Battle Sandbox
 
-Draw a squad into a meadow and watch it fight. The illustrated row along the bottom holds twenty-two troops and buildings and three spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
+Draw a squad into a meadow and watch it fight. The illustrated row along the bottom holds twenty-five troops and buildings and six spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
 ![Four armies in a live free-for-all, with a base in each corner and recruitment controls below the field](media/free-for-all.png)
 
@@ -21,13 +21,15 @@ The playground opens in your browser. To play together on the same network, have
 | Duel (`/room`) | 2 | Your half, or anywhere for a Miner | Destroy the opposing base |
 | Free-for-all (`/ffa`) | 3–4 | Your corner, or anywhere for a Miner | Be the last player with a standing base |
 
-Pick **People**, **Machines**, **Mythical** or **Spells**, then tap a portrait to arm it. Swipe the row sideways, roll the mouse wheel over it, or use its arrows. Browsing keeps the current brush armed until you pick another portrait. The category and brush are remembered when you reload. Number keys **1–9** select the first nine portraits in the open category, and **0** selects the tenth. In matches, spells unlock when the countdown ends.
+Pick **People**, **Machines**, **Towers**, **Mythical** or **Spells**, then tap a portrait to arm it. Swipe the row sideways, roll the mouse wheel over it, or use its arrows. Browsing keeps the current brush armed until you pick another portrait. The category and brush are remembered when you reload. Number keys **1–9** select the first nine portraits in the open category, and **0** selects the tenth. In matches, spells unlock when the countdown ends.
 
 An Archer's bowstring sounds at release. The hit sounds when the arrow reaches its target. A Meteor whistles on the way down and lands with a low thump. Press **M** or use the speaker button to mute or unmute. [Watch two Meteor strikes and a mid-fight troop switch with sound](media/field-palette.mp4)
 
 ### Playground
 
 Click to place one troop. Hold and drag to add another every 24 arena units. Friendly troops breathe and blink while they wait. Place an enemy nearby and they react while your pointer is still down. Gold is unlimited. When a fight ends, you can paint the next one straight onto the same field. **Undo** removes the last stroke. **Clear** empties the field.
+
+Run `npm run demo:siege` to watch a Watchpost hit itself with three reflected bolts, two Lancers get caught under a falling stone, rain interrupt a Sun Lens, and a tremor dig a Miner out early. It leaves three Blue towers on the field with Red's Fault Line selected. Aim between two towers to crack both. With the game already running, open `/?demo=siege` to go straight to that lineup. [Watch the four encounters with sound](media/siege-and-spells.mp4)
 
 Let a Lancer build speed toward a distant Watchpost. Place a Storm Kirin beside the approaching line. Follow the bolt along the enemy formation and watch the spear lift when the stun erases its charge. [Watch the battle clip](media/mythical-encounters.mp4)
 
@@ -68,13 +70,16 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Bomber | 16 | 8 | Lobs a sparking bomb at a fixed spot. When it lands it deals 13 damage to each enemy troop within 43 arena units. |
 | Musketeer | 17 | 8 | One bullet deals 11 damage to its first enemy and 6 to the next. A front-facing shield or a base ends the shot. |
 | Venom Scout | 13 | 6 | The dart deals 3 immediately, then venom deals 3 every half second for three pulses. Machines and Zombies resist venom. |
-| Miner | 19 | 9 | Plant an exit flag anywhere. A traveling dirt ridge starts at home. The Miner can be hit when it surfaces and swings its pick after a short emergence. |
+| Miner | 19 | 9 | Plant an exit flag anywhere. A traveling dirt ridge starts at home. Fault Line can force it to surface early. Once above ground the Miner can be hit and swings its pick after a short emergence. |
 | Clown | 18 | 9 | Tosses a striped balloon that leaves a poison cloud for 1.35 seconds. Late arrivals can inhale the poison. Enemy Gust clears the cloud, and a Medic can treat the poison. |
 | Engineer | 21 | 10 | Hammers together one Watchpost near the fight, then repairs damaged machines. |
 | Clockmouse | 8 | 4 | A squeak at a Cyclops's boots can interrupt a raised club, even on its own team. |
 | Bolt Drone | 15 | 7 | Commits to one line for a three-bolt burst. A sidestepping enemy can escape the later shots. |
 | Mouse Workshop | 23 | 11 | Winds the drum and releases up to three Clockmice, one at a time. |
 | Watchpost | 15 | 7 | Stays where it was built and fires at enemies in range. An Engineer can mend it. |
+| Stone Lobber | 24 | 12 | Marks the ground, then slings a boulder there. Up to 35 units from impact, ground enemies take 16 damage and bases take 8. Flyers and troops closer than 65 units to the sling evade its aim. |
+| Sun Lens | 27 | 13 | Keeps its beam on one enemy. Successive stages pulse for 3, 6 and 10 damage as the facets light. Breaking range, a stun or an enemy rain shower resets the focus. |
+| Bell Tower | 19 | 9 | Tolls when a ground troop comes within 65 units. Ground troops in the circle take 4 damage and are shoved and briefly stunned. A charging Lancer has to start its run again. |
 | Cyclops | 33 | 16 | Raises its spiked club for 0.45 seconds, then smashes a patch of ground. The impact scatters enemies and stuns them. It can lift and swallow a human at 12 HP or less who stays within reach. |
 | Storm Kirin | 23 | 11 | Lightning travels through up to four enemies, stunning every contact for 0.35 seconds. Metal and shields carry the next jump up to 110 units. Other targets carry it up to 78. |
 | Frost Queen | 24 | 12 | Her crystal bursts on impact. Enemies inside the frost walk at 48% speed for 100 ticks. |
@@ -87,7 +92,10 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | --- | ---: | --- |
 | Gust | 10 | Shoves enemies and scatters hostile arrows and bolts in its circle. Bullets and lobbed bombs keep flying. A friendly Phoenix egg hatches immediately. |
 | Meteor | 20 | A white-hot stone sheds flame and cinders from the top edge. It strikes the marked ground after 0.8 seconds, dealing 17 damage to enemies still inside or 6 to a base. |
-| Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies and puts out an enemy Phoenix egg. |
+| Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies, puts out enemy Phoenix eggs and fogs enemy Sun Lenses. |
+| Fault Line | 18 | Two tremors each deal 12 damage to enemy buildings, 3 to ground troops and 3 to bases. An underground Miner caught by either pulse surfaces right there. |
+| Briar Snare | 13 | At the moment the vines spring up, they catch grounded enemies for 1.3 seconds. Rooted troops can still shoot or strike within reach. A Phoenix hit burns the vines away. |
+| Mirror Ward | 14 | Three circling panes intercept enemy arrows and bolts as they enter. Each shot turns back along its path and can hit its shooter. Bullets, boulders and magic pass through. The ward lasts three seconds. |
 
 Stars overhead mark a stun. Ice around the feet marks a slow. Violet bubbles mean poison. Green skin and a torn coat show that a human has already become a Zombie. Small orange flames on an enemy mean it is taking burn damage. The Phoenix's cracked ember egg counts down to its own rebirth. A Phoenix in flight sheds sparks and a passing Frost Queen leaves small ice crystals. These trails follow their actual movement and fade when they stop.
 
@@ -101,8 +109,9 @@ A connection loss reserves your seat for 60 seconds. Reopen the match to reclaim
 | --- | --- |
 | `npm test` | Fixed-tick combat, troop interactions, towers, spells, returning to a full-roster fight, brush spacing, spending and two real WebSocket clients |
 | `npm run demo:encounters` | A charged Lancer meets chain lightning, a Cyclops smashes and swallows, and a Phoenix hatches from its ember egg. |
+| `npm run demo:siege` | Four short tower and spell encounters, followed by a live field for trying a cast. |
 | `npm run demo:oddities` | See the new troops in six short fights, then try turning an Archer in the live playground. [Watch the gameplay clip](media/tunnels-and-turncoats.mp4) |
-| `npm run check:modes` | All 25 portraits, touch scrolling, sound and mute, a cross-field Meteor in a desktop-and-phone duel, a reconnect after a four-target chain stun, and complete three- and four-player matches with reconnection and rematches |
+| `npm run check:modes` | All 31 portraits, touch scrolling, sound, a cross-field Meteor, desktop and phone reconnects after a chain stun or reflected Watchpost bolt, and complete three- and four-player matches with rematches |
 | `npm run demo:room -- --headed` | Two browser windows drawing at the same time, then recruiting during a base battle |
 | `npm run demo:retry` | Drop confirmation of a five-Warrior stroke, disconnect and return with the original five IDs and one charge |
 | `npm run demo:reconnect` | Disconnect Blue after the first hit, catch up to the live fight and verify both browsers agree through the fall of a base |

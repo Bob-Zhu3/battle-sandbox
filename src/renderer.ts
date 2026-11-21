@@ -4,6 +4,8 @@ import { type ArenaPoint } from "./deployment.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { drawFieldSpell } from "./magic-art.ts";
 import { drawMeteor } from "./meteor-art.ts";
+import { stoneMarker } from "./siege-magic-art.ts";
+import { sunbeam } from "./tower-art.ts";
 import { drawTrail, drawTunnel, drawChange, drawSoul } from "./field-effects.ts";
 import { drawChain, drawConditions, drawGroundEffect, drawSpecialShot, drawStun } from "./combat-art.ts";
 import { drawKeep } from "./keeps.ts";
@@ -75,6 +77,10 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   for (const unit of current.units) drawTrail(ctx,unit,tick,sx,sy);
   for (const effect of current.effects ?? []) drawGroundEffect(ctx, effect, tick, sx, sy);
   for (const spell of current.spells ?? []) drawFieldSpell(ctx, spell, tick, sx, sy);
+  for (const shot of current.arrows) if (shot.kind==="stone" && shot.landTick!==undefined) {
+    const left=shot.landTick-current.tick;
+    stoneMarker(ctx,shot.x+shot.vx*left,shot.y+shot.vy*left,tick,shot.landTick,sx,sy,shot.team);
+  }
   const targets = [...current.units, ...(current.bases ?? [])];
   const byId = new Map(targets.map(target => [target.id, target]));
   for (const base of current.bases ?? []) {
@@ -137,19 +143,20 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     } else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, tick);
     if (unit.hex || unit.unhexedTick !== undefined || unit.zombified) drawChange(ctx,unit,x,y,scale,tick);
     if (unit.soul) drawSoul(ctx,unit,x,y,tick,sx,sy);
-    if (unit.burn || unit.poison || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) drawConditions(ctx,unit,x,y,r,scale,tick);
+    if (unit.burn || unit.poison || (unit.rootedUntil ?? 0)>tick || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) drawConditions(ctx,unit,x,y,r,scale,tick);
     if (unit.lastTreatedTick !== undefined && tick - unit.lastTreatedTick < 16) {
       ctx.save();ctx.globalAlpha=1-(tick-unit.lastTreatedTick)/16;ctx.strokeStyle="#fff7cc";ctx.lineWidth=2*scale;
       ctx.beginPath();ctx.arc(x,y-r*.4,r*.85,0,Math.PI*1.5);ctx.stroke();ctx.restore();
     }
   }
   for (const u of current.units) if (u.arc) drawChain(ctx,u.arc,tick,sx,sy);
+  for (const u of current.units) if (u.kind==="sunlens" && u.targetId!==null) sunbeam(ctx,u,byId.get(u.targetId),tick,sx,sy);
   for (const arrow of current.arrows) {
     const rewind = arrow.releasedTick === current.tick ? 0 : 1 - blend;
     const x = (arrow.x - arrow.vx * rewind) * sx;
     const y = (arrow.y - arrow.vy * rewind) * sy;
     const length = Math.min(1, Math.max(0, tick - arrow.releasedTick) / 3);
-    if (arrow.kind === "bomb" || arrow.kind === "ice" || arrow.kind === "bullet" || arrow.kind === "venom" || arrow.kind === "balloon" || arrow.kind === "hex") {
+    if (arrow.kind === "stone" || arrow.kind === "bomb" || arrow.kind === "ice" || arrow.kind === "bullet" || arrow.kind === "venom" || arrow.kind === "balloon" || arrow.kind === "hex") {
       drawSpecialShot(ctx,arrow,x,y,Math.atan2(arrow.vy*sy,arrow.vx*sx),scale,tick);
     } else if (length > 0) {
       const height=arrow.kind==="bolt" ? 7+15*Math.max(0,1-(tick-arrow.releasedTick)/22) : 7;

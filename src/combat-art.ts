@@ -14,9 +14,14 @@ export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: num
   c.save(); c.translate(e.x*sx,e.y*sy); c.scale(sx,sy);
   c.globalAlpha=fade;
   c.beginPath(); c.arc(0,0,e.radius*expand,0,Math.PI*2);
-  c.strokeStyle=e.kind==="smash"?"#8c6d51":e.kind==="blast"?"#d98045":"#72bac7";
+  c.strokeStyle=e.kind==="toll"?"#c69c55":e.kind==="smash" || e.kind==="stonefall"?"#8c6d51":e.kind==="blast"?"#d98045":"#72bac7";
   c.lineWidth=e.kind==="smash"?2.4:2; c.stroke();
-  if (e.kind==="frost") {
+  if (e.kind==="toll") {
+    for(let i=1;i<=2;i++){c.beginPath();c.arc(0,0,e.radius*Math.max(.02,Math.min(1,(age+2-i*4)/16)),0,Math.PI*2);c.strokeStyle=i===1?"#fff0ae":"#d1a75f";c.lineWidth=i===1?2:1;c.stroke();}
+  } else if(e.kind==="stonefall") {
+    for(let i=0;i<9;i++){const a=i*2.4,r=(.55+.09*(i%4))*e.radius*expand;
+      oval(c,Math.cos(a)*r,Math.sin(a)*r-6*Math.sin(age/34*Math.PI),2+2*fade,1.8+fade,i%3?"#ac916f":"#858478");}
+  } else if (e.kind==="frost") {
     c.fillStyle="#b1e7f24a"; c.fill();
     for(let i=0;i<6;i++){
       c.save();c.rotate(i*Math.PI/3);line(c,1,0,e.radius*expand*.8,0,"#edfbef",1.6);
@@ -50,6 +55,10 @@ export function drawStun(c: Pens, x: number, y: number, size: number, tick: numb
 export function drawConditions(c: Pens, u: Unit, x: number, y: number, r: number, scale: number, tick: number) {
   c.save(); c.translate(x,y); c.scale(scale,scale);
   const radius=r/scale;
+  if ((u.rootedUntil??0)>tick) {
+    cut(c,"M-9 4 Q-6 5.5 -5.4 3.6 L-7 -1.6 Q-3.8 -.5 -3.2 3.9 Q-1 5.1 3.5 4 L6.5 -.7 L5.9 3.6 L9 .9 Q8.3 8.4 2.5 7.1 Q-6 9.8 -9 4Z","#7a9b58",1);
+    line(c,-5.7,5.3,1.8,6.2,"#b7c87d",1);
+  }
   if ((u.slowUntil??0)>tick) {
     cut(c,"M-9 4 L-10 -2 L-6 0 L-5 -4 L-2 3 L3 4 L6 -1 L8 -4 L9 4 L5 7 L-4 7Z","#b8ecf1",1);
     line(c,-6,4,-3,5,"#ffffff",1.1);
@@ -98,7 +107,12 @@ export function drawChain(c: Pens, arc: NonNullable<Unit["arc"]>, tick: number, 
 
 export function drawSpecialShot(c: Pens, shot: Arrow, x: number, y: number, angle: number, k: number, tick: number) {
   c.save(); c.translate(x,y); c.scale(k,k);
-  if(shot.kind==="bomb" || shot.kind==="balloon") {
+  if(shot.kind==="stone") {
+    const t=Math.max(0,Math.min(1,(tick-shot.releasedTick)/(shot.landTick!-shot.releasedTick)));
+    oval(c,0,1.5,4.7,1.9,"#59634b50");c.translate(0,-7*(1-t)-42*Math.sin(Math.PI*t));c.rotate(t*5.9);
+    cut(c,"M-5 -.8 Q-5.2 -4.9 -.7 -5.4 L3.5 -4 Q5.7 -3.1 5 1.9 L2 5 L-2.7 4.1Z","#93988a",1.2);
+    line(c,-3.1,-2.1,-.8,-3.6,"#e1dfbe",1.25);
+  } else if(shot.kind==="bomb" || shot.kind==="balloon") {
     const progress=Math.max(0,Math.min(1,(tick-shot.releasedTick)/(shot.landTick!-shot.releasedTick)));
     const height=8*(1-progress)+30*Math.sin(Math.PI*progress);
     oval(c,0,2,4.6,1.6,"#4a554841"); if (shot.kind==="balloon") balloon(c,0,-height,.94); else drawBomb(c,0,-height,.9,tick);

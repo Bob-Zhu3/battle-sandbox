@@ -53,6 +53,14 @@ function updateBrushHint() {
   field.canvas.setAttribute("aria-label", hint.textContent || "Playground. Choose a color and draw troops anywhere.");
 }
 game.addEventListener("brushchange",updateBrushHint);
+if (new URLSearchParams(location.search).get("demo") === "siege") {
+  const lineup = ["lobber", "sunlens", "belltower"] as const;
+  lineup.forEach((kind,index) => {
+    play.place("blue",{type:UNIT_DEFINITIONS[kind].command,positions:[{x:405+index*75,y:178}]});
+  });
+  previous = play.world;
+  field.armBrush("fault");
+}
 updateBrushHint();
 
 function paint(blend = 1) {

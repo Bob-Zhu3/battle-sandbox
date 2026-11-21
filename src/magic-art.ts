@@ -1,6 +1,7 @@
 import { ARMIES } from "./battlefield.ts";
 import { INK, cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell, type SpellKind } from "./spells.ts";
+import { drawSiegeSpell, siegeSpellIcon } from "./siege-magic-art.ts";
 
 function meteorIcon(c: Pens) {
   c.lineJoin="round";
@@ -17,11 +18,11 @@ export function drawSpellIcon(c: Pens, kind: SpellKind) {
   } else if (kind === "gust") {
     const curls=new Path2D("M-11 -4 Q-4 -7 2 -4 Q10 0 9 -6 M-12 2 Q-6 -1 1 2 Q8 5 12 1 M-6 7 Q0 5 5 8");
     c.strokeStyle=INK;c.lineWidth=3.3;c.stroke(curls);c.strokeStyle="#a6d9c5";c.lineWidth=1.65;c.stroke(curls);
-  } else {
+  } else if (kind === "rain") {
     oval(c,-3,-3,7,5,INK);oval(c,3,-5,6,5,INK);oval(c,6,-2,6,4,INK);
     oval(c,0,-3,8,3.6,"#addad4");oval(c,4,-5,4.3,3.4,"#d8eee3");
     for (const x of [-6,0,6]) line(c,x,4,x-2,8,"#418b96",1.8);
-  }
+  } else siegeSpellIcon(c,kind);
   c.restore();
 }
 
@@ -32,9 +33,12 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
   c.save(); c.translate(spell.x*sx,spell.y*sy);
   const after=Math.max(0,age-spec.delay), life=Math.max(0,1-age/spec.duration);
   c.beginPath();c.ellipse(0,0,r*sx,r*sy,0,0,2*Math.PI);
-  const fill=spell.kind==="meteor"?"#cc7541":spell.kind==="rain"?"#71b4af":"#d6eed1";
-  c.fillStyle=fill+"20";c.fill();c.strokeStyle=ARMIES[spell.team].hem;c.globalAlpha=.55*life;
-  c.lineWidth=1.6*scale;c.setLineDash([5*scale,6*scale]);c.stroke();c.setLineDash([]);
+  const spent=spell.kind==="mirror" && (spell.reflection?.count??0)>=SPELLS.mirror.panes;
+  if(!spent) {
+    const colors={meteor:"#cc7541",rain:"#71b4af",gust:"#d6eed1",briar:"#69a454",fault:"#ad8c5c",mirror:"#91c8d1"};
+    c.fillStyle=colors[spell.kind]+"20";c.fill();c.strokeStyle=ARMIES[spell.team].hem;c.globalAlpha=.55*life;
+    c.lineWidth=1.6*scale;c.setLineDash([5*scale,6*scale]);c.stroke();c.setLineDash([]);
+  }
   c.globalAlpha=1;
   if(spell.kind==="meteor") {
     if (age < spec.delay) {
@@ -44,7 +48,7 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
   } else if(spell.kind==="gust") {
     const t=Math.min(1,(after+2)/21);c.strokeStyle="#fcffe9";c.globalAlpha=.85*life;c.lineWidth=2.4*scale;
     for(let i=0;i<3;i++){c.beginPath();c.ellipse(0,0,r*sx*t,r*sy*t,0,i*2.1+age*.025,i*2.1+1.4+age*.025);c.stroke();}
-  } else {
+  } else if (spell.kind==="rain") {
     c.globalAlpha=Math.min(1,life*4);c.lineWidth=1.6*scale;c.strokeStyle="#377f8a";
     for(let i=0;i<11;i++){
       const dx=Math.cos(i*2.4)*r*Math.sqrt((i+1)/12);
@@ -68,6 +72,6 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
         c.restore();
       }
     }
-  }
+  } else drawSiegeSpell(c,spell,tick,sx,sy);
   c.restore();
 }

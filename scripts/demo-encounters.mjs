@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { playOddities } from "./oddities-scenes.mjs";
 import { playMotion } from "./motion-scenes.mjs";
+import { playSiege } from "./siege-scenes.mjs";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -11,7 +12,7 @@ import { parseArgs } from "node:util";
 import { chromium } from "playwright";
 import { createGameServer } from "../server/http.ts";
 
-const {values} = parseArgs({options:{oddities:{type:"boolean"}, motion:{type:"boolean"}, headless:{type:"boolean"}, frames:{type:"string"}, channel:{type:"string"}}});
+const {values} = parseArgs({options:{oddities:{type:"boolean"}, motion:{type:"boolean"}, siege:{type:"boolean"}, headless:{type:"boolean"}, frames:{type:"string"}, channel:{type:"string"}}});
 const {http,closeRoom} = createGameServer();
 http.listen(0,"127.0.0.1");
 await once(http,"listening");
@@ -31,7 +32,8 @@ try {
   const button=(container,name)=>container.getByRole("button",{name,exact:true});
   const shelves = {
     People:["Warrior","Archer","Lancer","Musketeer","Venom Scout","Bomber","Miner","Clown","Shieldbearer","Engineer","Field Medic"],
-    Machines:["Watchpost"], Mythical:["Storm Kirin","Cyclops","Frost Queen","Phoenix","Reaper","Witch","Zombie"], Spells:["Healing Rain","Gust"],
+    Towers:["Watchpost","Stone Lobber","Bell Tower","Sun Lens"], Mythical:["Storm Kirin","Cyclops","Frost Queen","Phoenix","Reaper","Witch","Zombie"],
+    Spells:["Healing Rain","Gust","Mirror Ward","Briar Snare","Fault Line"],
   };
   async function brush(team,name) {
     await click(button(page,team+" army"));
@@ -46,8 +48,17 @@ try {
   const hp=async team=>Number(await page.locator("#"+team+"-hp").textContent());
   const frames=[];
   if(values.frames)await mkdir(values.frames,{recursive:true});
-  const crop={x:327,y:130,width:422,height:291};
+  const crop=values.siege ? {
+    x:Math.round(arena.x+arena.width*318/960),y:Math.round(arena.y+arena.height*95/360),
+    width:Math.round(arena.width*324/960),height:Math.round(arena.height*154/360),
+  } : {x:327,y:130,width:422,height:291};
+  const caption=values.siege && !values.headless ? await page.evaluateHandle(()=>{
+    const text=document.createElement("output");
+    text.style.cssText="position:fixed;top:15%;left:50%;transform:translateX(-50%);padding:6px 12px;border-radius:6px;background:#fff7dfed;color:#33432e;pointer-events:none;font:600 15px 'Bricolage Grotesque',sans-serif;text-align:center";
+    document.body.append(text);return text;
+  }) : undefined;
   async function show(ms,label,hold=false) {
+    if(caption)await caption.evaluate((element,text)=>element.textContent=text,label);
     for(let i=0;i<ms;i+=50){
       if(values.frames){
         const filename=String(frames.length).padStart(4,"0")+".png";
@@ -58,7 +69,8 @@ try {
       if(!hold) await page.clock.runFor(50);
     }
   }
-  if(values.motion) await playMotion({place,show,clear,hp});
+  if(values.siege) await playSiege({place,show,clear,hp});
+  else if(values.motion) await playMotion({place,show,clear,hp});
   else if(values.oddities) await playOddities({page,place,show,clear,hp});
   else {
     await place("Red","Watchpost",300,166);
@@ -108,7 +120,10 @@ try {
   assert.deepEqual(errors,[]);
   if(values.frames) {
     await writeFile(join(values.frames,"timeline.json"),JSON.stringify(frames));
-    const characters = values.motion ? [
+    const characters = values.siege ? [
+      ["Red","Towers","Stone Lobber","Ground splash"], ["Blue","Towers","Sun Lens","Focused sunlight"], ["Amber","Towers","Bell Tower","Interrupts charges"],
+      ["Red","Spells","Briar Snare","Roots"], ["Blue","Spells","Mirror Ward","Reflects shots"], ["Violet","Spells","Fault Line","Two tremors"],
+    ] : values.motion ? [
       ["Blue","Mythical","Phoenix","Flight and talon strike"], ["Blue","Mythical","Cyclops","Ground smash"],
       ["Red","People","Musketeer","Recoil and reload"], ["Violet","Mythical","Storm Kirin","Chain lightning"],
     ] : values.oddities ? [
@@ -128,13 +143,14 @@ try {
     }
     const sheet=await page.evaluate(async cards=>{
       await document.fonts.load('800 22px "Barlow Condensed"');
-      const canvas=document.createElement("canvas");canvas.width=820;canvas.height=Math.ceil(cards.length/4)*163;
+      const columns=cards.length===6?3:4;
+      const canvas=document.createElement("canvas");canvas.width=columns*205;canvas.height=Math.ceil(cards.length/columns)*163;
       const c=canvas.getContext("2d");
       c.fillStyle="#fff3d7";c.fillRect(0,0,820,canvas.height);c.strokeStyle="#c8bb91";c.lineWidth=1;
-      c.beginPath();c.moveTo(20,164);c.lineTo(800,164);c.stroke();c.textAlign="center";
+      c.beginPath();c.moveTo(20,164);c.lineTo(canvas.width-20,164);c.stroke();c.textAlign="center";
       for(const [i,card] of cards.entries()){
         const image=new Image();image.src=card.portrait;await image.decode();
-        const x=102+(i%4)*205,y=Math.floor(i/4)*163;
+        const x=102+(i%columns)*205,y=Math.floor(i/columns)*163;
         c.drawImage(image,x-61,y+1,122,122);
         c.fillStyle="#283830";c.font='800 23px "Barlow Condensed"';c.fillText(card.name,x,y+126);
         c.fillStyle="#52604c";c.font='600 13px "Bricolage Grotesque"';c.fillText(card.skill,x,y+146);
@@ -143,12 +159,18 @@ try {
     },cards);
     await writeFile(join(values.frames,"portraits.png"),Buffer.from(sheet,"base64"));
   }
-  if(values.motion) console.log("PASS: four encounters, from the Phoenix's first wingbeat to the Kirin's lightning strike.");
+  if(values.siege) console.log("PASS: three reflected bolts, a snared formation hit by a boulder, an interrupted beam, and a Miner forced to surface.");
+  else if(values.motion) console.log("PASS: four encounters, from the Phoenix's first wingbeat to the Kirin's lightning strike.");
   else if(values.oddities) console.log("PASS: tunnels, counterattacking pigs, direct Zombie conversions, poison clouds, soul harvests and mythical trails.");
   else console.log("PASS: four enemies struck, the Cyclops scattered a line and swallowed a wounded Lancer, and a one-HP egg hatched at half health.");
   if(!values.headless) {
     await clear();
-    if(values.motion){
+    if(caption)await caption.evaluate(element=>element.remove());
+    if(values.siege){
+      await page.goto("http://127.0.0.1:"+http.address().port+"/?demo=siege");
+      await page.getByRole("button",{name:"Fault Line",exact:true}).waitFor();
+    }
+    else if(values.motion){
       await place("Blue","Phoenix",391,181);await place("Blue","Warrior",464,184);
       await place("Blue","Storm Kirin",538,181);await place("Blue","Frost Queen",616,181);
       await place("Blue","Lancer",435,234);await place("Blue","Cyclops",509,234);
@@ -158,7 +180,8 @@ try {
     else if(values.oddities){await place("Red","Zombie",397,166);await brush("Blue","Archer");}
     else {await place("Red","Storm Kirin",392,166);await brush("Blue","Lancer");}
     await page.clock.resume();
-    if(values.motion) console.log("Your turn. The Blue Phoenix leads the line. Place a Red Shieldbearer in front of it to see the strike. Close the window when finished.");
+    if(values.siege) console.log("Your turn. Cast Fault Line between two Blue towers. Close the window when finished.");
+    else if(values.motion) console.log("Your turn. The Blue Phoenix leads the line. Place a Red Shieldbearer in front of it to see the strike. Close the window when finished.");
     else if(values.oddities) console.log("Your turn. Place a Blue Archer by the waiting Red Zombie. Close the window when finished.");
     else console.log("Your turn. Draw Blue Lancers in front of the Storm Kirin. Close the window when finished.");
     await page.waitForEvent("close",{timeout:0});

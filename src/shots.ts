@@ -5,7 +5,7 @@ import { canHex, type Conversion } from "./transformations.ts";
 import { insideSpell, type FieldSpell } from "./spells.ts";
 import { facesShot } from "./defense.ts";
 import type { Target, Unit } from "./simulation.ts";
-import { UNIT_DEFINITIONS } from "./units.ts";
+import { airborne, UNIT_DEFINITIONS } from "./units.ts";
 
 export function releaseShot(unit: Unit, target: Target, tick: number, tickRate: number): Arrow {
   const spec = UNIT_DEFINITIONS[unit.kind];
@@ -13,10 +13,10 @@ export function releaseShot(unit: Unit, target: Target, tick: number, tickRate: 
   const speed = spec.arrowSpeed / tickRate;
   const shot: Arrow = {team: unit.team, casterId: unit.id, x: unit.x, y: unit.y, vx: unit.aimX * speed, vy: unit.aimY * speed, damage: spec.damage, releasedTick: tick};
   switch (unit.kind) {
-    case "clown": case "bomber": {
+    case "lobber": case "clown": case "bomber": {
       const dx = target.x - unit.x, dy = target.y - unit.y;
       const flight = Math.max(15, Math.ceil(Math.hypot(dx, dy) / speed));
-      return {...shot, kind: unit.kind === "clown" ? "balloon" : "bomb", landTick: tick + flight, vx: dx / flight, vy: dy / flight};
+      return {...shot, kind: unit.kind === "lobber" ? "stone" : unit.kind === "clown" ? "balloon" : "bomb", landTick: tick + flight, vx: dx / flight, vy: dy / flight};
     }
     case "musketeer": return {...shot, kind: "bullet"};
     case "scout": return {...shot, kind: "venom"};
@@ -28,11 +28,12 @@ export function releaseShot(unit: Unit, target: Target, tick: number, tickRate: 
 }
 
 function splash(shot: Arrow, x: number, y: number, tick: number, targets: readonly Target[], hit: Hit, effects: GroundEffect[]) {
-  const ice = shot.kind === "ice", gas = shot.kind === "balloon";
-  const radius = gas ? UNIT_DEFINITIONS.clown.cloudRadius : ice ? UNIT_DEFINITIONS.frostqueen.frostRadius : UNIT_DEFINITIONS.bomber.blastRadius;
-  effects.push({kind: gas ? "miasma" : ice ? "frost" : "blast", x, y, tick, radius, team: shot.team});
+  const ice = shot.kind === "ice", gas = shot.kind === "balloon", stone = shot.kind === "stone";
+  const radius = stone ? UNIT_DEFINITIONS.lobber.blastRadius : gas ? UNIT_DEFINITIONS.clown.cloudRadius : ice ? UNIT_DEFINITIONS.frostqueen.frostRadius : UNIT_DEFINITIONS.bomber.blastRadius;
+  effects.push({kind: stone ? "stonefall" : gas ? "miasma" : ice ? "frost" : "blast", x, y, tick, radius, team: shot.team});
   for (const target of targets) {
     if (target.hp <= 0 || (target.kind !== "base" && target.tunnel) || target.team === shot.team || Math.hypot(x-target.x, y-target.y) > radius + (target.kind === "base" ? BASE_RADIUS : 0)) continue;
+    if (stone && airborne(target)) continue;
     hit(target, target.kind === "base" ? Math.ceil(shot.damage / 2) : shot.damage, shot.team);
     if (ice && target.kind !== "base") slow(target, tick + UNIT_DEFINITIONS.frostqueen.slowTicks);
   }
@@ -54,7 +55,7 @@ export function applyClouds(effects: GroundEffect[], units: Unit[], winds: reado
 export function advanceShot(shot: Arrow, tick: number, from: readonly Target[], to: readonly Target[], byId: ReadonlyMap<number, Unit>,
   hit: Hit, effects: GroundEffect[], conversions: Conversion[]): Arrow | undefined {
   const x = shot.x + shot.vx, y = shot.y + shot.vy;
-  if (shot.kind === "bomb" || shot.kind === "balloon") {
+  if (shot.kind === "bomb" || shot.kind === "balloon" || shot.kind === "stone") {
     if (tick >= shot.landTick!) { splash(shot, x, y, tick, to, hit, effects); return; }
     return {...shot, x, y};
   }

@@ -57,6 +57,10 @@ export class Playground {
     const next = stepBattle(from);
     const units = next.units.filter(u => u.hp > 0 || next.tick - (u.lastHitTick ?? next.tick) < 48);
     this.world = new Battle(next.tick, units, next.arrows, undefined, next.spells, next.effects);
-    this.resting = !next.spells?.length && !next.effects?.length && !next.arrows.length && units.every(u => u.hp > 0 && u.targetId === null && u.pace < .001 && (u.aidReadyTick ?? 0) <= next.tick && u.emberUntil === undefined && !u.windup && !u.burstLeft && !u.burn && !u.poison && !u.hex && !u.tunnel && !u.trail && !u.knockback && (u.stunnedUntil ?? 0) <= next.tick);
+    this.resting = !next.spells?.length && !next.effects?.length && !next.arrows.length && units.every(u =>
+      u.hp > 0 && u.targetId === null && u.pace < .001 && u.emberUntil === undefined &&
+      !u.windup && !u.burstLeft && !u.burn && !u.poison && !u.hex && !u.tunnel && !u.trail && !u.knockback &&
+      (u.aidReadyTick ?? 0) <= next.tick && (u.rootedUntil ?? 0) <= next.tick &&
+      (u.stunnedUntil ?? 0) <= next.tick && (u.fogUntil ?? 0) <= next.tick);
   }
 }

@@ -3,7 +3,7 @@ import type { Target, Unit } from "./simulation.ts";
 import { isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Affliction { team: Team; until: number; next: number; applied: number }
-export interface GroundEffect { kind: "blast" | "smash" | "frost" | "miasma"; team: Team; x: number; y: number; tick: number; radius: number }
+export interface GroundEffect { kind: "blast" | "smash" | "frost" | "miasma" | "stonefall" | "toll"; team: Team; x: number; y: number; tick: number; radius: number }
 export type Hit = (target: Target, amount: number, team: Team) => void;
 export const effectLifetime = (e: GroundEffect) => e.kind === "miasma" ? UNIT_DEFINITIONS.clown.cloudTicks : 34;
 const ailments = {
@@ -14,6 +14,7 @@ type Ailment = keyof typeof ailments;
 
 export function afflict(unit: Unit, kind: Ailment, team: Team, tick: number) {
   if (unit.hp <= 0 || unit.emberUntil !== undefined || (kind === "poison" && (isMachine(unit.kind) || unit.kind === "zombie"))) return;
+  if (kind === "burn") delete unit.rootedUntil;
   const prior = unit[kind], rule = ailments[kind];
   // Two simultaneous applications choose the same source in either storage order.
   const source = prior?.applied === tick && TEAMS.indexOf(prior.team) < TEAMS.indexOf(team) ? prior.team : team;
@@ -38,6 +39,7 @@ export function stun(unit: Unit, until: number) {
   delete unit.constructingSince;
   delete unit.burstLeft;
   delete unit.nextBurstTick;
+  delete unit.focusSince;
 }
 
 export function slow(unit: Unit, until: number) {

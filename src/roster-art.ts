@@ -4,6 +4,7 @@ import type { Unit } from "./simulation.ts";
 import { clownArt, minerArt, oldHeadgear, pigArt, reaperArt, witchArt } from "./oddities-art.ts";
 import { cyclops, frostQueen, kirin } from "./mythical-art.ts";
 import { phoenix } from "./phoenix-art.ts";
+import { bellTower, stoneLobber, sunLens } from "./tower-art.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
 const linen = "#fff5d9", leather = "#865836", brass = "#e3ad59";
@@ -223,6 +224,9 @@ export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?
       break;
     }
     case "workshop": case "post": building(c,d,kind,p,u,tick); break;
+    case "lobber": stoneLobber(c,d,p,u,tick); break;
+    case "sunlens": sunLens(c,d,p,u,tick); break;
+    case "belltower": bellTower(c,d,u,tick); break;
     case "drone": drone(c,d,p,u,tick); break;
     case "kirin": kirin(c,d,p,u,tick); break;
     case "phoenix": phoenix(c,d,p,u,tick); break;
@@ -230,6 +234,13 @@ export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?
   }
 }
 export function fallenSpecialist(c: Pens,d: Dye,kind: UnitKind) {
+  if(kind==="sunlens" || kind==="belltower" || kind==="lobber"){
+    cut(c,"M-7 3 L-5 -2 L-.6 -.9 L1.3 -4 L6.4 -.5 L6.7 3.1Z","#a3aa97",1.1);
+    if(kind==="sunlens") {ring(c,-2,-2,3.4,brass);oval(c,-2,-2,1.8,1.7,"#f7c16b");}
+    else if(kind==="belltower") cut(c,"M-3 2 Q-1.7 .3 -2 -2.8 Q.6 -5 1.7 -2 Q1.7 .3 3.4 1.1Z",brass,.9);
+    else limb(c,-6,1,5,-3,WOOD,2.2);
+    return;
+  }
   if(kind==="bomber") cut(c,"M-6 0 Q0 -7 5 0 L7 2 L-6 2Z",d.hem);
   else if(kind==="shieldbearer") shield(c,d,0,0);
   else if(kind==="medic" || kind==="engineer") cut(c,"M-6 -3 L4 -4 L6 3 L-5 4Z",leather);

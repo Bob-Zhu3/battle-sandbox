@@ -2,7 +2,8 @@ import type { World } from "./room-protocol.ts";
 import { SPELLS } from "./spells.ts";
 
 // Order also gives landmark sounds first claim on the mix during a large fight.
-export const soundGaps = { impact: .21, fall: .19, thunder: .19, smash: .16, shot: .12, bow: .095,
+export const soundGaps = { impact: .21, fall: .19, toll: .29, reflect: .10, fault: .21, briar: .16, mirror: .18,
+  lens: .14, sling: .17, thunder: .19, smash: .16, shot: .12, bow: .095,
   block: .12, hit: .10, rain: .21, gust: .21, place: .068 } as const;
 export type CueKind = keyof typeof soundGaps;
 export interface Cue { kind: CueKind; x: number; seed: number }
@@ -19,7 +20,10 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
   const fresh = (tick: number | null | undefined) => tick != null && tick > since && tick <= world.tick;
 
   for (const spell of world.spells ?? []) {
-    if (spell.startTick >= since && !before.spells?.some(old => old.id === spell.id)) {
+    if (spell.kind === "briar" || spell.kind === "mirror" || spell.kind === "fault") {
+      if (fresh(spell.startTick+SPELLS[spell.kind].delay) || (spell.kind === "fault" && fresh(spell.startTick+SPELLS.fault.aftershock))) add(spell.kind,spell.x,spell.id);
+      if (spell.reflection && fresh(spell.reflection.tick)) add("reflect",spell.reflection.x,spell.id);
+    } else if (spell.startTick >= since && !before.spells?.some(old => old.id === spell.id)) {
       add(spell.kind === "meteor" ? "fall" : spell.kind,spell.x,spell.id);
     }
     if (spell.kind === "meteor" && fresh(spell.startTick+SPELLS.meteor.delay)) add("impact",spell.x,spell.id);
@@ -32,14 +36,17 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
       if (fresh(unit.lastBlockTick)) add("block",unit.x,unit.id);
       else if (fresh(unit.lastHitTick)) add("hit",unit.x,unit.id);
       if (fresh(unit.lastSmashTick)) add("smash",unit.x,unit.id);
+      if (unit.kind === "belltower" && fresh(unit.lastAttackTick)) add("toll",unit.x,unit.id);
+      if (unit.beam && fresh(unit.beam.tick)) add("lens",unit.x,unit.id);
       if (fresh(unit.arc?.tick)) add("thunder",unit.x,unit.id);
     }
   }
   for (const base of world.bases ?? []) if (fresh(base.lastHitTick)) add("hit",base.x,base.id);
   // Releases come from real projectiles. Hits come from the target's later damage tick.
   for (const arrow of world.arrows) {
-    if (fresh(arrow.releasedTick)) add(arrow.kind === "bullet" ? "shot" : "bow",arrow.x,arrow.casterId ?? arrow.releasedTick);
+    if (arrow.reflectedTick === undefined && fresh(arrow.releasedTick)) add(arrow.kind === "stone" ? "sling" : arrow.kind === "bullet" ? "shot" : "bow",arrow.x,arrow.casterId ?? arrow.releasedTick);
   }
+  for (const effect of world.effects ?? []) if (effect.kind === "stonefall" && fresh(effect.tick)) add("smash",effect.x,effect.tick);
   return (Object.keys(soundGaps) as CueKind[]).flatMap(kind => {
     const g = groups.get(kind);
     return g ? [{kind, x:g.sum/g.count, seed:g.seed}] : [];

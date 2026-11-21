@@ -3,7 +3,7 @@ import { BASE_RADIUS } from "./battlefield.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Arrow {
-  kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom" | "balloon" | "hex";
+  kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom" | "balloon" | "hex" | "stone";
   casterId?: number;
   piercedIds?: number[];
   landTick?: number;
@@ -14,17 +14,15 @@ export interface Arrow {
   vy: number;
   damage: number;
   releasedTick: number;
+  reflectedTick?: number;
 }
 
 // Intersect the moving tip with a moving circle over one tick. In the circle's
 // frame of reference the circle stands still and the tip follows one segment.
-function contactTime(arrow: Arrow, from: Target, to: Target): number | undefined {
-  const x = arrow.x - from.x, y = arrow.y - from.y;
-  const radius = from.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[from.kind].radius;
+export function circleEntry(x: number, y: number, dx: number, dy: number, radius: number): number | undefined {
   const c = x * x + y * y - radius * radius;
   if (c <= 0) return 0;
 
-  const dx = arrow.vx - (to.x - from.x), dy = arrow.vy - (to.y - from.y);
   const a = dx * dx + dy * dy;
   const b = x * dx + y * dy;
   if (a === 0 || b >= 0) return;
@@ -39,8 +37,9 @@ export function projectileContacts(shot: Arrow, previous: readonly Target[], nex
   const hits: {target: Target; time: number}[] = [];
   for (const [i, target] of previous.entries()) {
     if (target.id === shot.casterId || target.hp <= 0 || (target.kind !== "base" && target.tunnel) || target.team === shot.team || shot.piercedIds?.includes(target.id) ||
-        (shot.kind === "bolt" && target.kind === "base")) continue;
-    const time = contactTime(shot, target, next[i]);
+        (shot.kind === "bolt" && target.kind === "base" && shot.reflectedTick === undefined)) continue;
+    const end = next[i], radius = target.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[target.kind].radius;
+    const time = circleEntry(shot.x-target.x,shot.y-target.y,shot.vx-(end.x-target.x),shot.vy-(end.y-target.y),radius);
     if (time !== undefined) hits.push({target, time});
   }
   return hits.sort((a, b) => a.time - b.time || a.target.id - b.target.id);
