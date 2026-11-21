@@ -1,5 +1,5 @@
 import { ARENA, BASE_RADIUS } from "./battlefield.ts";
-import type { GroundEffect, Hit } from "./conditions.ts";
+import { disabledUntil, type GroundEffect, type Hit } from "./conditions.ts";
 import type { Unit, Target, Placement } from "./simulation.ts";
 import { nearestEnemy } from "./targeting.ts";
 import { airborne, isBuilding, isHuman, isMachine, UNIT_DEFINITIONS } from "./units.ts";
@@ -45,7 +45,7 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
   }
   const disable = (id: number, duration: number) => stuns.set(id, Math.max(stuns.get(id) ?? 0, tick + duration));
   for (const u of units) {
-    if (u.hp <= 0 || (u.stunnedUntil ?? 0) > tick) continue;
+    if (u.hp <= 0 || disabledUntil(u) > tick) continue;
     if (u.kind === "cyclops" && tick - (u.lastStartleTick ?? -Infinity) >= 165) {
       let mouse: Unit | undefined, closest = 30 ** 2;
       for (const other of units) {
@@ -75,7 +75,7 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
 
   const bell = UNIT_DEFINITIONS.belltower;
   for (const tower of units) {
-    if (tower.kind !== "belltower" || tower.hp <= 0 || tick < tower.nextAttackTick || tick < (tower.stunnedUntil ?? 0) || stuns.has(tower.id)) continue;
+    if (tower.kind !== "belltower" || tower.hp <= 0 || tick < tower.nextAttackTick || tick < disabledUntil(tower) || stuns.has(tower.id)) continue;
     const nearby = units.filter(u => u.hp > 0 && u.team !== tower.team && !u.tunnel && !isBuilding(u.kind) && !airborne(u) && u.emberUntil === undefined && within(tower,u,bell.reach));
     if (!nearby.length) continue;
     bells.set(tower.id,nearestEnemy(tower,nearby)!.id);
@@ -84,7 +84,7 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
       hit(enemy,bell.damage,tower.team); disable(enemy.id,bell.stunTicks); push(enemy.id,tower,bell.shove);
     }
   }
-  const ready = units.filter(u => u.hp > 0 && u.windup && tick >= (u.stunnedUntil ?? 0) &&
+  const ready = units.filter(u => u.hp > 0 && u.windup && tick >= disabledUntil(u) &&
     tick - u.windup.since >= (u.windup.kind === "smash" ? club.windup : club.swallowTicks));
   ready.sort((a, b) => a.windup!.since - b.windup!.since || a.id - b.id);
   for (const caster of ready) {

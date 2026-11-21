@@ -30,6 +30,7 @@ function changeAllegiance(unit: Unit, team: Team, tick: number) {
   unit.targetId = null;
   unit.aimX = ARMIES[team].facing; unit.aimY = 0;
   unit.pace = 0; unit.lastAttackTick = null; unit.attackDirection = null;
+  delete unit.raging; delete unit.drawingBow;
   unit.nextAttackTick = tick + 5;
   delete unit.windup; delete unit.runUp; delete unit.wrappingSince; delete unit.constructingSince;
   delete unit.burstLeft; delete unit.nextBurstTick; delete unit.trail;

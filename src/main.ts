@@ -20,6 +20,8 @@ let team: Team = "red", strokeTeam: Team = team;
 let previous = play.world;
 let lastTime = performance.now(), remainder = 0;
 const tickMs = 1000 / TICKS_PER_SECOND;
+const demo=new URLSearchParams(location.search).get("demo");
+let soundHint=demo==="sound";
 
 game.dataset.mode = "playground";
 document.title = "Playground · Battle Sandbox";
@@ -42,24 +44,31 @@ for (const color of TEAMS) {
   button.type = "button"; button.className = "swatch"; button.dataset.color = color;
   button.style.setProperty("--dye", ARMIES[color].coat);
   button.title = ARMIES[color].name; button.setAttribute("aria-label", ARMIES[color].name + " army");
-  button.addEventListener("click", () => choose(color)); colors.append(button);
+  button.addEventListener("click", () => {choose(color);updateBrushHint();}); colors.append(button);
 }
 choose(team);
 
 function updateBrushHint() {
   const spell = field.selectedSpell(), hint = element("deploy-hint");
-  hint.textContent = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." : "";
+  hint.textContent = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." :
+    soundHint && team==="blue" && field.selectedKind()==="cyclops" ? "Place the blue Cyclops just to the right of the red trio." : "";
   hint.hidden = !hint.textContent;
   field.canvas.setAttribute("aria-label", hint.textContent || "Playground. Choose a color and draw troops anywhere.");
 }
 game.addEventListener("brushchange",updateBrushHint);
-if (new URLSearchParams(location.search).get("demo") === "siege") {
+if (demo === "siege") {
   const lineup = ["lobber", "sunlens", "belltower"] as const;
   lineup.forEach((kind,index) => {
     play.place("blue",{type:UNIT_DEFINITIONS[kind].command,positions:[{x:405+index*75,y:178}]});
   });
   previous = play.world;
   field.armBrush("fault");
+} else if (demo === "sound") {
+  play.place("red",{type:"place-archers",positions:[{x:390,y:150}]});
+  play.place("red",{type:"place-clowns",positions:[{x:406,y:201}]});
+  play.place("red",{type:"place-lancers",positions:[{x:359,y:177}]});
+  previous=play.world;
+  choose("blue");field.armBrush("cyclops");
 }
 updateBrushHint();
 
@@ -67,6 +76,7 @@ function paint(blend = 1) {
   drawArena(field.ctx, previous, play.world, blend);
 }
 function update() {
+  if(soundHint && play.world.units.length<3){soundHint=false;updateBrushHint();}
   guide.hidden = !!(play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length);
   undo.disabled = !play.canUndo;
   clear.disabled = !play.canUndo && !play.world.units.length && !play.world.arrows.length;
@@ -81,6 +91,7 @@ const cancel = attachDeploymentBrush(field.canvas, {
   selectedKind() { strokeTeam = team; return field.selectedKind(); },
   livePlace(points, kind, first) {
     const before = play.world;
+    if (soundHint) {soundHint=false;updateBrushHint();}
     play.place(strokeTeam, { type: UNIT_DEFINITIONS[kind].command, positions: points }, !first);
     field.hear(before,play.world);
     previous = play.world;

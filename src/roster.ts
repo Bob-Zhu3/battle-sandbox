@@ -10,7 +10,7 @@ const shelves: {name: string; items: Brush[]}[] = [
   {name: "Machines", items: ["mouse","drone"]},
   {name: "Towers", items: ["post","workshop","lobber","sunlens","belltower"]},
   {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","reaper","witch","zombie"]},
-  {name: "Spells", items: ["gust","meteor","rain","fault","briar","mirror"]},
+  {name: "Spells", items: ["gust","meteor","rain","fault","briar","mirror","freeze","lightning","rage"]},
 ];
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
 function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key); }

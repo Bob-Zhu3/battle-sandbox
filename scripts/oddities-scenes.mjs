@@ -28,7 +28,7 @@ export async function playOddities({page,place,show,clear,hp}) {
   assert.match(await roster("red"),/Zombie 3/);await clear();
 
   await place("Red","Clown",404,165);await place("Blue","Watchpost",510,167);
-  await show(800,"The striped balloon leaves a poison cloud.");
+  await show(800,"The glass bottle shatters and leaves a poison cloud.");
   await place("Blue","Lancer",510,174);
   await show(550,"A late arrival picks up the poison.");
   await place("Blue","Gust",506,168);

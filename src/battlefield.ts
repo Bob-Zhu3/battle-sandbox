@@ -47,7 +47,7 @@ export const TOWER = { range: 160, sightTicks: 18, cooldownTicks: 72, damage: 6,
 export interface Base {
   kind: "base"; id: number; team: Team; x: number; y: number; hp: number;
   lastHitTick: number | null; targetId: number | null; acquiredTick: number | null;
-  lastShotTick: number | null; aimX: number; aimY: number; stunnedUntil?: number;
+  lastShotTick: number | null; aimX: number; aimY: number; stunnedUntil?: number; frozenUntil?: number;
 }
 export function makeBase(mode: MatchMode, team: Team): Base {
   const camp = campFor(mode, team);

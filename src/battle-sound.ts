@@ -1,8 +1,9 @@
 import { ARENA } from "./battlefield.ts";
-import { battleCues, soundGaps, type Cue, type CueKind } from "./sound-events.ts";
+import { battleCues, createCueMixer, type Cue } from "./sound-events.ts";
+import { prepareRecordings } from "./recordings.ts";
 import type { World } from "./room-protocol.ts";
 
-function instrument(ctx: AudioContext, output: AudioNode) {
+function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType<typeof prepareRecordings>) {
   const buffer = ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
   const samples = buffer.getChannelData(0);
   let bits = 731027;
@@ -17,6 +18,7 @@ function instrument(ctx: AudioContext, output: AudioNode) {
     const now = ctx.currentTime+.004;
     const variation = ((Math.imul(cue.seed,2654435761) >>> 0)%101)/100;
     const pitch = .93+.14*variation;
+    if(recordings.play(cue,ctx,pan,pitch))return;
     let layers = 0;
     function envelope(node: AudioScheduledSourceNode, source: AudioNode, at: number, duration: number, peak: number, attack: number) {
       const gain = ctx.createGain();
@@ -38,10 +40,39 @@ function instrument(ctx: AudioContext, output: AudioNode) {
     }
     switch (cue.kind) {
       case "place": tone(410,210,.059,.10,"sine"); noise(1250,690,.045,.075); break;
-      case "bow": noise(3500,1500,.07,.095); tone(640,280,.105,.071,"triangle"); break;
+      case "bowDraw": noise(690,2220,.26,.25,.115);noise(1250,850,.12,.13,.042,.09);break;
+      case "bow": tone(238,183,.20,.20,"triangle");tone(728,525,.095,.10);noise(5400,2600,.042,.16);break;
       case "shot": noise(3400,660,.105,.29); tone(185,72,.145,.15,"triangle"); break;
-      case "hit": noise(1540,660,.057,.17); tone(191,96,.085,.14,"triangle"); break;
-      case "block": tone(1050,875,.09,.082,"triangle"); tone(560,390,.10,.13); break;
+      case "hit": case "beastHurt": noise(580,320,.14,.34,.018);tone(156,93,.16,.18,"sawtooth",.01,.017);break;
+      case "clash": case "block": tone(1180,1160,.23,.18);tone(2910,2840,.14,.12);noise(4200,2900,.035,.21);break;
+      case "wood": noise(850,430,.085,.33);tone(210,165,.10,.13,"triangle");break;
+      case "metal": tone(712,682,.24,.18);tone(1593,1570,.15,.13);noise(3200,1580,.043,.24);break;
+      case "bolt": noise(3000,1350,.06,.32);tone(540,360,.045,.10,"square");break;
+      case "toss": noise(540,1500,.12,.13,.055);break;
+      case "fuse": noise(3800,6200,.17,.21,.028);noise(4900,2200,.05,.15,.003,.07);break;
+      case "dart": noise(1300,3500,.11,.24,.025);break;
+      case "shard": tone(1430,2050,.15,.11);tone(2050,2310,.095,.08);break;
+      case "hex": tone(480,250,.22,.13,"triangle");tone(610,375,.19,.09,"sine",.055);break;
+      case "glass":
+        noise(7000,3100,.065,.38);for(const [i,hz] of [1640,2460,3210,1970,4700].entries())tone(hz,hz*.985,.19-i*.014,.155/(1+i*.16),"sine",i*i*.007);break;
+      case "charge": case "roar": case "groan":
+        tone(135,77,.33,.13,"sawtooth",.015,.04);noise(960,380,.30,.31,.045);break;
+      case "howl": tone(290,826,.34,.18,"triangle",0,.11);tone(800,423,.36,.17,"sine",.23,.055);break;
+      case "whisper": noise(600,1840,.35,.28,.065);break;
+      case "squeal": case "squeak": tone(1350,2230,.067,.13);tone(2110,990,.13,.15,"triangle",.045);break;
+      case "screech": case "birdHurt": {
+        const long=cue.kind==="screech";
+        tone(1320,2380,.115,.17,"triangle",0,.021);tone(2110,1240,long?.25:.115,.17,"sine",.068);
+        noise(4300,2500,long?.24:.14,.24,.031);if(long)tone(1700,2260,.075,.10,"sine",.24);break;
+      }
+      case "freeze":
+        noise(5600,2400,.37,.24,.07);for(const [i,hz] of [1850,2480,3350,2780].entries())tone(hz,hz*1.016,.24,.14-i*.013,"sine",i*.032,.007);break;
+      case "lightning":
+        noise(8600,700,.09,.83);noise(5300,300,.19,.74,.004,.043);noise(630,120,.49,.64,.045,.08);
+        tone(105,42,.46,.35,"triangle",.065,.028);break;
+      case "rage":
+        tone(221,290,.21,.22,"sawtooth",0,.047);tone(332,428,.31,.14,"triangle",.095,.046);
+        noise(590,2000,.34,.22,.085);break;
       case "thunder": noise(4900,960,.12,.24); noise(3100,480,.085,.17,.004,.047); break;
       case "smash": tone(153,59,.22,.26); noise(800,230,.16,.22); break;
       case "toll": tone(325,307,.48,.17); tone(823,787,.28,.083); tone(1214,1184,.14,.04); break;
@@ -64,20 +95,19 @@ function instrument(ctx: AudioContext, output: AudioNode) {
 }
 
 export function createBattleSound(button: HTMLButtonElement) {
+  const recordings=prepareRecordings(), mix=createCueMixer();
   const storage = "battle.sound.muted";
   let muted = false;
   try { muted = localStorage.getItem(storage) === "true"; } catch { /* Optional preference. */ }
   let ctx: AudioContext | undefined, master: GainNode | undefined, play: ReturnType<typeof instrument> | undefined;
-  let lastOrdinary = -Infinity;
-  const last = new Map<CueKind,number>();
   function unlock() {
     if (muted || document.hidden || typeof AudioContext === "undefined") return;
     if (!ctx) {
       ctx = new AudioContext({latencyHint:"interactive"});
-      master = ctx.createGain(); master.gain.value = .62;
-      const compressor = ctx.createDynamicsCompressor(); compressor.threshold.value = -15; compressor.ratio.value = 6;
+      master = ctx.createGain(); master.gain.value = .9;
+      const compressor = ctx.createDynamicsCompressor(); compressor.threshold.value = -11; compressor.ratio.value = 5;
       master.connect(compressor); compressor.connect(ctx.destination);
-      play = instrument(ctx,master);
+      recordings.unlock(ctx);play = instrument(ctx,master,recordings);
     }
     if (ctx.state === "suspended") void ctx.resume().catch(() => {});
   }
@@ -87,7 +117,7 @@ export function createBattleSound(button: HTMLButtonElement) {
   }
   function toggle() {
     muted = !muted; label(); unlock();
-    if (ctx && master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(muted ? 0 : .62,ctx.currentTime,.008); }
+    if (ctx && master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(muted ? 0 : .9,ctx.currentTime,.008); }
     try { localStorage.setItem(storage,String(muted)); } catch { /* Optional preference. */ }
   }
   label(); button.addEventListener("click",toggle);
@@ -99,14 +129,6 @@ export function createBattleSound(button: HTMLButtonElement) {
   });
   return function hear(before: World | undefined, world: World) {
     if (!ctx || !play || ctx.state !== "running" || muted || document.hidden) return;
-    let voices = 0;
-    for (const cue of battleCues(before,world)) {
-      const now = ctx.currentTime, landmark = cue.kind === "impact" || cue.kind === "fall";
-      if (now-(last.get(cue.kind) ?? -Infinity) < soundGaps[cue.kind] || (!landmark && now-lastOrdinary < .046)) continue;
-      last.set(cue.kind,now);
-      if (!landmark) lastOrdinary = now;
-      play(cue);
-      if (++voices === 2) break;
-    }
+    for (const cue of mix(battleCues(before,world),ctx.currentTime)) play(cue);
   };
 }

@@ -2,6 +2,7 @@ import { ARMIES } from "./battlefield.ts";
 import { INK, cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell, type SpellKind } from "./spells.ts";
 import { drawSiegeSpell, siegeSpellIcon } from "./siege-magic-art.ts";
+import { drawWeatherField, weatherIcon } from "./weather-art.ts";
 
 function meteorIcon(c: Pens) {
   c.lineJoin="round";
@@ -22,7 +23,8 @@ export function drawSpellIcon(c: Pens, kind: SpellKind) {
     oval(c,-3,-3,7,5,INK);oval(c,3,-5,6,5,INK);oval(c,6,-2,6,4,INK);
     oval(c,0,-3,8,3.6,"#addad4");oval(c,4,-5,4.3,3.4,"#d8eee3");
     for (const x of [-6,0,6]) line(c,x,4,x-2,8,"#418b96",1.8);
-  } else siegeSpellIcon(c,kind);
+  } else if (kind==="freeze" || kind==="lightning" || kind==="rage") weatherIcon(c,kind);
+  else siegeSpellIcon(c,kind);
   c.restore();
 }
 
@@ -35,7 +37,7 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
   c.beginPath();c.ellipse(0,0,r*sx,r*sy,0,0,2*Math.PI);
   const spent=spell.kind==="mirror" && (spell.reflection?.count??0)>=SPELLS.mirror.panes;
   if(!spent) {
-    const colors={meteor:"#cc7541",rain:"#71b4af",gust:"#d6eed1",briar:"#69a454",fault:"#ad8c5c",mirror:"#91c8d1"};
+    const colors={meteor:"#cc7541",rain:"#71b4af",gust:"#d6eed1",briar:"#69a454",fault:"#ad8c5c",mirror:"#91c8d1",freeze:"#73c5e0",lightning:"#efd470",rage:"#cb687c"};
     c.fillStyle=colors[spell.kind]+"20";c.fill();c.strokeStyle=ARMIES[spell.team].hem;c.globalAlpha=.55*life;
     c.lineWidth=1.6*scale;c.setLineDash([5*scale,6*scale]);c.stroke();c.setLineDash([]);
   }
@@ -72,6 +74,7 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
         c.restore();
       }
     }
-  } else drawSiegeSpell(c,spell,tick,sx,sy);
+  } else if (spell.kind==="freeze" || spell.kind==="lightning" || spell.kind==="rage") drawWeatherField(c,spell,tick,sx,sy);
+  else drawSiegeSpell(c,spell,tick,sx,sy);
   c.restore();
 }

@@ -40,7 +40,7 @@ export function restingPose(side: number): CharacterPose {
   return { side, breath: 0, blink: 0, pitch: 0, step: 0, lift: 0, pace: 0, guard: 0, ready: 0, strike: 0, loose: 0, peek: 0, duck: 0, hurt: 0, hitFlash: 0 };
 }
 
-export function characterPose(unit: Unit, target: Target | undefined, tick: number, travel = unit.walkDistance, previousHitTick = unit.lastHitTick): CharacterPose {
+export function characterPose(unit: Unit, target: Target | undefined, tick: number, travel = unit.walkDistance, previousHitTick = unit.lastHitTick, impactTick = tick): CharacterPose {
   const pose = restingPose(ARMIES[unit.team].facing);
   if (!target && unit.hp > 0) {
     const phase = tick + unit.id * 53;
@@ -58,8 +58,8 @@ export function characterPose(unit: Unit, target: Target | undefined, tick: numb
   const attentionAge = since(tick, unit.lastAttentionTick);
   // A second hit can already be in the next snapshot while we're drawing
   // the interval before it. Finish the previous flash up to the actual impact.
-  const hit = unit.lastHitTick !== null && tick < unit.lastHitTick ? previousHitTick : unit.lastHitTick;
-  const hitAge = hit !== null && tick >= hit ? tick - hit : Infinity;
+  const hit = unit.lastHitTick !== null && impactTick < unit.lastHitTick ? previousHitTick : unit.lastHitTick;
+  const hitAge = hit !== null && impactTick >= hit ? impactTick - hit : Infinity;
   pose.hurt = (1 - smooth(hitAge / 10));
   // The first network snapshot after impact can arrive two simulation ticks later.
   pose.hitFlash = 1 - smooth((hitAge - 2) / (HIT_FLASH_TICKS - 2));
@@ -68,6 +68,7 @@ export function characterPose(unit: Unit, target: Target | undefined, tick: numb
   const near = 1 - smooth((range - definition.reach) / (kind === "warrior" ? 42 : 30));
   const remaining = unit.nextAttackTick - tick;
   pose.ready = tick < (unit.stunnedUntil ?? 0) ? 0 : near * (1 - smooth((remaining - 1) / (kind === "warrior" ? 12 : 22)));
+  if (kind==="archer" && unit.drawingBow && unit.lastDrawTick!==undefined) pose.ready=smooth((tick-unit.lastDrawTick+1)/13);
   if (kind === "warrior") {
     pose.guard = near;
     pose.strike = (1 - smooth((attackAge - 2) / 10));

@@ -258,6 +258,39 @@ async function touchAndSound(url) {
   } finally { await context.close(); }
 }
 
+async function fieldVoices(url) {
+  const page=await browser.newPage({viewport:{width:960,height:540}});
+  try {
+    await page.addInitScript(()=>{
+      window.playedCuts=[];
+      const start=AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start=function(...args){
+        if(this.buffer?.duration>20){
+          const slot=Math.round(args[1]/1.25), samples=this.buffer.getChannelData(0), rate=this.buffer.sampleRate;
+          const first=Math.round(args[1]*rate), end=first+Math.floor(args[2]*rate);
+          let energy=0;
+          for(let i=first;i<end;i+=8)energy+=samples[i]*samples[i];
+          window.playedCuts.push({slot,energy});
+        }
+        return start.apply(this,args);
+      };
+    });
+    await page.goto(url+"/?demo=sound");
+    const cyclops=page.getByRole("button",{name:"Cyclops",exact:true});
+    assert.equal(await cyclops.getAttribute("aria-pressed"),"true");
+    assert.equal(await page.locator("#red-count").textContent(),"3");
+    await cyclops.click();
+    const box=await page.locator("#arena").boundingBox();
+    await page.mouse.click(box.x+box.width*548/960,box.y+box.height*.5);
+    await page.waitForFunction(()=>{
+      const slots=new Set(window.playedCuts.filter(c=>c.energy>1).map(c=>c.slot));
+      return slots.has(0) && slots.has(1) && (slots.has(5)||slots.has(6)) &&
+        (slots.has(7)||slots.has(8)) && slots.has(10) && (slots.has(12)||slots.has(18));
+    },null,{timeout:8500});
+    console.log("Live sound: the Archer drew and loosed, the Lancer shouted, the bottle broke, and the Cyclops roared and reacted to damage.");
+  } finally {await page.close();}
+}
+
 async function playground(url) {
   const {page,point} = await open(url);
   await page.getByRole("button",{name:"Red army"}).click();
@@ -296,7 +329,7 @@ async function browseRoster(url) {
       Machines:["Clockmouse","Bolt Drone"],
       Towers:["Watchpost","Mouse Workshop","Stone Lobber","Sun Lens","Bell Tower"],
       Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Reaper","Witch","Zombie"],
-      Spells:["Gust","Meteor","Healing Rain","Fault Line","Briar Snare","Mirror Ward"],
+      Spells:["Gust","Meteor","Healing Rain","Fault Line","Briar Snare","Mirror Ward","Freeze","Lightning","Rage"],
     };
     const portraits=new Set();
     let placed=0;
@@ -318,7 +351,7 @@ async function browseRoster(url) {
         }
       }
     }
-    assert.equal(portraits.size,31);assert.equal(placed,25);
+    assert.equal(portraits.size,34);assert.equal(placed,25);
     const panel=page.getByRole("region",{name:"Troops and spells"});
     for(const team of TEAMS) {
       await page.getByRole("button",{name:ARMIES[team].name+" army",exact:true}).click();
@@ -352,7 +385,7 @@ async function browseRoster(url) {
         "Portraits form one horizontally scrollable, tappable row at "+width+"px");
     }
     assert.equal(await page.locator("#gold-balance").textContent(),"∞");
-    console.log("Roster: all 31 portraits fit their cards in four colors, all 25 troops and buildings place, and all six spells cast.");
+    console.log("Roster: all 34 portraits fit their cards in four colors, all 25 troops and buildings place, and all nine spells cast.");
   } finally {await page.context().close();}
 }
 
@@ -404,6 +437,46 @@ async function magicDuel(url) {
     assert.deepEqual(frame.world.units.map(u=>u.kind),["shieldbearer","cyclops"]);
     console.log("Two-client roster and magic: a 390px client bought a Cyclops, saw a cross-field Meteor hit its base, and rejoined the same world.");
   } finally {await Promise.all([red,blue].map(p=>p.page.context().close()));}
+}
+
+async function weatherDuel(url) {
+  const red=await open(url+"/room",1024,640),blue=await open(url+"/room",390,700),players=[red,blue];
+  try {
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue");
+    await chooseCard(red.page,"People","Archer");
+    await red.page.mouse.click(...red.point(235,170));await red.waitForUnits(1);
+    await chooseCard(blue.page,"Towers","Bell Tower");
+    await blue.page.mouse.click(...blue.point(828,178));await blue.waitForUnits(2);
+    await Promise.all(players.map(p=>p.page.getByRole("tab",{name:"Spells"}).click()));
+    for(const name of ["Freeze","Lightning","Rage"])assert.equal(await red.page.getByRole("button",{name,exact:true}).isEnabled(),false);
+    await Promise.all(players.map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
+    await red.page.getByText("Live",{exact:true}).waitFor();
+    const cast=async(p,name,x,y)=>{
+      await p.page.getByRole("button",{name,exact:true}).click();await p.page.mouse.click(...p.point(x,y));
+    };
+    await Promise.all([cast(red,"Freeze",843,180),cast(blue,"Lightning",104,180)]);
+    const archer=red.frames.at(-1).world.units.find(u=>u.kind==="archer");
+    await cast(red,"Rage",archer.x+28,archer.y);
+    const together=f=>{
+      const w=f.world;
+      return w.spells?.some(s=>s.kind==="lightning" && s.strikes?.some(a=>a.id===w.bases[0].id)) &&
+        w.units[1].frozenUntil>w.tick && w.units[0].raging && w.bases[0].hp===154;
+    };
+    const deadline=Date.now()+3800;
+    while(!blue.frames.some(together) && Date.now()<deadline)await delay(10);
+    const proof=blue.frames.find(together);
+    assert.ok(proof,"the phone sees lightning hit Red's base while Blue's tower is frozen and Red's Archer is enraged");
+    const serverTick=proof.world.tick;
+    await blue.page.reload({waitUntil:"domcontentloaded"});
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" &&
+      document.querySelector("#red-score").dataset.baseHp==="154");
+    assert.equal(blue.joins[1].resumeToken,blue.joins[0].resumeToken);
+    const frame=blue.frames.at(-1),limit=Date.now()+3000;
+    assert.ok(frame.world.tick>=serverTick && frame.world.spells.some(s=>s.kind==="rage"));
+    while(!red.frames.some(f=>f.revision===frame.revision) && Date.now()<limit)await delay(10);
+    assert.deepEqual(red.frames.find(f=>f.revision===frame.revision)?.world,frame.world);
+    console.log("Weather duel: desktop and phone saw all three spells, the same lightning damage, and the same world after a reconnect.");
+  } finally {await Promise.all(players.map(p=>p.page.context().close()));}
 }
 
 async function siegeDuel(url) {
@@ -620,10 +693,12 @@ try {
   await withField(arrowFlash);
   await withField(paletteAndMeteor);
   await withField(touchAndSound);
+  await withField(fieldVoices);
   await withField(playground);
   await withField(browseRoster);
   await withField(siegePlayground);
   await withField(magicDuel);
+  await withField(weatherDuel);
   await withField(siegeDuel);
   await withField(stormDuel);
   await withField(turncoatDuel);

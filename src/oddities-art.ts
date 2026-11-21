@@ -37,11 +37,12 @@ export function minerArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined,
   limb(c, -3, 1, .35, -.25, FACE, 1.75); c.restore();
 }
 
-export function balloon(c: Pens, x: number, y: number, size: number) {
-  c.save(); c.translate(x, y); c.scale(size, size);
-  cut(c, "M0 5 C-2 3 -5 1 -4.4 -2.5 Q-4 -6 0 -6 Q5 -6 5 -2 Q5 2 1 5 L2 6.8 Q.3 7.45 -1 6.7Z", "#bd80b3", 1.1);
-  cut(c, "M-3 -3 Q0 -5 4 -4 L5 -2 Q1 -3 -3 0Z", "#e7dc8e", 0);
-  oval(c, -2, -3, .8, 1, "#fff5df"); c.restore();
+export function poisonBottle(c: Pens, x: number, y: number, size: number, turn = -.16) {
+  c.save(); c.translate(x,y); c.scale(size,size); c.rotate(turn);
+  cut(c,"M-1.8 -5.2 L2 -5.2 L2 -2.5 Q6.4 .2 4.8 4 Q4 6.2 .2 6.1 Q-4.8 6 -5.1 3.1 Q-5.7 .3 -1.8 -2.5Z","#c1e1ce",1.15);
+  cut(c,"M-4.4 1 Q-1 2.5 1.5 1.3 Q3.5 .5 4.5 1.7 Q5.1 5.1 .5 5.3 Q-4.1 5.6 -4.4 2.8Z","#975997",0);
+  cut(c,"M-2.3 -7 L2.3 -7 L1.9 -4.8 L-2 -4.8Z","#bd8854",.8);
+  line(c,-3.3,.3,-2.1,-1.2,"#fffdf0",1.15); c.restore();
 }
 
 export function clownArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
@@ -63,8 +64,8 @@ export function clownArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined,
   limb(c, -4, -2, catchX, -2 - 2 * hop, FACE, 1.7);
   const handX = 9 - 8 * p.ready + 4 * toss, handY = -4 - 6 * p.ready - 4 * toss;
   limb(c, 4, -2, handX, handY, FACE, 1.8);
-  balloon(c, catchX, -7 - 8 * hop, .63);
-  if (toss < .45) balloon(c, handX + 1.7, handY - 3, .69);
+  poisonBottle(c, catchX, -7 - 8 * hop, .63, hop*.8-.3);
+  if (toss < .45) poisonBottle(c, handX + 1.7, handY - 3, .69);
 }
 
 export function reaperArt(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {

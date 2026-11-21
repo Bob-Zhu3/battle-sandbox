@@ -1,4 +1,4 @@
-import { balloon } from "./oddities-art.ts";
+import { poisonBottle } from "./oddities-art.ts";
 import { drawMiasma } from "./field-effects.ts";
 import type { Unit } from "./simulation.ts";
 import type { GroundEffect } from "./conditions.ts";
@@ -7,7 +7,20 @@ import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { drawBomb } from "./roster-art.ts";
 
 export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
-  if (e.kind==="miasma") {drawMiasma(c,e,tick,sx,sy);return;}
+  if (e.kind==="miasma") { drawMiasma(c,e,tick,sx,sy); return; }
+  if (e.kind==="glass") {
+    const age=tick-e.tick;
+    if (age>=0 && age<19) {
+      const t=age/19, k=Math.min(sx,sy);
+      for (let i=0;i<6;i++) {
+        const a=i*2.4+.5, reach=6+17*t;
+        c.save();c.translate((e.x+Math.cos(a)*reach)*sx,(e.y+Math.sin(a)*reach*.65)*sy-11*Math.sin(t*Math.PI)*k);
+        c.scale(k,k);c.rotate(a+t*4);c.globalAlpha=1-t;
+        cut(c,"M-1.7 -2.2 L2.1 -.7 L-.6 2.3Z",i%2?"#c4eee4":"#fff8e3",.72);c.restore();
+      }
+    }
+    return;
+  }
   const age=tick-e.tick;
   if (age<0 || age>=34) return;
   const k=Math.min(sx,sy), fade=1-age/34, expand=Math.min(1,(age+2)/13);
@@ -115,7 +128,7 @@ export function drawSpecialShot(c: Pens, shot: Arrow, x: number, y: number, angl
   } else if(shot.kind==="bomb" || shot.kind==="balloon") {
     const progress=Math.max(0,Math.min(1,(tick-shot.releasedTick)/(shot.landTick!-shot.releasedTick)));
     const height=8*(1-progress)+30*Math.sin(Math.PI*progress);
-    oval(c,0,2,4.6,1.6,"#4a554841"); if (shot.kind==="balloon") balloon(c,0,-height,.94); else drawBomb(c,0,-height,.9,tick);
+    oval(c,0,2,4.6,1.6,"#4a554841"); if (shot.kind==="balloon") poisonBottle(c,0,-height,1.04,progress*5.3-.4); else drawBomb(c,0,-height,.9,tick);
   } else {
     c.translate(0,-8); c.rotate(angle);
     if(shot.kind==="bullet"){

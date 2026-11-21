@@ -61,6 +61,6 @@ export class Playground {
       u.hp > 0 && u.targetId === null && u.pace < .001 && u.emberUntil === undefined &&
       !u.windup && !u.burstLeft && !u.burn && !u.poison && !u.hex && !u.tunnel && !u.trail && !u.knockback &&
       (u.aidReadyTick ?? 0) <= next.tick && (u.rootedUntil ?? 0) <= next.tick &&
-      (u.stunnedUntil ?? 0) <= next.tick && (u.fogUntil ?? 0) <= next.tick);
+      (u.stunnedUntil ?? 0) <= next.tick && (u.fogUntil ?? 0) <= next.tick && (u.frozenUntil ?? 0) <= next.tick && !u.raging);
   }
 }

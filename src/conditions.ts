@@ -3,9 +3,9 @@ import type { Target, Unit } from "./simulation.ts";
 import { isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Affliction { team: Team; until: number; next: number; applied: number }
-export interface GroundEffect { kind: "blast" | "smash" | "frost" | "miasma" | "stonefall" | "toll"; team: Team; x: number; y: number; tick: number; radius: number }
+export interface GroundEffect { kind: "blast" | "smash" | "frost" | "miasma" | "glass" | "stonefall" | "toll"; team: Team; x: number; y: number; tick: number; radius: number }
 export type Hit = (target: Target, amount: number, team: Team) => void;
-export const effectLifetime = (e: GroundEffect) => e.kind === "miasma" ? UNIT_DEFINITIONS.clown.cloudTicks : 34;
+export const effectLifetime = (e: GroundEffect) => e.kind === "miasma" ? UNIT_DEFINITIONS.clown.cloudTicks : e.kind === "glass" ? 19 : 34;
 const ailments = {
   burn: { period: 24, duration: 72, damage: 2 },
   poison: { period: 30, duration: 90, damage: 3 },
@@ -14,7 +14,7 @@ type Ailment = keyof typeof ailments;
 
 export function afflict(unit: Unit, kind: Ailment, team: Team, tick: number) {
   if (unit.hp <= 0 || unit.emberUntil !== undefined || (kind === "poison" && (isMachine(unit.kind) || unit.kind === "zombie"))) return;
-  if (kind === "burn") delete unit.rootedUntil;
+  if (kind === "burn") { delete unit.rootedUntil; delete unit.frozenUntil; delete unit.frozenAt; }
   const prior = unit[kind], rule = ailments[kind];
   // Two simultaneous applications choose the same source in either storage order.
   const source = prior?.applied === tick && TEAMS.indexOf(prior.team) < TEAMS.indexOf(team) ? prior.team : team;
@@ -33,7 +33,16 @@ export function tickAfflictions(unit: Unit, tick: number, hit: Hit) {
 
 export function stun(unit: Unit, until: number) {
   unit.stunnedUntil = Math.max(until, unit.stunnedUntil ?? 0);
+  interrupt(unit);
+}
+
+export function disabledUntil(target: Target) {
+  return Math.max(target.stunnedUntil ?? 0,target.frozenUntil ?? 0);
+}
+
+export function interrupt(unit: Unit) {
   if (unit.kind === "lancer") unit.runUp = 0;
+  delete unit.drawingBow;
   delete unit.windup;
   delete unit.wrappingSince;
   delete unit.constructingSince;

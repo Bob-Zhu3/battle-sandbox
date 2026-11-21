@@ -31,6 +31,7 @@ function splash(shot: Arrow, x: number, y: number, tick: number, targets: readon
   const ice = shot.kind === "ice", gas = shot.kind === "balloon", stone = shot.kind === "stone";
   const radius = stone ? UNIT_DEFINITIONS.lobber.blastRadius : gas ? UNIT_DEFINITIONS.clown.cloudRadius : ice ? UNIT_DEFINITIONS.frostqueen.frostRadius : UNIT_DEFINITIONS.bomber.blastRadius;
   effects.push({kind: stone ? "stonefall" : gas ? "miasma" : ice ? "frost" : "blast", x, y, tick, radius, team: shot.team});
+  if (gas) effects.push({kind:"glass",x,y,tick,radius:23,team:shot.team});
   for (const target of targets) {
     if (target.hp <= 0 || (target.kind !== "base" && target.tunnel) || target.team === shot.team || Math.hypot(x-target.x, y-target.y) > radius + (target.kind === "base" ? BASE_RADIUS : 0)) continue;
     if (stone && airborne(target)) continue;

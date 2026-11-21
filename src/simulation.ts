@@ -4,8 +4,9 @@ import { recordTrail, type TrailMark } from "./trails.ts";
 import { applyMagic, blownAway, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
 import { reflectAtWards } from "./mirror.ts";
 import { focusLens, pickTowerTarget } from "./siege.ts";
+import { applyRage, strikeField } from "./battle-magic.ts";
 import { finishBuilding, resolveControl, startCyclopsSwing, type Windup } from "./encounters.ts";
-import { afflict, effectLifetime, moveKnockback, shove, slow, stun, tickAfflictions, type Affliction, type GroundEffect } from "./conditions.ts";
+import { afflict, disabledUntil, effectLifetime, moveKnockback, shove, slow, stun, tickAfflictions, type Affliction, type GroundEffect } from "./conditions.ts";
 import { aimTower, incomingShot } from "./defense.ts";
 import { finishTreatments, medicDuty } from "./medic.ts";
 import { nearestEnemy } from "./targeting.ts";
@@ -53,6 +54,12 @@ export interface Unit extends Placement {
   swallowedTick?: number;
   slowUntil?: number;
   rootedUntil?: number;
+  frozenUntil?: number;
+  frozenAt?: number;
+  raging?: boolean;
+  drawingBow?: boolean;
+  lastDrawTick?: number;
+  lastChargeReadyTick?: number;
   focusSince?: number;
   fogUntil?: number;
   beam?: {tick: number; x: number; y: number; level: number};
@@ -144,6 +151,9 @@ export function createDuel(): Battle {
 }
 
 export type Target = Unit | Base;
+function walkSpeed(unit: Unit) {
+  return UNIT_DEFINITIONS[unit.kind].speed * (unit.raging ? SPELLS.rage.speedFactor : 1);
+}
 function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   const dx = x - unit.x, dy = y - unit.y;
   const distance = Math.hypot(dx, dy);
@@ -151,7 +161,7 @@ function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   unit.aimY = distance > 0 ? dy / distance : 0;
   if (distance > stopAt && unit.rootedUntil === undefined) {
     const speedFactor = unit.slowUntil === undefined ? 1 : UNIT_DEFINITIONS.frostqueen.speedFactor;
-    const step = Math.min(UNIT_DEFINITIONS[unit.kind].speed * speedFactor / TICKS_PER_SECOND, distance - stopAt);
+    const step = Math.min(walkSpeed(unit) * speedFactor / TICKS_PER_SECOND, distance - stopAt);
     unit.x += unit.aimX * step;
     unit.y += unit.aimY * step;
   }
@@ -201,8 +211,8 @@ function separateFootprints(previous: readonly Unit[], next: Unit[], solid: read
     const dx = unit.x - from.x + push[i].x;
     const dy = unit.y - from.y + push[i].y;
     const distance = Math.hypot(dx, dy);
-    const { speed, radius } = UNIT_DEFINITIONS[unit.kind];
-    const walkStep = unit.rootedUntil === undefined ? speed / TICKS_PER_SECOND : 0;
+    const { radius } = UNIT_DEFINITIONS[unit.kind];
+    const walkStep = unit.rootedUntil === undefined && unit.frozenUntil === undefined ? walkSpeed(unit) / TICKS_PER_SECOND : 0;
     const fraction = distance > walkStep ? walkStep / distance : 1;
     unit.x = boundCenter(from.x + dx * fraction, ARENA.width, radius);
     unit.y = boundCenter(from.y + dy * fraction, ARENA.height, radius);
@@ -249,18 +259,23 @@ export function stepBattle(battle: Battle): Battle {
   const cuts: Harvest[] = [];
   const braces = new Set<number>();
   const healing = new Map<number, number>();
-  const activeMagic = battle.spells?.filter(spell => pulses(spell, tick)) ?? [];
+  const spells = battle.spells?.filter(s => tick-s.startTick < SPELLS[s.kind].duration)
+    .map(s => s.kind === "mirror" || (s.kind === "lightning" && pulses(s,tick)) ? {...s} : s);
+  const activeMagic = spells?.filter(spell => pulses(spell, tick)) ?? [];
+  const strikes = activeMagic.filter(s => s.kind === "freeze" || s.kind === "lightning");
+  const rings = spells?.filter(s => s.kind === "rage" && tick-s.startTick >= SPELLS.rage.delay) ?? [];
   const winds = activeMagic.filter(spell => spell.kind === "gust");
   const fieldChanges = activeMagic.filter(s => s.kind === "briar" || s.kind === "fault" || s.kind === "rain");
   // Restore allegiances first so spells and target acquisition see the same teams.
-  const starting = fieldChanges.length || battle.units.some(u => u.hp > 0 && u.hex && tick >= u.hex.until) ? battle.units.map(u => {
+  const starting = fieldChanges.length || strikes.length || rings.length || battle.units.some(u => u.hp > 0 && (u.raging || u.hex && tick >= u.hex.until)) ? battle.units.map(u => {
     if (!u.hp) return u;
     const ready = {...u};
     if (u.hex && tick >= u.hex.until) releaseHex(ready,tick);
     if (fieldChanges.length) prepareFieldMagic(ready,fieldChanges,tick);
     return ready;
   }) : battle.units;
-  const targets: readonly Target[] = battle.bases ? [...starting, ...battle.bases] : starting;
+  const basesAtStart = strikes.length ? battle.bases?.map(b => ({...b})) : battle.bases;
+  const targets: readonly Target[] = basesAtStart ? [...starting, ...basesAtStart] : starting;
   function hit(target: Target, amount: number, team: Team) {
     damage.set(target.id, (damage.get(target.id) ?? 0) + amount);
     if (!battle.bases || target.kind === "base") return;
@@ -269,10 +284,13 @@ export function stepBattle(battle: Battle): Battle {
     sources.set(target.id, contributors);
   }
 
+  for (const spell of strikes) strikeField(spell,targets,tick,hit);
+  for (const u of starting) if (u.hp && (rings.length || u.raging)) applyRage(u,rings,tick);
   const control = resolveControl(starting, targets, tick, hit, effects);
-  const towers = battle.bases?.map(base => {
+  const towers = basesAtStart?.map(base => {
     const until = Math.max(base.stunnedUntil ?? 0, control.stuns.get(base.id) ?? 0);
     if (tick < until) return {...base, stunnedUntil: until, acquiredTick: null, targetId: null};
+    if (tick < (base.frozenUntil ?? 0)) return {...base, acquiredTick: null, targetId: null};
     return aimTower(base, starting, tick, TICKS_PER_SECOND, arrows);
   });
 
@@ -285,6 +303,7 @@ export function stepBattle(battle: Battle): Battle {
     if (next.slowUntil !== undefined && tick >= next.slowUntil) delete next.slowUntil;
     if (next.fogUntil !== undefined && tick >= next.fogUntil) delete next.fogUntil;
     if (next.rootedUntil !== undefined && tick >= next.rootedUntil) delete next.rootedUntil;
+    if (next.frozenUntil !== undefined && tick >= next.frozenUntil) { delete next.frozenUntil; delete next.frozenAt; }
     if (unit.emberUntil !== undefined) {
       if (tick >= unit.emberUntil) {
         delete next.emberUntil;
@@ -318,6 +337,7 @@ export function stepBattle(battle: Battle): Battle {
       stun(next, interruptedUntil);
       return next;
     }
+    if (next.frozenUntil !== undefined) return next;
     if (arc || unit.windup) return next;
     if (unit.kind === "belltower") {
       next.targetId = control.bells.get(unit.id) ?? null;
@@ -366,13 +386,19 @@ export function stepBattle(battle: Battle): Battle {
       }
     }
     next.targetId = target?.id ?? null;
-    if (!target) return next;
+    if (!target) { delete next.drawingBow; return next; }
 
     const definition = UNIT_DEFINITIONS[unit.kind];
     const reach = definition.reach + (target.kind === "base" ? BASE_RADIUS : 0);
     const targetRadius = target.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[target.kind].radius;
     const stopAt = definition.attack === "melee" || unit.kind === "cyclops" ? definition.radius + targetRadius : reach;
     const distance = moveToward(next, target.x, target.y, stopAt);
+    if (unit.kind === "archer") {
+      const readyIn = next.nextAttackTick-tick;
+      const drawing = distance <= reach+walkSpeed(next)*.3 && readyIn <= 18 && (readyIn>0 || distance>reach);
+      if (drawing && !unit.drawingBow) next.lastDrawTick=tick;
+      if (drawing) next.drawingBow=true; else delete next.drawingBow;
+    }
     if (unit.kind === "cyclops") {
       startCyclopsSwing(next, starting, target, tick, distance);
       return next;
@@ -425,8 +451,6 @@ export function stepBattle(battle: Battle): Battle {
   }
   if (winds.length) arrows = arrows.filter(arrow => !blownAway(arrow, winds));
   const movedTargets = towers ? [...units, ...towers] : units;
-  const spells = battle.spells?.filter(spell => tick-spell.startTick < SPELLS[spell.kind].duration)
-    .map(spell => spell.kind === "mirror" ? {...spell} : spell);
   const wards = spells?.filter(s => s.kind === "mirror" && tick-s.startTick >= SPELLS.mirror.delay) ?? [];
   const incoming = winds.length ? battle.arrows.filter(arrow => !blownAway(arrow,winds)) : battle.arrows;
   const reflected = reflectAtWards(incoming,wards,targets,movedTargets,tick);
@@ -441,12 +465,16 @@ export function stepBattle(battle: Battle): Battle {
   for (const [index, unit] of units.entries()) {
     const from = starting[index];
     const distance = Math.hypot(unit.x - from.x, unit.y - from.y);
-    unit.walkDistance += distance;
-    const speed = UNIT_DEFINITIONS[unit.kind].speed / TICKS_PER_SECOND;
-    unit.pace += ((speed ? Math.min(1, distance / speed) : 0) - unit.pace) * .3;
+    const speed = walkSpeed(unit) / TICKS_PER_SECOND;
+    // A shove can slide the ice. Keep the stride fixed inside the shell.
+    if (unit.frozenUntil === undefined) {
+      unit.walkDistance += distance;
+      unit.pace += ((speed ? Math.min(1, distance / speed) : 0) - unit.pace) * .3;
+    }
     if (unit.kind === "lancer" && unit.lastChargeTick !== tick) {
       const straight = unit.aimX * from.aimX + unit.aimY * from.aimY > 0.93;
-      unit.runUp = distance > 0.15 && straight && !from.knockback && !control.shocks.has(unit.id) && tick >= (unit.stunnedUntil ?? 0) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
+      unit.runUp = distance > 0.15 && straight && !from.knockback && !control.shocks.has(unit.id) && tick >= disabledUntil(unit) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
+      if ((from.runUp ?? 0) < UNIT_DEFINITIONS.lancer.runUp && unit.runUp >= UNIT_DEFINITIONS.lancer.runUp) unit.lastChargeReadyTick=tick;
     }
     const amount = damage.get(unit.id);
     if (amount === undefined) continue;
@@ -455,7 +483,7 @@ export function stepBattle(battle: Battle): Battle {
     if (!unit.hp && unit.kind === "phoenix" && !unit.reborn) {
       unit.hp = 1; unit.reborn = true; unit.emberUntil = tick + UNIT_DEFINITIONS.phoenix.hatchTicks;
       unit.targetId = null; unit.pace = 0;
-      delete unit.burn; delete unit.poison; delete unit.slowUntil; delete unit.knockback;
+      delete unit.burn; delete unit.poison; delete unit.slowUntil; delete unit.knockback; delete unit.raging;
     }
     const contributors = sources.get(unit.id);
     if (!unit.hp && contributors) {

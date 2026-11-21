@@ -44,7 +44,7 @@ const recruits = {
     tunnelSpeed: 385, digTicks: 8, emergeTicks: 9,
   },
   clown: {
-    name: "Clown", command: "place-clowns", description: "Lobs a striped stink balloon. The purple cloud poisons enemies who walk in. An enemy Gust blows it away.",
+    name: "Clown", command: "place-clowns", description: "Juggles little glass poison bottles. They shatter on the ground and leave a purple cloud. An enemy Gust blows it away.",
     cost: 18, bounty: 9, attack: "arrow", radius: 10, maxHp: troopHealth(25), speed: 74, reach: 121, damage: 3, cooldownTicks: 104, arrowSpeed: 215,
     cloudRadius: 38, cloudTicks: 81, puffEvery: 10,
   },

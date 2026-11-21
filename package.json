@@ -11,6 +11,7 @@
     "play": "vite --host 0.0.0.0 --open /",
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build",
     "start": "node server/start.ts",
+    "demo:sound": "vite --host 127.0.0.1 --open /?demo=sound",
     "predemo:encounters": "npm run build --silent",
     "demo:encounters": "node scripts/demo-encounters.mjs",
     "predemo:motion": "npm run build --silent",

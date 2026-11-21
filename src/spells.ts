@@ -17,6 +17,12 @@ export const SPELLS = {
     description: "Roots catch enemy feet as the thorns rise. Rooted troops can still attack. Fire burns the vines away." },
   mirror: { name: "Mirror Ward", command: "cast-mirror-ward", cost: 14, radius: 46, delay: 6, duration: 180, panes: 3,
     description: "Three panes turn incoming enemy arrows and bolts back toward their source. Bullets, boulders and magic pass through." },
+  freeze: { name: "Freeze", command: "cast-freeze", cost: 18, radius: 62, delay: 12, duration: 39, hold: 66, baseHold: 33,
+    description: "Encases enemies in ice and cuts a charge short. Bases thaw sooner. A Phoenix strike melts the ice." },
+  lightning: { name: "Lightning", command: "cast-lightning", cost: 24, radius: 83, delay: 18, duration: 44, targets: 3, damage: 18, baseDamage: 6, stunTicks: 15,
+    description: "Calls down a bolt on each of the three healthiest enemies in the circle. Each strike deals damage and stuns." },
+  rage: { name: "Rage", command: "cast-rage", cost: 14, radius: 66, delay: 8, duration: 152, speedFactor: 1.4,
+    description: "Allied troops inside the ring move 40% faster and recover attacks 50% faster. Late arrivals join the rush." },
 } as const;
 export type SpellKind = keyof typeof SPELLS;
 export type SpellType = (typeof SPELLS)[SpellKind]["command"];
@@ -25,6 +31,7 @@ export function spellKind(type: unknown) { return SPELL_KINDS.find(kind => SPELL
 export interface FieldSpell {
   id: number; team: Team; kind: SpellKind; x: number; y: number; startTick: number;
   reflection?: {count: number; tick: number; x: number; y: number};
+  strikes?: {id: number; x: number; y: number}[];
 }
 
 export function pulses(spell: FieldSpell, tick: number) {
@@ -66,7 +73,6 @@ export function applyMagic(active: readonly FieldSpell[], units: Unit[], targets
       }
       continue;
     }
-    if (spell.kind === "mirror" || spell.kind === "briar") continue;
     if (spell.kind === "meteor") {
       for (const target of targets) {
         if (target.team !== spell.team && target.hp > 0 && (target.kind === "base" || !target.tunnel) && insideSpell(spell, target, target.kind === "base" ? BASE_RADIUS : 0))
@@ -74,6 +80,7 @@ export function applyMagic(active: readonly FieldSpell[], units: Unit[], targets
       }
       continue;
     }
+    if (spell.kind !== "rain" && spell.kind !== "gust") continue;
     for (const unit of units) {
       if (unit.hp <= 0 || unit.tunnel || !insideSpell(spell, unit)) continue;
       const friendly = unit.team === spell.team;

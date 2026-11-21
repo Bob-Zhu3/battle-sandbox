@@ -127,7 +127,7 @@ try {
       ["Blue","Mythical","Phoenix","Flight and talon strike"], ["Blue","Mythical","Cyclops","Ground smash"],
       ["Red","People","Musketeer","Recoil and reload"], ["Violet","Mythical","Storm Kirin","Chain lightning"],
     ] : values.oddities ? [
-      ["Amber","People","Miner","Cross-field tunnels"], ["Red","People","Clown","Poison balloons"],
+      ["Amber","People","Miner","Cross-field tunnels"], ["Red","People","Clown","Poison bottles"],
       ["Violet","Mythical","Reaper","Soul harvest"], ["Blue","Mythical","Witch","Hex Pig"],
     ] : [
       ["Red","Mythical","Cyclops","Ground smash"], ["Blue","Mythical","Storm Kirin","Chain stun"],

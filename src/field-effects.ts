@@ -119,6 +119,5 @@ export function drawMiasma(c: Pens,e: GroundEffect,tick: number,sx: number,sy: n
     oval(c,x,y,5+3*p,4+3*p,"#b184b2");
     if(i%2===0){c.strokeStyle="#795783";c.lineWidth=1;c.beginPath();c.arc(x,y,4+p,2.7,4.7);c.stroke();}
   }
-  if(age<12){c.globalAlpha=fade*(1-age/12);cut(c,"M-8 1 L-3 -2 L-3 -8 L1 -5 L5 -9 L4 -3 L9 0 L3 2 L3 7 L0 4 L-5 6 L-4 2Z","#f6d991",1);}
   c.restore();
 }

@@ -3,6 +3,7 @@ import { BASE_RADIUS } from "./battlefield.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Arrow {
+  // "balloon" is the Clown's glass bottle in saved and live snapshots.
   kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom" | "balloon" | "hex" | "stone";
   casterId?: number;
   piercedIds?: number[];

@@ -104,7 +104,7 @@ test("a lone hexed survivor keeps the playground awake and changes back on the p
   assert.equal(get(p.world,1).kind,"warrior");assert.equal(get(p.world,1).team,"blue");
 });
 
-test("a Clown balloon pops once; a late arrival is poisoned, machines are immune, and enemy Gust disperses the cloud",()=>{
+test("a Clown bottle breaks once; a late arrival is poisoned, machines are immune, and enemy Gust disperses the cloud",()=>{
   let w=quiet(createBattle([at(1,"clown","red",300),at(2,"post","blue",390),at(3,"lancer","blue",640),at(4,"post","red",340)]));
   get(w,1).nextAttackTick=1;w=stepBattle(w);
   const land=w.arrows[0].landTick;assert.equal(w.arrows[0].kind,"balloon");

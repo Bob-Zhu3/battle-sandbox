@@ -3,6 +3,7 @@ import type { World } from "./room-protocol.ts";
 import { type ArenaPoint } from "./deployment.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { drawFieldSpell } from "./magic-art.ts";
+import { iceShell, rageRibbons } from "./weather-art.ts";
 import { drawMeteor } from "./meteor-art.ts";
 import { stoneMarker } from "./siege-magic-art.ts";
 import { sunbeam } from "./tower-art.ts";
@@ -85,6 +86,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   const byId = new Map(targets.map(target => [target.id, target]));
   for (const base of current.bases ?? []) {
     drawKeep(ctx, base, base.x*sx, base.y*sy, scale, tick);
+    if (base.hp && (base.frozenUntil ?? 0)>tick) iceShell(ctx,base.x*sx,base.y*sy,25*scale,base.frozenUntil!-tick);
     if (base.hp && (base.stunnedUntil ?? 0)>tick) drawStun(ctx,base.x*sx,base.y*sy-24*scale,scale,tick,base.id);
   }
   const prior = new Map(previous.units.map(unit => [unit.id, unit]));
@@ -132,15 +134,19 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     if (!unit.hp) continue;
     if (unit.tunnel) {drawTunnel(ctx,unit,x,y,tick,sx,sy); continue;}
     const travel = from.walkDistance + (unit.walkDistance - from.walkDistance) * blend;
+    const frozen = unit.frozenAt !== undefined && tick>=unit.frozenAt && tick<(unit.frozenUntil ?? 0);
+    const bodyTick = frozen ? unit.frozenAt! : tick;
     const pose = deploying ? restingPose(ARMIES[unit.team].facing)
-      : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), tick, travel, from.lastHitTick);
+      : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), bodyTick, travel, from.lastHitTick,tick);
     const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
+    if (unit.raging) rageRibbons(ctx,x,y,r,tick,unit.id,unit.aimX<0?-1:1);
     const hand = scoops.get(unit.id);
     if (hand) {
       const lift = Math.max(0, Math.min(1, (tick-hand.windup!.since-3)/(UNIT_DEFINITIONS.cyclops.swallowTicks-3)));
       const mouthX = hand.x*sx + (hand.aimX<0?-1:1)*9*scale, mouthY = hand.y*sy-12*scale;
       drawUnitToken(ctx,x+(mouthX-x)*lift,y+(mouthY-y)*lift-12*scale*Math.sin(Math.PI*lift),r*(1-.82*lift),unit.team,unit.kind,pose,unit,tick);
-    } else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, tick);
+    } else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, bodyTick);
+    if (frozen) iceShell(ctx,x,y,r,unit.frozenUntil!-tick);
     if (unit.hex || unit.unhexedTick !== undefined || unit.zombified) drawChange(ctx,unit,x,y,scale,tick);
     if (unit.soul) drawSoul(ctx,unit,x,y,tick,sx,sy);
     if (unit.burn || unit.poison || (unit.rootedUntil ?? 0)>tick || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) drawConditions(ctx,unit,x,y,r,scale,tick);
