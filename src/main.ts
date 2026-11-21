@@ -3,7 +3,7 @@ import { ARMIES, TEAMS, type Team } from "./battlefield.ts";
 import { createField, element } from "./field.ts";
 import { Playground } from "./playground.ts";
 import { drawArena } from "./renderer.ts";
-import { UNIT_DEFINITIONS } from "./units.ts";
+import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 import { SPELLS } from "./spells.ts";
 import { TICKS_PER_SECOND } from "./simulation.ts";
 
@@ -14,11 +14,14 @@ const picker = element<HTMLDetailsElement>("demo-picker");
 const guide = element("empty-guide");
 const undo = element<HTMLButtonElement>("undo");
 const clear = element<HTMLButtonElement>("clear");
+const clockButton = element<HTMLButtonElement>("playground-pause");
 const colors = element("team-tools");
 const scenario = element("scenario-name");
 let team: Team = "red", strokeTeam: Team = team;
 let previous = play.world;
 let lastTime = performance.now(), remainder = 0;
+let lastBlend = 1;
+let animation = 0;
 const tickMs = 1000 / TICKS_PER_SECOND;
 const demo=new URLSearchParams(location.search).get("demo");
 let soundHint=demo==="sound";
@@ -30,6 +33,7 @@ field.canvas.dataset.deploying = "true";
 scenario.hidden = false;
 undo.title = "Remove the last squad you drew";
 clear.title = "Clear the playground";
+clockButton.hidden = false;
 
 function choose(color: Team) {
   team = color;
@@ -69,12 +73,51 @@ if (demo === "siege") {
   play.place("red",{type:"place-lancers",positions:[{x:359,y:177}]});
   previous=play.world;
   choose("blue");field.armBrush("cyclops");
+} else if (demo === "expressions") {
+  const cast: [Team, RecruitKind, number, number][] = [
+    ["red","archer",170,115], ["red","warrior",197,115], ["blue","warrior",286,115],
+    ["red","medic",212,151], ["red","lancer",223,207], ["blue","shieldbearer",336,203],
+    ["red","phoenix",420,120], ["blue","archer",479,125], ["blue","archer",520,146],
+    ["red","cyclops",693,141], ["blue","mouse",720,145], ["blue","mouse",748,161],
+    ["red","kirin",528,252], ["blue","lancer",634,258], ["blue","musketeer",704,256],
+  ];
+  for (const [side,kind,x,y] of cast) play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
+  for (let i=0; i<11; i++) { previous=play.world; play.advance(); }
+  play.paused = true;
 }
 updateBrushHint();
 
-function paint(blend = 1) {
+function paint(blend = play.paused ? lastBlend : 1) {
+  lastBlend = blend;
   drawArena(field.ctx, previous, play.world, blend);
 }
+function syncClockButton() {
+  field.pauseSound(play.paused);
+  const label = play.paused ? "Resume playground" : "Pause playground";
+  clockButton.setAttribute("aria-label", label);
+  clockButton.title = label + " (Space)";
+  clockButton.toggleAttribute("data-paused", play.paused);
+  clockButton.firstElementChild!.classList.toggle("pause", !play.paused);
+  element("match-state").textContent = play.paused ? "Paused" : "Playground";
+}
+function toggleClock() {
+  play.paused = !play.paused;
+  syncClockButton();
+  if (play.paused) {
+    cancelAnimationFrame(animation);
+    update();
+  } else {
+    lastTime = performance.now();
+    animation = requestAnimationFrame(frame);
+  }
+}
+clockButton.addEventListener("click", toggleClock);
+document.addEventListener("keydown", event => {
+  if (event.code !== "Space" || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.target instanceof Element && event.target.closest("button, input, textarea, select, summary, a, [contenteditable=true]")) return;
+  event.preventDefault();
+  toggleClock();
+});
 function update() {
   if(soundHint && play.world.units.length<3){soundHint=false;updateBrushHint();}
   guide.hidden = !!(play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length);
@@ -84,7 +127,9 @@ function update() {
 }
 attachSpellBrush(field.canvas, field.selectedSpell, (spell, point) => {
   const before = play.world;
-  play.cast(team, spell, point.x, point.y); field.hear(before,play.world); previous = play.world; update(); paint();
+  play.cast(team, spell, point.x, point.y);
+  if (!play.paused) { field.hear(before,play.world); previous = play.world; }
+  update(); paint();
 });
 const cancel = attachDeploymentBrush(field.canvas, {
   canDraw: () => !field.selectedSpell(),
@@ -93,17 +138,16 @@ const cancel = attachDeploymentBrush(field.canvas, {
     const before = play.world;
     if (soundHint) {soundHint=false;updateBrushHint();}
     play.place(strokeTeam, { type: UNIT_DEFINITIONS[kind].command, positions: points }, !first);
-    field.hear(before,play.world);
-    previous = play.world;
+    if (!play.paused) { field.hear(before,play.world); previous = play.world; }
     update(); paint();
   },
 });
-undo.addEventListener("click", () => { cancel(); play.undo(); previous = play.world; update(); paint(); });
+undo.addEventListener("click", () => { cancel(); play.undo(); if (!play.paused) previous = play.world; update(); paint(); });
 clear.addEventListener("click", () => { cancel(); play.clear(); previous = play.world; update(); paint(); });
 document.addEventListener("pointerdown", e => { if (picker.open && e.target instanceof Node && !picker.contains(e.target)) picker.open = false; });
 document.addEventListener("keydown", e => { if (e.key === "Escape") picker.open = false; });
 window.addEventListener("blur", cancel);
-document.addEventListener("visibilitychange", () => { lastTime = performance.now(); remainder = 0; if (document.hidden) cancel(); });
+document.addEventListener("visibilitychange", () => { lastTime = performance.now(); if (!play.paused) remainder = 0; if (document.hidden) cancel(); });
 
 function frame(time: number) {
   remainder += Math.min(250, Math.max(0, time - lastTime));
@@ -117,8 +161,9 @@ function frame(time: number) {
   if (before !== play.world.tick) field.hear(startWorld,play.world);
   if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
   if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
-  requestAnimationFrame(frame);
+  animation = requestAnimationFrame(frame);
 }
+syncClockButton();
 update();
 field.watchSize(() => paint());
-requestAnimationFrame(frame);
+if (!play.paused) animation = requestAnimationFrame(frame);

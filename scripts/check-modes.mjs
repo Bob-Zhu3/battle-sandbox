@@ -94,6 +94,43 @@ async function withField(check) {
   finally { closeRoom(); await new Promise(resolve => http.close(resolve)); }
 }
 
+async function pausePlayground(url) {
+  const {page, point} = await open(url, 960, 540, true);
+  try {
+    const tick = () => page.locator("#tick").textContent();
+    const pixels = () => page.locator("#arena").evaluate(c => c.toDataURL());
+    await page.getByRole("button", {name:"Archer",exact:true}).click({force:true});
+    await page.mouse.click(...point(330,155));
+    await page.getByRole("button", {name:"Blue army"}).click({force:true});
+    await page.getByRole("button", {name:"Warrior",exact:true}).click({force:true});
+    await page.mouse.click(...point(438,155));
+    await page.clock.runFor(84);
+    const pose = await pixels();
+    await page.getByRole("button", {name:"Pause playground"}).click({force:true});
+    const frozen = await tick();
+    await page.clock.runFor(900);
+    assert.equal(await pixels(), pose);
+    assert.equal(await tick(), frozen);
+    await page.mouse.click(...point(470,200));
+    assert.equal(await page.locator("#blue-count").textContent(), "2");
+    const newPose = await pixels();
+    assert.notEqual(newPose, pose);
+    await page.clock.runFor(500);
+    assert.equal(await pixels(), newPose);
+    await page.locator("#arena").focus();
+    await page.keyboard.press("Space");
+    await page.clock.runFor(150);
+    const resumed = Number(await tick());
+    assert.ok(resumed > Number(frozen) && resumed <= Number(frozen) + 10);
+    assert.notEqual(await pixels(), newPose);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor), "rgb(255, 255, 255)");
+    await page.goto(url+"/room");
+    await page.locator("#play").waitFor();
+    assert.ok(await page.locator("#playground-pause").isHidden());
+    console.log("Playground: pause holds the exact painted frame, accepts troops and resumes without catching up.");
+  } finally { await page.context().close(); }
+}
+
 async function arrowFlash(url) {
   const {page,point}=await open(url,960,540,true);
   try {
@@ -689,6 +726,7 @@ async function match(url,size) {
 }
 
 try {
+  await withField(pausePlayground);
   await withField(phoenixDuringDeployment);
   await withField(arrowFlash);
   await withField(paletteAndMeteor);

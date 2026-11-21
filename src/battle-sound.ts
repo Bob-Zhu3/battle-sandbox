@@ -98,10 +98,11 @@ export function createBattleSound(button: HTMLButtonElement) {
   const recordings=prepareRecordings(), mix=createCueMixer();
   const storage = "battle.sound.muted";
   let muted = false;
+  let paused = false;
   try { muted = localStorage.getItem(storage) === "true"; } catch { /* Optional preference. */ }
   let ctx: AudioContext | undefined, master: GainNode | undefined, play: ReturnType<typeof instrument> | undefined;
   function unlock() {
-    if (muted || document.hidden || typeof AudioContext === "undefined") return;
+    if (paused || muted || document.hidden || typeof AudioContext === "undefined") return;
     if (!ctx) {
       ctx = new AudioContext({latencyHint:"interactive"});
       master = ctx.createGain(); master.gain.value = .9;
@@ -127,8 +128,16 @@ export function createBattleSound(button: HTMLButtonElement) {
     if (e.key.toLowerCase() === "m" && !e.repeat) { e.preventDefault(); toggle(); }
     else unlock();
   });
-  return function hear(before: World | undefined, world: World) {
-    if (!ctx || !play || ctx.state !== "running" || muted || document.hidden) return;
+  function hear(before: World | undefined, world: World) {
+    if (paused || !ctx || !play || ctx.state !== "running" || muted || document.hidden) return;
     for (const cue of mix(battleCues(before,world),ctx.currentTime)) play(cue);
-  };
+  }
+  function pauseSound(hold: boolean) {
+    if (hold === paused) return;
+    paused = hold;
+    if (hold) void ctx?.suspend().catch(() => {});
+    else if (ctx && !muted) void ctx.resume().catch(() => {});
+    else unlock();
+  }
+  return {hear, pauseSound};
 }

@@ -5,6 +5,7 @@ import type { PlacementCommand } from "./deployment.ts";
 
 export class Playground {
   world = createBattle([]);
+  paused = false;
   private nextId = 1;
   private strokes: number[][] = [];
   private resting = false;
@@ -46,6 +47,7 @@ export class Playground {
   }
 
   advance() {
+    if (this.paused) return;
     const from = this.world;
     if (!from.units.length && !from.arrows.length && !from.spells?.length && !from.effects?.length) return;
     // A quiet field needs only the clock for breathing and blinks. Placing a

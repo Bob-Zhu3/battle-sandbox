@@ -7,6 +7,28 @@ import { characterPose } from "../src/character-pose.ts";
 const troop = (x, y, archer = false) => ({ type: archer ? "place-archers" : "place-warriors", positions: [{ x, y }] });
 function ticks(field, n) { for (let i = 0; i < n; i++) field.advance(); }
 
+test("pausing preserves an airborne arrow and queued spell until exactly the next tick on resume", () => {
+  const control = new Playground(), paused = new Playground();
+  for (const field of [control, paused]) {
+    field.place("red", troop(300, 180, true));
+    field.place("blue", troop(400, 180));
+    ticks(field, 3);
+    assert.equal(field.world.arrows.length, 1);
+  }
+  paused.paused = true;
+  for (const field of [control, paused]) {
+    field.cast("red", "meteor", 400, 180);
+    field.place("red", troop(240, 180));
+  }
+  const stopped = structuredClone(paused.world);
+  ticks(paused, 600);
+  assert.deepEqual(structuredClone(paused.world), stopped);
+  paused.paused = false;
+  ticks(control, 125);
+  ticks(paused, 125);
+  assert.deepEqual(paused.world, control.world);
+});
+
 test("allies idle anywhere; enemies can join a fight and another fight can follow on the same field", () => {
   const field = new Playground();
   field.place("red", troop(740, 110));

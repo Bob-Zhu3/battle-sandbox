@@ -81,6 +81,6 @@ export function createField(mode?: MatchMode) {
     roster.setBudget(amount);
   }
   setGold(undefined);
-  const hear = createBattleSound(element<HTMLButtonElement>("sound-toggle"));
-  return { canvas, ctx, ...roster, hear, watchSize, updateScore, setGold };
+  const sound = createBattleSound(element<HTMLButtonElement>("sound-toggle"));
+  return { canvas, ctx, ...roster, ...sound, watchSize, updateScore, setGold };
 }
