@@ -54,8 +54,8 @@ const recruits = {
     huntRange: 118, harvestHp: 8,
   },
   witch: {
-    name: "Witch", command: "place-witches", description: "A spiral hex turns an enemy into a pig for three seconds. It butts its old allies, then returns with its remaining health.",
-    cost: 29, bounty: 14, attack: "arrow", radius: 12, maxHp: troopHealth(28), speed: 69, reach: 134, damage: 6, cooldownTicks: 225, arrowSpeed: 256, hexTicks: 180,
+    name: "Witch", command: "place-witches", description: "Her spiral permanently turns an enemy into a Hex Pig. It keeps its health and fights for her side until it dies.",
+    cost: 29, bounty: 14, attack: "arrow", radius: 12, maxHp: troopHealth(28), speed: 69, reach: 134, damage: 6, cooldownTicks: 225, arrowSpeed: 256,
   },
   cyclops: {
     name: "Cyclops", command: "place-cyclopes", description: "Raises a spiked club, then smashes, stuns and scatters a crowd. Scoops up wounded humans within arm's reach.",

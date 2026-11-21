@@ -66,42 +66,80 @@ test("a burrowing Miner passes under troops and shots, then surfaces at the chos
   w=stepBattle(w);assert.equal(get(w,3).hp,defs.warrior.maxHp-7);
 });
 
-test("Witch hexes on actual impact, a pig counterattacks its old army, then returns with the same ID and damage",()=>{
+test("the Witch's spiral converts on impact and the pig keeps fighting after the Witch dies",()=>{
   let w=quiet(createBattle([at(1,"witch","red",300),at(2,"engineer","blue",399),at(3,"post","blue",427)]));
-  get(w,1).nextAttackTick=1;get(w,2).builtCount=1;get(w,2).hp=19;
+  get(w,1).nextAttackTick=1;get(w,2).hp=19;
   w=stepBattle(w);assert.equal(w.arrows[0].kind,"hex");assert.equal(get(w,2).kind,"engineer");
   w=waitFor(w,s=>!!get(s,2).hex);
-  const pig=get(w,2),end=pig.hex.until;
+  const pig=get(w,2);
   assert.deepEqual([pig.kind,pig.team,pig.hex.kind,pig.hex.team,pig.hp],["pig","red","engineer","blue",19]);
+  const witch=get(w,1);
+  w.arrows.push({...shot(witch.x,witch.y,"blue",witch.hp),kind:"dart"});
+  w=stepBattle(w);assert.equal(get(w,1).hp,0);
   w=waitFor(w,s=>get(s,3).hp<defs.post.maxHp);
   assert.equal(get(w,2).targetId,3);
-  w.arrows.push(shot(get(w,2).x,get(w,2).y,"blue",4));w=stepBattle(w);
-  const saved=clone(w);w=advance(w,end-w.tick);
-  const restored=get(w,2);
-  assert.deepEqual([restored.kind,restored.team,restored.hp,restored.hex,restored.builtCount],["engineer","blue",15,undefined,1]);
-  assert.equal(restored.unhexedTick,end);assert.deepEqual(advance(saved,end-saved.tick),w);
+  w.arrows.push({...shot(get(w,2).x,get(w,2).y,"blue",4),kind:"dart"});
+  w=stepBattle(w);
+  const saved=clone(w);
+  w=advance(w,360);
+  assert.deepEqual([get(w,2).kind,get(w,2).team,get(w,2).hp],["pig","red",15]);
+  assert.ok(get(w,3).hp<get(saved,3).hp);
+  assert.deepEqual(advance(saved,360),w);
 });
 
-test("a pig cannot be repeatedly hexed or farmed by its original army; its caster losing a base frees it",()=>{
-  const room=new Room();room.join();room.join();room.phase="running";
-  room.world=quiet(createBattle([at(2,"cyclops","blue",400)],0,["red","blue"].map(t=>makeBase("duel",t))));
+test("a permanent pig keeps its allegiance through rival hexes, a server restart, and base losses",()=>{
+  const room=new Room("ffa");
+  const teams=["red","blue","violet"];
+  teams.forEach(()=>room.join());
+  room.phase="running";
+  room.world=quiet(createBattle([at(2,"cyclops","blue",400)],0,teams.map(t=>makeBase("ffa",t))));
   room.world.arrows.push(hexShot(400,180));room.advance();
-  const pig=get(room.world,2),end=pig.hex.until;
+  const pig=get(room.world,2);
   assert.equal(maxHealth(pig),defs.cyclops.maxHp);assert.equal(pig.hp,defs.cyclops.maxHp);
-  room.world.arrows.push(hexShot(pig.x,pig.y,"blue"));room.advance();assert.equal(get(room.world,2).hex.until,end);
-  const saved=clone(room.world);
-  room.world.arrows.push(shot(get(room.world,2).x,get(room.world,2).y,"blue",200));room.advance();
-  assert.equal(room.gold.blue,120);
-  saved.bases[0].hp=1;saved.arrows.push(shot(104,180,"blue",12));
-  const returned=get(stepBattle(saved),2);assert.equal(returned.kind,"cyclops");assert.equal(returned.team,"blue");
+  room.world.arrows.push(hexShot(pig.x,pig.y,"blue"));room.advance();
+  assert.deepEqual(get(room.world,2).hex,pig.hex);
+  assert.equal(get(room.world,2).team,"red");
+  const checkpoint=clone(room.checkpoint(1));
+  // A running match saved by the previous version still carries a reversion timer.
+  Object.assign(get(checkpoint.state.world,2).hex,{until:room.world.tick+1,nextAttackTick:100});
+  for(const fallen of ["blue","red"]){
+    const restored=Room.restore(clone(checkpoint));
+    const base=restored.world.bases.find(b=>b.team===fallen);
+    restored.world.arrows.push(shot(base.x,base.y,"violet",base.hp));restored.advance();
+    const converted=get(restored.world,2);
+    assert.equal(converted.kind,"pig");assert.equal(converted.team,"red");
+    assert.equal(converted.hp,fallen==="red" ? 0 : get(room.world,2).hp);
+  }
+  for(const killer of ["blue","violet"]){
+    const restored=Room.restore(clone(checkpoint)),target=get(restored.world,2);
+    const balance=restored.gold[killer];
+    restored.world.arrows.push(shot(target.x,target.y,killer,target.hp));restored.advance();restored.advance();
+    assert.equal(get(restored.world,2).hp,0);
+    assert.equal(restored.gold[killer],balance+(killer==="blue" ? 0 : defs.cyclops.bounty));
+  }
 });
 
-test("a lone hexed survivor keeps the playground awake and changes back on the promised tick",()=>{
+test("a lone pig idles on its new team and attacks when another enemy enters the playground",()=>{
   const p=new Playground();p.place("blue",command("place-warriors",500,180));
   p.world.arrows.push(hexShot(500,180));p.advance();
-  assert.equal(get(p.world,1).kind,"pig");assert.equal(battleOutcome(p.world),null);
-  for(let i=0;i<defs.witch.hexTicks;i++)p.advance();
-  assert.equal(get(p.world,1).kind,"warrior");assert.equal(get(p.world,1).team,"blue");
+  assert.equal(battleOutcome(p.world),"red");
+  for(let i=0;i<600;i++)p.advance();
+  assert.equal(get(p.world,1).kind,"pig");assert.equal(get(p.world,1).team,"red");
+  p.place("blue",command("place-watchposts",525,180));p.advance();
+  assert.equal(get(p.world,1).targetId,2);assert.equal(get(p.world,2).hp,defs.post.maxHp-defs.pig.damage);
+});
+
+test("a hexed Phoenix dies as a pig and never hatches or respawns",()=>{
+  const p=new Playground();p.place("blue",command("place-phoenixes",500,180));
+  get(p.world,1).hp=defs.warrior.damage;
+  p.world.arrows.push(hexShot(500,180));p.advance();
+  assert.equal(get(p.world,1).kind,"pig");
+  p.place("blue",command("place-warriors",522,180));
+  p.advance();
+  const dead=get(p.world,1);
+  assert.deepEqual([dead.kind,dead.team,dead.hp,dead.emberUntil],["pig","red",0,undefined]);
+  for(let i=0;i<360;i++)p.advance();
+  assert.deepEqual(p.world.units.map(u=>[u.id,u.kind]),[[2,"warrior"]]);
 });
 
 test("a Clown bottle breaks once; a late arrival is poisoned, machines are immune, and enemy Gust disperses the cloud",()=>{

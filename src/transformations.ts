@@ -3,7 +3,7 @@ import type { Target, Unit } from "./simulation.ts";
 import { nearestEnemy } from "./targeting.ts";
 import { isHuman, isMachine, UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 
-export interface Hex { kind: RecruitKind; team: Team; since: number; until: number; nextAttackTick: number }
+export interface Hex { kind: RecruitKind; team: Team; since: number }
 export interface Conversion { id: number; team: Team; casterId: number; kind: "bite" | "hex" }
 export interface Harvest { casterId: number; victimId: number }
 
@@ -38,16 +38,6 @@ function changeAllegiance(unit: Unit, team: Team, tick: number) {
   if (unit.burn?.team === team) delete unit.burn;
 }
 
-export function releaseHex(unit: Unit, tick: number) {
-  const hex = unit.hex;
-  if (!hex) return;
-  unit.kind = hex.kind;
-  changeAllegiance(unit, hex.team, tick);
-  unit.nextAttackTick = Math.max(tick + 1, hex.nextAttackTick);
-  unit.unhexedTick = tick;
-  delete unit.hex;
-}
-
 // Damage, swallowing and base losses settle before a living target changes sides.
 // Contested bites take precedence over a hex. Seat order and caster ID break ties.
 export function resolveConversions(events: Conversion[], byId: ReadonlyMap<number, Unit>, tick: number, fallen: ReadonlySet<Team>) {
@@ -66,7 +56,7 @@ export function resolveConversions(events: Conversion[], byId: ReadonlyMap<numbe
       unit.nextAttackTick = tick + UNIT_DEFINITIONS.zombie.turnTicks;
     } else {
       if (unit.kind === "pig" || !canHex(unit)) continue;
-      unit.hex = {kind: unit.kind, team: unit.team, since: tick, until: tick + UNIT_DEFINITIONS.witch.hexTicks, nextAttackTick: unit.nextAttackTick};
+      unit.hex = {kind: unit.kind, team: unit.team, since: tick};
       unit.kind = "pig";
       changeAllegiance(unit,event.team,tick);
     }

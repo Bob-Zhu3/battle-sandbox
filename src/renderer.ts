@@ -152,7 +152,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     } else if (crowd) drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick);
     else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, bodyTick);
     if (frozen) iceShell(ctx,x,y,r,unit.frozenUntil!-tick);
-    if (unit.hex || unit.unhexedTick !== undefined || unit.zombified) drawChange(ctx,unit,x,y,scale,tick);
+    if (unit.hex || unit.zombified) drawChange(ctx,unit,x,y,scale,tick);
     if (unit.soul) drawSoul(ctx,unit,x,y,tick,sx,sy);
     if (unit.burn || unit.poison || (unit.rootedUntil ?? 0)>tick || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) drawConditions(ctx,unit,x,y,r,scale,tick);
     if (unit.lastTreatedTick !== undefined && tick - unit.lastTreatedTick < 16) {

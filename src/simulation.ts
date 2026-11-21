@@ -1,4 +1,4 @@
-import { collectSouls, hasSoul, hunt, releaseHex, resolveConversions, type Conversion, type Harvest, type Hex } from "./transformations.ts";
+import { collectSouls, hasSoul, hunt, resolveConversions, type Conversion, type Harvest, type Hex } from "./transformations.ts";
 import { advanceTunnel, digFromHome, type Tunnel } from "./tunnels.ts";
 import { recordTrail, type TrailMark } from "./trails.ts";
 import { applyMagic, blownAway, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
@@ -67,7 +67,6 @@ export interface Unit extends Placement {
   poison?: Affliction;
   zombified?: { kind: UnitKind; team: Team; tick: number };
   hex?: Hex;
-  unhexedTick?: number;
   soul?: { x: number; y: number; tick: number };
   tunnel?: Tunnel;
   emergedTick?: number;
@@ -293,11 +292,9 @@ export function stepBattle(battle: Battle): Battle {
   const rings = spells?.filter(s => s.kind === "rage" && tick-s.startTick >= SPELLS.rage.delay) ?? [];
   const winds = activeMagic.filter(spell => spell.kind === "gust");
   const fieldChanges = activeMagic.filter(s => s.kind === "briar" || s.kind === "fault" || s.kind === "rain");
-  // Restore allegiances first so spells and target acquisition see the same teams.
-  const starting = fieldChanges.length || strikes.length || rings.length || battle.units.some(u => u.hp > 0 && (u.raging || u.hex && tick >= u.hex.until)) ? battle.units.map(u => {
+  const starting = fieldChanges.length || strikes.length || rings.length || battle.units.some(u => u.hp > 0 && u.raging) ? battle.units.map(u => {
     if (!u.hp) return u;
     const ready = {...u};
-    if (u.hex && tick >= u.hex.until) releaseHex(ready,tick);
     if (fieldChanges.length) prepareFieldMagic(ready,fieldChanges,tick);
     return ready;
   }) : battle.units;
@@ -531,10 +528,9 @@ export function stepBattle(battle: Battle): Battle {
   collectSouls(cuts, byId, tick);
   if (fallen.size) {
     for (const unit of units) {
-      if (unit.hp && unit.hex && fallen.has(unit.team)) releaseHex(unit,tick);
       if (unit.burn && fallen.has(unit.burn.team)) delete unit.burn;
       if (unit.poison && fallen.has(unit.poison.team)) delete unit.poison;
-      if (unit.hp && (fallen.has(unit.team) || (unit.hex && fallen.has(unit.hex.team)))) { unit.hp = 0; unit.lastHitTick = tick; }
+      if (unit.hp && fallen.has(unit.team)) { unit.hp = 0; unit.lastHitTick = tick; }
     }
   }
   finishTreatments(units, byId, tick, healing);
@@ -561,7 +557,6 @@ export function battleOutcome(battle: Battle): Outcome | null {
     if (survivor && survivor !== unit.team) return null;
     survivor = unit.team;
   }
-  if (battle.units.some(u => u.hp > 0 && u.hex && u.hex.team !== survivor)) return null;
   if (!survivor) return "draw";
   return battle.arrows.some(arrow => arrow.team !== survivor) ? null : survivor;
 }

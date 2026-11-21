@@ -635,22 +635,25 @@ async function turncoatDuel(url) {
     await Promise.all(players.map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
     await blue.page.waitForFunction(()=>document.querySelector("#red-score").title.includes("Hex Pig") && document.querySelector("#red-score").title.includes("Zombie 2"));
     const contact=blue.frames.find(f=>f.world.units[4]?.kind==="pig");
+    const pig=contact.world.units[4];
     assert.ok(contact.world.units[0].tunnel && contact.world.units[0].x>destination.fromX);
     assert.equal(contact.world.units[3].zombified.kind,"archer");
     await picture(red.page,"witch-and-zombies");
+    await blue.page.waitForFunction(tick=>Number(document.querySelector("#tick").textContent)>=tick,pig.hex.since+210);
     await blue.page.reload({waitUntil:"domcontentloaded"});
     await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" && document.querySelector("#red-score").title.includes("Hex Pig"));
     assert.equal(blue.joins[0].resumeToken,blue.joins[1].resumeToken);
     const returned=blue.frames.at(-1),limit=Date.now()+3000;
     while(!red.frames.some(f=>f.revision===returned.revision) && Date.now()<limit)await delay(10);
     assert.deepEqual(red.frames.find(f=>f.revision===returned.revision)?.world,returned.world);
+    const stillPig=returned.world.units.find(u=>u.id===pig.id);
+    assert.ok(returned.world.tick>=pig.hex.since+210 && stillPig.hp>0);
+    assert.deepEqual([stillPig.kind,stillPig.team,stillPig.hex.kind],["pig","red","shieldbearer"]);
     await chooseCard(red.page,"People","Miner");await red.page.mouse.click(...red.point(738,206));
     await Promise.all(players.map(p=>p.waitForUnits(7)));
     assert.ok(blue.frames.at(-1).world.units[6].tunnel.toX>700);
-    await red.page.waitForFunction(()=>Number(document.querySelector("#tick").textContent)>210);
     assert.ok(red.frames.some(f=>f.world.units[0]?.emergedTick && !f.world.units[0].tunnel));
-    assert.ok(red.frames.some(f=>f.world.units[4]?.unhexedTick && f.world.units[4].team==="blue"));
-    console.log("Cross-field Miners, an instantly zombified Archer and a counterattacking Hex Pig agreed across desktop, phone and reconnect.");
+    console.log("Both browsers agreed on the permanent Hex Pig, its health and its team after reconnect, alongside cross-field Miners and a turned Archer.");
   } finally {await Promise.all(players.map(p=>p.page.context().close()));}
 }
 

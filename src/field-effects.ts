@@ -78,8 +78,8 @@ export function drawTunnel(c: Pens,u: Unit,x: number,y: number,tick: number,sx: 
 }
 
 export function drawChange(c: Pens,u: Unit,x: number,y: number,k: number,tick: number) {
-  const hexStart=u.hex?.since ?? -Infinity, bite=u.zombified?.tick ?? -Infinity, end=u.unhexedTick ?? -Infinity;
-  const stamp=Math.max(hexStart,bite,end), age=tick-stamp;
+  const hexStart=u.hex?.since ?? -Infinity, bite=u.zombified?.tick ?? -Infinity;
+  const stamp=Math.max(hexStart,bite), age=tick-stamp;
   if(age<0 || age>24) return;
   const infection=stamp===bite;
   c.save();c.translate(x,y-6*k);c.scale(k,k);c.globalAlpha=1-age/25;

@@ -92,7 +92,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Phoenix | 22 | 11 | A talon strike sets its target on fire for three pulses of 2 damage. On its first defeat it becomes a 1 HP ember egg and hatches at half health after 1.5 seconds if protected. |
 | Zombie | 10 | 5 | One bite immediately turns a surviving human green and changes its team. Look for the former troop's headgear. The new Zombie keeps its ID and up to 33 remaining HP, then can spread the bite. |
 | Reaper | 25 | 12 | Its scythe seeks a living enemy at or below one-third health within 118 units, even if a healthy foe is nearer. Cutting down a living enemy draws one soul into its lantern and restores up to 8 HP. |
-| Witch | 29 | 14 | The pink spiral turns an enemy person or creature into a Hex Pig on impact. It fights its old allies for three seconds. Survivors change back with the same ID and remaining health. Bases and machines take a direct magic hit. |
+| Witch | 29 | 14 | On impact, the pink spiral permanently turns an enemy person or creature into a Hex Pig. It keeps its ID and remaining health and fights for the Witch's side until it dies. Bases and machines take a direct magic hit. |
 
 | Spell | Gold | What happens |
 | --- | ---: | --- |

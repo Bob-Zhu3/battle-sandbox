@@ -18,8 +18,9 @@ export async function playOddities({page,place,show,clear,hp}) {
   assert.match(await roster("red"),/Hex Pig 1/);
   await show(1100,"The pig rushes its old Watchpost.");
   await page.clock.runFor(1000);
-  await show(1000,"Three seconds later the Shieldbearer is blue again.");
-  assert.match(await roster("blue"),/Shieldbearer 1/);await clear();
+  await show(1000,"The pig keeps fighting on the Witch's side.");
+  assert.match(await roster("red"),/Hex Pig 1/);
+  assert.doesNotMatch(await roster("blue"),/Shieldbearer/);await clear();
 
   await place("Red","Zombie",370,160);await place("Blue","Archer",443,164);await place("Blue","Engineer",485,179);
   await show(950,"A bite turns the Archer on the spot.");
