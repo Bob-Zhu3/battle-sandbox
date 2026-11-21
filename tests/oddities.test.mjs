@@ -59,11 +59,11 @@ test("a burrowing Miner passes under troops and shots, then surfaces at the chos
   const end=get(w,1).tunnel.end;w=advance(w,end-2);
   const miner=get(w,1);assert.equal(get(w,3).targetId,null);
   w.arrows.push(shot(miner.x,miner.y,"blue",12));w=stepBattle(w);
-  assert.equal(get(w,1).hp,33);assert.equal(get(w,1).tunnel.toX,440);
+  assert.equal(get(w,1).hp,defs.miner.maxHp);assert.equal(get(w,1).tunnel.toX,440);
   w.arrows=[];w=stepBattle(w);assert.equal(get(w,1).tunnel,undefined);
   assert.deepEqual([get(w,1).x,get(w,1).y,get(w,1).emergedTick],[440,180,end]);
-  w=advance(w,defs.miner.emergeTicks-1);assert.equal(get(w,3).hp,30);
-  w=stepBattle(w);assert.equal(get(w,3).hp,23);
+  w=advance(w,defs.miner.emergeTicks-1);assert.equal(get(w,3).hp,defs.warrior.maxHp);
+  w=stepBattle(w);assert.equal(get(w,3).hp,defs.warrior.maxHp-7);
 });
 
 test("Witch hexes on actual impact, a pig counterattacks its old army, then returns with the same ID and damage",()=>{
@@ -87,7 +87,7 @@ test("a pig cannot be repeatedly hexed or farmed by its original army; its caste
   room.world=quiet(createBattle([at(2,"cyclops","blue",400)],0,["red","blue"].map(t=>makeBase("duel",t))));
   room.world.arrows.push(hexShot(400,180));room.advance();
   const pig=get(room.world,2),end=pig.hex.until;
-  assert.equal(maxHealth(pig),96);assert.equal(pig.hp,96);
+  assert.equal(maxHealth(pig),defs.cyclops.maxHp);assert.equal(pig.hp,defs.cyclops.maxHp);
   room.world.arrows.push(hexShot(pig.x,pig.y,"blue"));room.advance();assert.equal(get(room.world,2).hex.until,end);
   const saved=clone(room.world);
   room.world.arrows.push(shot(get(room.world,2).x,get(room.world,2).y,"blue",200));room.advance();
@@ -108,8 +108,8 @@ test("a Clown balloon pops once; a late arrival is poisoned, machines are immune
   let w=quiet(createBattle([at(1,"clown","red",300),at(2,"post","blue",390),at(3,"lancer","blue",640),at(4,"post","red",340)]));
   get(w,1).nextAttackTick=1;w=stepBattle(w);
   const land=w.arrows[0].landTick;assert.equal(w.arrows[0].kind,"balloon");
-  w=advance(w,land-w.tick-1);assert.equal(get(w,2).hp,37);
-  w=stepBattle(w);assert.equal(get(w,2).hp,34);assert.equal(get(w,2).poison,undefined);
+  w=advance(w,land-w.tick-1);assert.equal(get(w,2).hp,defs.post.maxHp);
+  w=stepBattle(w);assert.equal(get(w,2).hp,defs.post.maxHp-3);assert.equal(get(w,2).poison,undefined);
   assert.equal(w.effects.filter(e=>e.kind==="miasma").length,1);
   get(w,3).x=394;w=advance(w,10);assert.equal(get(w,3).poison?.team,"red");
   const saved=clone(w);w.spells=[{id:50,kind:"gust",team:"blue",x:390,y:180,startTick:w.tick-7}];
@@ -120,11 +120,11 @@ test("a Clown balloon pops once; a late arrival is poisoned, machines are immune
 test("the Reaper prefers a wounded living foe and one scythe earns exactly one healing soul",()=>{
   let w=quiet(createBattle([at(1,"reaper","red",402),at(2,"warrior","blue",390),at(3,"archer","blue",439)]));
   get(w,1).hp=17;get(w,1).nextAttackTick=1;get(w,3).hp=6;w=stepBattle(w);
-  assert.equal(get(w,1).targetId,3);assert.equal(get(w,3).hp,0);assert.equal(get(w,2).hp,30);
+  assert.equal(get(w,1).targetId,3);assert.equal(get(w,3).hp,0);assert.equal(get(w,2).hp,defs.warrior.maxHp);
   assert.equal(get(w,1).hp,25);assert.equal(get(w,1).soul.tick,1);
   w=stepBattle(w);assert.equal(get(w,1).hp,25);
   w=quiet(createBattle([at(1,"reaper","red",400),at(2,"mouse","blue",418)]));
-  get(w,1).nextAttackTick=1;get(w,1).hp=17;w=stepBattle(w);
+  get(w,1).nextAttackTick=1;get(w,1).hp=17;get(w,2).hp=defs.reaper.damage;w=stepBattle(w);
   assert.equal(get(w,2).hp,0);assert.equal(get(w,1).hp,17);assert.equal(get(w,1).soul,undefined);
 });
 

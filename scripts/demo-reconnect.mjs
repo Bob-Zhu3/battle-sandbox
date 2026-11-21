@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { UNIT_DEFINITIONS } from "../src/units.ts";
 import { ROOM_SOCKET } from "../src/room-protocol.ts";
 
 function warriors(frame) {
@@ -49,34 +50,38 @@ export async function runBattleReconnect({ openPlayer, move, capture }) {
     await red.page.waitForFunction(team => document.getElementById(team + "-count").textContent === "1", player.team, wait);
   }
   const deployed = red.frames.at(-1);
-  checkHealth(deployed, 30);
+  const warrior = UNIT_DEFINITIONS.warrior;
+  const afterFirst = warrior.maxHp - warrior.damage, afterSecond = afterFirst - warrior.damage;
+  const labelsAt = hp => [1,2].map(id => "#"+id+" · "+hp+" HP");
+  checkHealth(deployed, warrior.maxHp);
   await capture(players, "One Warrior on each team", 900);
   await red.page.getByRole("button", { name: "Ready", exact: true }).click();
   await blue.page.getByRole("button", { name: "Ready", exact: true }).click();
-  console.log("Red and Blue start a duel with 30 HP each.");
+  console.log(`Red and Blue start a duel with ${warrior.maxHp} HP each.`);
 
   // Disconnect only after Blue's canvas has actually drawn the first damage.
-  await blue.page.waitForFunction(() => window.arenaLabels.join("|") === "#1 · 20 HP|#2 · 20 HP", null, wait);
+  await blue.page.waitForFunction(labels => window.arenaLabels.join("|") === labels, labelsAt(afterFirst).join("|"), wait);
   const firstHit = links[0].frames.find(f => f.world.units.some(u => u.lastHitTick !== null));
   assert.equal(firstHit.world.tick, 90);
-  checkHealth(firstHit, 20);
+  checkHealth(firstHit, afterFirst);
+  const wipeTick = firstHit.world.tick + (Math.ceil(warrior.maxHp/warrior.damage)-1)*warrior.cooldownTicks;
   await disconnect();
-  console.log("Tick 90   Both Warriors have 20 HP. Blue loses its connection.");
+  console.log(`Tick ${firstHit.world.tick}   Both Warriors have ${afterFirst} HP. Blue loses its connection.`);
 
   async function observeMissedHit() {
-    await red.page.waitForFunction(() => document.getElementById("blue-seat").textContent === "Reconnecting" &&
-      !document.getElementById("blue-seat").hidden && window.arenaLabels.join("|") === "#1 · 10 HP|#2 · 10 HP", null, wait);
-    const missedHit = red.frames.find(f => f.phase === "running" && f.seats.blue.reserved && f.world.units[0].hp === 10);
+    await red.page.waitForFunction(labels => document.getElementById("blue-seat").textContent === "Reconnecting" &&
+      !document.getElementById("blue-seat").hidden && window.arenaLabels.join("|") === labels, labelsAt(afterSecond).join("|"), wait);
+    const missedHit = red.frames.find(f => f.phase === "running" && f.seats.blue.reserved && f.world.units[0].hp === afterSecond);
     assert.deepEqual([missedHit.world.tick, missedHit.seats.blue.connected, missedHit.seats.red.connected], [120, false, true]);
-    checkHealth(missedHit, 10);
+    checkHealth(missedHit, afterSecond);
     const frozen = await blue.page.evaluate(() => ({
       state: document.getElementById("match-state").textContent, tick: Number(document.getElementById("tick").textContent),
       labels: window.arenaLabels,
     }));
     assert.equal(frozen.state, "Reconnecting");
     assert.ok(frozen.tick >= firstHit.world.tick && frozen.tick < missedHit.world.tick);
-    assert.deepEqual(frozen.labels, ["#1 · 20 HP", "#2 · 20 HP"]);
-    console.log("Tick 120  Red sees both at 10 HP. Disconnected Blue still shows 20 HP.");
+    assert.deepEqual(frozen.labels, labelsAt(afterFirst));
+    console.log(`Tick ${missedHit.world.tick}  Red sees both at ${afterSecond} HP. Disconnected Blue still shows ${afterFirst} HP.`);
     return { missedHit, frozen };
   }
   const outage = observeMissedHit();
@@ -88,11 +93,11 @@ export async function runBattleReconnect({ openPlayer, move, capture }) {
         observation.missedHit.world.tick + 12, wait);
       return observation;
     }).finally(() => allowRejoin.resolve()),
-    outage.then(() => capture(players, "Red shows 10 HP while disconnected Blue still shows 20 HP", 1900)),
+    outage.then(() => capture(players, `Red shows ${afterSecond} HP while disconnected Blue still shows ${afterFirst} HP`, 1900)),
   ]);
 
-  await blue.page.waitForFunction(() => Object.values(window.battleLabels).some(labels =>
-    labels.join("|") === "#1 · 10 HP|#2 · 10 HP"), null, wait);
+  await blue.page.waitForFunction(expected => Object.values(window.battleLabels).some(labels =>
+    labels.join("|") === expected), labelsAt(afterSecond).join("|"), wait);
   assert.equal(red.connections.length, 1);
   assert.equal(links.length, 2);
   const [original, returned] = links;
@@ -102,18 +107,18 @@ export async function runBattleReconnect({ openPlayer, move, capture }) {
   assert.equal(caughtUp.round, deployed.round);
   assert.equal(caughtUp.phase, "running");
   assert.deepEqual(caughtUp.seats.blue, { connected: true, reserved: false, ready: true });
-  assert.ok(caughtUp.world.tick >= missedHit.world.tick && caughtUp.world.tick < 150);
-  checkHealth(caughtUp, 10);
-  console.log("Tick " + caughtUp.world.tick + "  Blue rejoins its team with #1 and #2 at 10 HP each.");
+  assert.ok(caughtUp.world.tick >= missedHit.world.tick && caughtUp.world.tick < missedHit.world.tick + warrior.cooldownTicks);
+  checkHealth(caughtUp, afterSecond);
+  console.log("Tick " + caughtUp.world.tick + `  Blue rejoins its team with #1 and #2 at ${afterSecond} HP each.`);
   await capture(players, "Blue has rejoined the same battle", 1200);
 
   await red.page.waitForFunction(() => window.arenaLabels.join("|") === "#1 · 0 HP|#2 · 0 HP" &&
     document.getElementById("match-state").textContent === "Live", null, wait);
-  const wipe = red.frames.find(f => f.world.tick === 150);
+  const wipe = red.frames.find(f => f.world.tick === wipeTick);
   checkHealth(wipe, 0);
   assert.equal(wipe.phase, "running");
   assert.deepEqual(wipe.world.bases.map(base => base.hp), [160, 160]);
-  console.log("Tick 150  Both Warriors fall. Both bases stand. Red recruits five reinforcements.");
+  console.log(`Tick ${wipeTick}  Both Warriors fall. Both bases stand. Red recruits five reinforcements.`);
   await move(red, 460, 132);
   await red.page.mouse.down();
   await red.page.waitForFunction(() => window.arenaLabels.length === 3, null, wait);

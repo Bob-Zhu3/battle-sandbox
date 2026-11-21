@@ -31,7 +31,7 @@ test("a room rejects a whole invalid stroke and assigns authoritative units only
   assert.match(room.place("blue", 1, 1, place(at(479.9))), /half/);
   assert.deepEqual(room.place("red", 1, 1, place({ ...at(456), id: 4000, team: "blue", hp: 900, kind: "archer" })).ack.unitIds, [1]);
   assert.deepEqual(room.place("blue", 1, 1, { type: "place-archers", positions: [at(480)] }).ack.unitIds, [2]);
-  assert.deepEqual(room.world.units.map(u => [u.id, u.x, u.kind, u.team, u.hp]), [[1,456,"warrior","red",30],[2,480,"archer","blue",20]]);
+  assert.deepEqual(room.world.units.map(u => [u.id, u.x, u.kind, u.team, u.hp]), [[1,456,"warrior","red",40],[2,480,"archer","blue",27]]);
 
   room.control("red", { type: "undo" });
   assert.deepEqual(room.world.units.map(u => u.id), [2]);
@@ -218,13 +218,13 @@ test("Blue misses a hit while disconnected, rejoins the live duel, and gets the 
       [[1, "red", hp, hitTick], [2, "blue", hp, hitTick]]);
   }
   const hit = await blue.wait(e => e.type === "snapshot" && e.world.units.some(u => u.lastHitTick !== null));
-  checkWarriors(hit, 20, 90);
+  checkWarriors(hit, 30, 90);
   blue.socket.terminate();
   const reserved = await red.wait(e => e.type === "snapshot" && e.seats.blue.reserved);
-  checkWarriors(reserved, 20, 90);
-  const missed = await red.wait(e => e.type === "snapshot" && e.seats.blue.reserved && e.world.tick > reserved.world.tick && e.world.units[0].hp === 10);
+  checkWarriors(reserved, 30, 90);
+  const missed = await red.wait(e => e.type === "snapshot" && e.seats.blue.reserved && e.world.tick > reserved.world.tick && e.world.units[0].hp === 20);
   assert.deepEqual([missed.phase, missed.seats.blue.connected, missed.seats.red.connected], ["running", false, true]);
-  checkWarriors(missed, 10, 120);
+  checkWarriors(missed, 20, 120);
 
   const returned = client(url, { resumeToken: seat.resumeToken });
   assert.deepEqual(await returned.wait(e => e.type === "joined"), seat);
@@ -232,11 +232,11 @@ test("Blue misses a hit while disconnected, rejoins the live duel, and gets the 
   assert.equal(catchUp.phase, "running");
   assert.ok(catchUp.world.tick >= missed.world.tick);
   assert.deepEqual(catchUp.seats.blue, { connected: true, reserved: false, ready: true });
-  checkWarriors(catchUp, 10, 120);
-  const wipe = await red.wait(e => e.type === "snapshot" && e.world.tick === 150);
-  checkWarriors(wipe, 0, 150);
+  checkWarriors(catchUp, 20, 120);
+  const wipe = await red.wait(e => e.type === "snapshot" && e.world.tick === 180);
+  checkWarriors(wipe, 0, 180);
   assert.equal(wipe.phase,"running");
-  assert.deepEqual(wipe.gold,{red:122,blue:122});
+  assert.deepEqual(wipe.gold,{red:126,blue:126});
   red.send(2,round,place(...[132,156,180,204,228].map(y=>at(468,y))));
   const finished = e => e.type === "snapshot" && e.phase === "finished";
   const [a, b] = await Promise.all([red.wait(finished), returned.wait(finished)]);

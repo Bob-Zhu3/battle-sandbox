@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { Room } from "../server/room.ts";
 import { BASE_HP, makeBase, TEAMS } from "../src/battlefield.ts";
 import { createBattle } from "../src/simulation.ts";
@@ -52,7 +53,7 @@ test("three seconds lock the opening formation; income then buys a live reinforc
   assert.deepEqual(room.world.units.slice(0, -1), before.units);
   assert.deepEqual(room.world.bases, before.bases);
   assert.deepEqual(room.world.arrows, before.arrows);
-  assert.equal(room.world.units.at(-1).hp, 20);
+  assert.equal(room.world.units.at(-1).hp, defs.archer.maxHp);
   room.disconnect("red");
   advance(room, 8);
   assert.deepEqual(room.join(red.resumeToken), red);
@@ -68,14 +69,16 @@ test("the killer receives the victim's bounty once on the melee or arrow impact 
   const room = liveRoom(2, [warrior(1, "red", 420, 180), archer(2, "blue", 462, 180)]);
   room.world.units[1].nextAttackTick = 1000;
   room.advance();
-  assert.equal(room.world.units[1].hp, 10);
+  assert.equal(room.world.units[1].hp, defs.archer.maxHp - 10);
   assert.equal(room.gold.red, 120);
+  advance(room, 30);
+  assert.equal(room.world.units[1].hp, defs.archer.maxHp - 20);
   advance(room, 30);
   assert.equal(room.world.units[1].hp, 0);
   assert.equal(room.world.units[1].killedBy, "red");
-  assert.deepEqual(room.gold, {red: 124, blue: 120});
+  assert.deepEqual(room.gold, {red: 128, blue: 124});
   advance(room, 20);
-  assert.equal(room.gold.red, 124);
+  assert.equal(room.gold.red, 128);
 
   const ranged = liveRoom(2, [archer(1, "red", 360, 180), warrior(2, "blue", 460, 180)]);
   ranged.world.units[1].hp = 8;
@@ -126,7 +129,7 @@ test("an Archer can shoot a base from its edge range and a new defender can inte
     advance(room, 24);
     assert.deepEqual(room.world.arrows.map(shot => [shot.team, shot.kind]), [["blue", "bolt"]]);
     assert.equal(room.world.bases[1].hp, defend ? BASE_HP : BASE_HP - 8);
-    if (defend) assert.equal(room.world.units[1].hp, 22);
+    if (defend) assert.equal(room.world.units[1].hp, defs.warrior.maxHp - 8);
     assert.equal(room.gold.red, 120);
   }
 });

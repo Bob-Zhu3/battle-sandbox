@@ -2,11 +2,24 @@ import { ARMIES } from "./battlefield.ts";
 import { INK, cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell, type SpellKind } from "./spells.ts";
 
+// The stone is centered on the cast trajectory, with the flame trailing up its local Y axis.
+function meteor(c: Pens, falling: boolean) {
+  c.lineJoin="round";
+  if(falling){
+    cut(c,"M-5.6 -.8 C-8.1 -9.1 -5.9 -20.8 -7.1 -30.7 Q-3.7 -27 -2.3 -19.7 Q-.4 -26.6 -.9 -37 Q3.1 -29.8 3.3 -18.2 Q5.1 -22 5.5 -25.3 C7.5 -17.2 5.3 -7.3 4.1 -2Z","#f4ae58",.8);
+    cut(c,"M-3.7 -3 C-4.8 -10.8 -2.0 -13.8 -2.3 -21.2 Q.2 -17.1 .3 -11.9 Q2.05 -15.5 2.7 -19.1 Q4.3 -12.45 2.8 -3Z","#ffdf85",0);
+  } else {
+    cut(c,"M-4.8 -1.6 Q-6.5 -6.7 -5.4 -12.8 Q-2.7 -10.15 -2.3 -8.3 Q.1 -13.05 -.8 -17 Q4.5 -12.1 4.9 -4.0 L3.7 -1Z","#f4ae58",1);
+  }
+  cut(c,"M-6.25 -.55 Q-5.95 -5.35 -1.95 -6.55 Q2.5 -7.3 5.55 -3.6 Q7.55 .25 5.1 4.45 Q2.1 7.3 -2.85 5.85 Q-6.3 4.05 -6.25 -.55Z","#e7924c",1.55);
+  cut(c,"M-4.55 -.5 Q-2.95 1.1 -.6 2.1 Q1.7 2.4 2.8 4.1 Q.4 5.6 -2.1 4.3 Q-4.45 2.95 -4.55 -.5Z","#b86946",0);
+  oval(c,2.65,-2.5,1.55,1.12,"#ffe799");
+}
+
 export function drawSpellIcon(c: Pens, kind: SpellKind) {
   c.save(); c.lineCap="round"; c.lineJoin="round";
   if (kind === "meteor") {
-    line(c,-8,-10,2,2,"#bc6746",5); line(c,-1,-13,7,0,"#f0bc61",2.6);
-    oval(c,4,4,6.2,6.2,INK); oval(c,4,4,4.8,4.8,"#e7924c"); oval(c,5,3,1.8,1.5,"#ffe799");
+    c.translate(3.5,4);c.rotate(-Math.PI/4);meteor(c,false);
   } else if (kind === "gust") {
     const curls=new Path2D("M-11 -4 Q-4 -7 2 -4 Q10 0 9 -6 M-12 2 Q-6 -1 1 2 Q8 5 12 1 M-6 7 Q0 5 5 8");
     c.strokeStyle=INK;c.lineWidth=3.3;c.stroke(curls);c.strokeStyle="#a6d9c5";c.lineWidth=1.65;c.stroke(curls);
@@ -20,6 +33,7 @@ export function drawSpellIcon(c: Pens, kind: SpellKind) {
 
 export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: number, sy: number) {
   const age=tick-spell.startTick, spec=SPELLS[spell.kind], r=spec.radius;
+  if (age < 0) return;
   const scale=Math.min(sx,sy);
   c.save(); c.translate(spell.x*sx,spell.y*sy);
   const after=Math.max(0,age-spec.delay), life=Math.max(0,1-age/spec.duration);
@@ -30,9 +44,18 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
   c.globalAlpha=1;
   if(spell.kind==="meteor") {
     if(age<spec.delay) {
-      const t=age/spec.delay;
-      oval(c,0,0,(5+10*t)*sx,(3+5*t)*sy,"#805d485a");
-      c.save();c.translate(-(1-t)*40*sx,-(1-t)*112*scale);c.scale(scale,scale);drawSpellIcon(c,"meteor");c.restore();
+      const progress=age/spec.delay, travel=progress*(.65+.35*progress);
+      const drift=48+.22*spell.y;
+      // Near the left edge the rock enters from the right so its flight stays on the field.
+      const fromX=(spell.x < drift+12 ? drift : -drift)*sx;
+      const fromY=-spell.y*sy-2*scale;
+      oval(c,0,0,(5+10*travel)*sx,(3+5*travel)*sy,"#805d485a");
+      c.save();
+      c.translate(fromX*(1-travel),fromY*(1-travel));
+      c.rotate(Math.atan2(fromX,-fromY));
+      c.scale(scale,scale);
+      meteor(c,true);
+      c.restore();
     } else {
       c.strokeStyle="#fff0b7";c.lineWidth=4*scale*(1-after/(spec.duration-spec.delay));c.beginPath();
       c.ellipse(0,0,r*sx*Math.min(1,(after+1)/11),r*sy*Math.min(1,(after+1)/11),0,0,Math.PI*2);c.stroke();

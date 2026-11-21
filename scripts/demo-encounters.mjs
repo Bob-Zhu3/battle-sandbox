@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { playOddities } from "./oddities-scenes.mjs";
 import { playMotion } from "./motion-scenes.mjs";
 import { once } from "node:events";
@@ -29,12 +30,13 @@ try {
   const click=button=>button.click({force:true});
   const button=(container,name)=>container.getByRole("button",{name,exact:true});
   const shelves = {
-    People:["Lancer","Musketeer","Venom Scout","Bomber","Miner","Clown","Shieldbearer","Engineer"],
+    People:["Warrior","Archer","Lancer","Musketeer","Venom Scout","Bomber","Miner","Clown","Shieldbearer","Engineer"],
     Machines:["Watchpost"], Mythical:["Storm Kirin","Cyclops","Frost Queen","Phoenix","Reaper","Witch","Zombie"], Spells:["Healing Rain","Gust"],
   };
   async function brush(team,name) {
     await click(button(page,team+" army"));
-    if(name==="Warrior" || name==="Archer"){await click(button(page,name));return;}
+    const quick=button(page.locator("#brush-tool"),name);
+    if(await quick.count()){await click(quick);return;}
     const shelf=Object.keys(shelves).find(key=>shelves[key].includes(name));
     await click(button(page,"Roster"));
     await click(button(panel,shelf));
@@ -66,11 +68,12 @@ try {
     await place("Blue","Lancer",515,170);await place("Blue","Watchpost",500,228);
     await place("Blue","Venom Scout",555,212);await place("Blue","Bomber",590,180);
     await show(700,"The Lancer lowers his spear.");
-    assert.equal(await hp("blue"),107);
+    const formationHp=defs.lancer.maxHp+defs.post.maxHp+defs.scout.maxHp+defs.bomber.maxHp;
+    assert.equal(await hp("blue"),formationHp);
     await place("Red","Storm Kirin",407,132);
     await show(150,"One bolt stuns all four enemies.");
     await show(850,"One bolt stuns all four enemies.",true);
-    assert.equal(await hp("blue"),83);
+    assert.equal(await hp("blue"),formationHp-24);
     await show(650,"The Lancer has to build up speed again.");
     await clear();
 
@@ -79,9 +82,9 @@ try {
     await show(450,"Watch the club come up.");
     await show(250,"The impact throws the front line back.");
     await show(700,"The impact throws the front line back.",true);
-    assert.equal(await hp("blue"),21);
-    await show(500,"The wounded Lancer comes back within reach.");
-    await show(200,"The Cyclops swallows him.");
+    assert.equal(await hp("blue"),defs.lancer.maxHp+defs.archer.maxHp+defs.musketeer.maxHp-3*defs.cyclops.damage);
+    await show(2150,"The Lancer closes again and the Cyclops raises its club a second time.");
+    await show(1000,"The Cyclops scoops up the wounded Lancer.");
     await show(550,"The Cyclops swallows him.",true);
     assert.equal(await page.locator("#blue-count").textContent(),"2");
     await clear();
@@ -103,7 +106,7 @@ try {
     await place("Red","Gust",406,183);
     await show(250,"A friendly Gust hatches it early.");
     await show(600,"A friendly Gust hatches it early.",true);
-    assert.equal(await hp("red"),16);
+    assert.equal(await hp("red"),Math.ceil(defs.phoenix.maxHp/2));
   }
   assert.deepEqual(errors,[]);
   if(values.frames) {

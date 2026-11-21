@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 
 export async function playOddities({page,place,show,clear,hp}) {
   const roster=team=>page.locator("#"+team+"-score").getAttribute("title");
@@ -10,7 +11,7 @@ export async function playOddities({page,place,show,clear,hp}) {
   await place("Blue","Watchpost",545,167);await place("Red","Miner",512,165);
   await page.clock.runFor(680);
   await show(1350,"The Miner surfaces at the little red flag.");
-  assert.ok((await hp("blue"))<37);await clear();
+  assert.ok((await hp("blue"))<defs.post.maxHp);await clear();
 
   await place("Red","Witch",358,166);await place("Blue","Shieldbearer",443,166);await place("Blue","Watchpost",494,169);
   await show(500,"The Witch turns a Shieldbearer into a pig.");
@@ -34,8 +35,8 @@ export async function playOddities({page,place,show,clear,hp}) {
   await show(450,"A defending Gust clears the cloud.");await clear();
 
   await place("Red","Reaper",424,171);await place("Blue","Warrior",454,171);
-  await show(1400,"The Reaper and Warrior trade blows.");
-  await show(350,"The last scythe stroke brings a soul to the lantern.");
-  assert.equal(await hp("blue"),0);assert.equal(await hp("red"),10);
+  await show(2100,"The Reaper and Warrior trade blows.");
+  await show(450,"The last scythe stroke brings a soul to the lantern.");
+  assert.equal(await hp("blue"),0);assert.equal(await hp("red"),defs.reaper.maxHp - 5*defs.warrior.damage + defs.reaper.harvestHp);
   await show(450,"The last scythe stroke brings a soul to the lantern.",true);
 }

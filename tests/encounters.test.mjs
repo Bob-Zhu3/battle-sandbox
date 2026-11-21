@@ -56,10 +56,10 @@ test("the Shieldbearer raises its shield before impact; frontal and rear shots r
     let w=quiet(createBattle([at(1,"shieldbearer","red",350),at(2,"post","blue",600)]));
     w.arrows.push(shot("blue",front?400:316,180,front?-5:5,8,kind));
     w=stepBattle(w);
-    assert.equal(find(w,1).hp,46);
+    assert.equal(find(w,1).hp,defs.shieldbearer.maxHp);
     if(front) assert.equal(find(w,1).lastBraceTick,1);
-    w=until(w,s=>find(s,1).hp<46);
-    assert.equal(find(w,1).hp,46-damage);
+    w=until(w,s=>find(s,1).hp<defs.shieldbearer.maxHp);
+    assert.equal(find(w,1).hp,defs.shieldbearer.maxHp-damage);
     assert.equal(find(w,1).lastBlockTick!==undefined,damage===2);
     assert.equal(w.arrows.length,0);
   }
@@ -177,8 +177,8 @@ test("rain pulses three times and a marked Meteor hits only the enemies still in
   find(w,1).hp=8;
   cast(w,"rain","red",400,180);w.spells.push({id:501,team:"red",kind:"meteor",x:434,y:180,startTick:0});
   w=advance(w,11);assert.equal(find(w,1).hp,8);w=stepBattle(w);assert.equal(find(w,1).hp,13);
-  w=advance(w,35);find(w,3).x=600;assert.equal(find(w,2).hp,37);
-  w=stepBattle(w);assert.equal(find(w,2).hp,20);assert.equal(find(w,3).hp,20);assert.equal(find(w,1).hp,18);
+  w=advance(w,35);find(w,3).x=600;assert.equal(find(w,2).hp,defs.post.maxHp);
+  w=stepBattle(w);assert.equal(find(w,2).hp,defs.post.maxHp-17);assert.equal(find(w,3).hp,defs.archer.maxHp);assert.equal(find(w,1).hp,18);
   w=advance(w,36);assert.equal(find(w,1).hp,23);
 });
 

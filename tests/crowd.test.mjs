@@ -68,5 +68,5 @@ test("the 20-vs-20 front lines touch with both armies present and units remain d
   }
   assert.ok(sawContact, "the opposing front ranks never reached one another at full strength");
   assert.notEqual(battleOutcome(battle), null);
-  assert.equal(battle.tick, 238, "the original Warrior formation keeps its replay timing");
+  assert.equal(battle.tick, 297, "the reinforced Warrior formation keeps its replay timing");
 });

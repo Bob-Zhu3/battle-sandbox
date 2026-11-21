@@ -7,7 +7,7 @@ export const SPELLS = {
   gust: { name: "Gust", command: "cast-gust", cost: 10, radius: 70, delay: 8, duration: 32,
     description: "Pushes enemies outward, scatters incoming arrows and fans friendly Phoenix embers." },
   meteor: { name: "Meteor", command: "cast-meteor", cost: 20, radius: 58, delay: 48, duration: 69,
-    description: "Marks the ground, then strikes enemies inside the ring. Troops can escape the shadow." },
+    description: "Falls from the top of the field onto the marked ground. Troops can escape its shadow." },
   rain: { name: "Healing Rain", command: "cast-rain", cost: 15, radius: 65, delay: 12, duration: 100,
     description: "Three showers heal allies and put out burning feathers or clothing. Rain puts out enemy Phoenix eggs." },
 } as const;

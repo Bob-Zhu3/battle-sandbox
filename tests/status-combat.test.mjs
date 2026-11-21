@@ -32,11 +32,11 @@ test("each of four lightning contacts stuns; a chained Lancer loses its charge e
       assert.equal(get(world,id).stunnedUntil,1+defs.kirin.stunTicks);
       assert.equal(get(world,id).hp,defs[get(world,id).kind].maxHp-damage);
     }
-    assert.equal(get(world,6).stunnedUntil,undefined);assert.equal(get(world,7).hp,30);
+    assert.equal(get(world,6).stunnedUntil,undefined);assert.equal(get(world,7).hp,defs.warrior.maxHp);
     assert.equal(get(world,3).lastChargeTick,undefined);assert.equal(get(world,3).runUp,0);
     const x=get(world,3).x;world=advance(world,defs.kirin.stunTicks-1);
     assert.equal(get(world,3).x,x);assert.equal(get(world,3).runUp,0);
-    world=stepBattle(world);assert.equal(get(world,7).hp,23);
+    world=stepBattle(world);assert.equal(get(world,7).hp,defs.warrior.maxHp-7);
   }
 });
 
@@ -48,7 +48,7 @@ test("a lightning strike on the last wind-up tick cancels a Cyclops slam; a near
     world.units.push(...createBattle([at(3,attacker,attacker==="kirin"?"blue":"red",attacker==="kirin"?322:401)]).units);
     world=stepBattle(world);
     assert.equal(get(world,1).windup,undefined);assert.ok(get(world,1).stunnedUntil>world.tick);
-    assert.equal(get(world,1).lastSmashTick,undefined);assert.equal(get(world,2).hp,37);
+    assert.equal(get(world,1).lastSmashTick,undefined);assert.equal(get(world,2).hp,defs.post.maxHp);
     if(attacker==="mouse")assert.equal(get(world,3).lastSqueakTick,world.tick);
   }
 });
@@ -57,14 +57,14 @@ test("a club hits its marked patch once, stuns and shoves both enemies while an 
   let world=quiet(createBattle([at(1,"cyclops","red",410),at(2,"warrior","blue",448),
     at(3,"lancer","blue",462,194),at(4,"archer","red",450,195),at(5,"post","blue",585)]));
   get(world,1).nextAttackTick=1;
-  world=advance(world,defs.cyclops.windup);assert.equal(get(world,2).hp,30);
+  world=advance(world,defs.cyclops.windup);assert.equal(get(world,2).hp,defs.warrior.maxHp);
   get(world,3).runUp=60;
   const before=get(world,2).x;
   world=stepBattle(world);const t=world.tick;
   assert.equal(world.effects.filter(e=>e.kind==="smash").length,1);
-  for(const [id,hp] of [[2,14],[3,10],[4,20],[5,37]])assert.equal(get(world,id).hp,hp);
+  for(const [id,damage] of [[2,16],[3,16],[4,0],[5,0]])assert.equal(get(world,id).hp,defs[get(world,id).kind].maxHp-damage);
   assert.equal(get(world,3).runUp,0);assert.equal(get(world,3).stunnedUntil,t+defs.cyclops.stunTicks);
-  world=advance(world,7);assert.ok(get(world,2).x-before>30);assert.equal(get(world,2).hp,14);
+  world=advance(world,7);assert.ok(get(world,2).x-before>30);assert.equal(get(world,2).hp,defs.warrior.maxHp-16);
 });
 
 test("a ground stun takes priority over a charged thrust on its contact tick in either storage order",()=>{
@@ -110,10 +110,10 @@ test("a bomb follows its marked ground point after the Bomber falls and damages 
   get(world,1).nextAttackTick=1;world=stepBattle(world);
   const bomb=world.arrows.find(a=>a.kind==="bomb");assert.ok(bomb);const land=bomb.landTick;
   get(world,1).hp=0;get(world,4).y=310;
-  world=advance(world,land-world.tick-1);assert.equal(get(world,2).hp,37);
+  world=advance(world,land-world.tick-1);assert.equal(get(world,2).hp,defs.post.maxHp);
   world=stepBattle(world);assert.equal(world.effects[0].tick,land);assert.equal(world.arrows.length,0);
-  for(const [id,hp] of [[2,24],[3,24],[4,20],[5,20]])assert.equal(get(world,id).hp,hp);
-  assert.equal(get(advance(world,20),2).hp,24);
+  for(const [id,damage] of [[2,13],[3,13],[4,0],[5,0]])assert.equal(get(world,id).hp,defs[get(world,id).kind].maxHp-damage);
+  assert.equal(get(advance(world,20),2).hp,defs.post.maxHp-13);
 });
 
 test("one bullet pierces two enemies in contact order, remembers a previous hit, and stops on a facing shield",()=>{
@@ -121,15 +121,15 @@ test("one bullet pierces two enemies in contact order, remembers a previous hit,
     let world=quiet(createBattle([at(1,"musketeer","red",250),at(2,"post","blue",350),
       at(3,shield?"shieldbearer":"post","blue",395),at(4,"post","blue",433),at(5,"post","red",330)]));
     get(world,1).nextAttackTick=1;world=stepBattle(world);
-    assert.equal(world.arrows[0].kind,"bullet");assert.equal(get(world,2).hp,37);
+    assert.equal(world.arrows[0].kind,"bullet");assert.equal(get(world,2).hp,defs.post.maxHp);
     world=waitFor(world,w=>w.arrows.some(a=>a.piercedIds?.length===1));const saved=JSON.parse(JSON.stringify(world));
-    world=advance(world,18);assert.equal(get(world,2).hp,26);
-    assert.equal(get(world,3).hp,(shield?46:37)-(shield?2:6));assert.equal(get(world,4).hp,37);
+    world=advance(world,18);assert.equal(get(world,2).hp,defs.post.maxHp-11);
+    assert.equal(get(world,3).hp,defs[shield?"shieldbearer":"post"].maxHp-(shield?2:6));assert.equal(get(world,4).hp,defs.post.maxHp);
     assert.deepEqual(advance(saved,18),world);
   }
   let world=quiet(createBattle([at(2,"shieldbearer","blue",354),at(3,"post","blue",390)]));
   world.arrows.push(shot("bullet","red",340,170,90,11));world=stepBattle(world);
-  assert.equal(get(world,2).hp,43);assert.equal(get(world,3).hp,37);assert.equal(world.arrows.length,0);
+  assert.equal(get(world,2).hp,defs.shieldbearer.maxHp-3);assert.equal(get(world,3).hp,defs.post.maxHp);assert.equal(world.arrows.length,0);
 });
 
 test("a Frost Queen shard slows several enemies only on impact and movement returns to normal at expiry",()=>{
@@ -139,7 +139,7 @@ test("a Frost Queen shard slows several enemies only on impact and movement retu
   assert.equal(world.arrows[0].kind,"ice");assert.equal(get(world,2).slowUntil,undefined);
   world=waitFor(world,w=>w.effects?.some(e=>e.kind==="frost"));
   const until=get(world,2).slowUntil;assert.equal(until,world.tick+defs.frostqueen.slowTicks);
-  assert.equal(get(world,3).slowUntil,until);assert.equal(get(world,4).slowUntil,undefined);assert.equal(get(world,5).hp,37);
+  assert.equal(get(world,3).slowUntil,until);assert.equal(get(world,4).slowUntil,undefined);assert.equal(get(world,5).hp,defs.post.maxHp);
   const runner=get(world,2);
   world.units=[runner,...createBattle([at(9,"post","red",930,runner.y)]).units];get(world,9).nextAttackTick=10000;
   const x=runner.x;world=stepBattle(world);assert.ok(Math.abs(get(world,2).x-x-defs.lancer.speed*defs.frostqueen.speedFactor/60)<.0001);
@@ -150,11 +150,11 @@ test("a Frost Queen shard slows several enemies only on impact and movement retu
 test("poison ticks on its schedule, ignores machines, and a Medic's completed treatment clears it",()=>{
   let world=quiet(createBattle([at(1,"medic","blue",395),at(2,"warrior","blue",424),at(3,"post","blue",510)]));
   world.arrows.push(shot("venom","red",424,170,3,3),shot("venom","red",510,170,3,3));
-  world=stepBattle(world);assert.equal(get(world,2).hp,27);assert.equal(get(world,3).poison,undefined);
+  world=stepBattle(world);assert.equal(get(world,2).hp,defs.warrior.maxHp-3);assert.equal(get(world,3).poison,undefined);
   const unattended=JSON.parse(JSON.stringify(world));unattended.units=unattended.units.filter(u=>u.id!==1);
-  assert.equal(get(advance(unattended,29),2).hp,27);
-  const last=advance(unattended,90);assert.equal(get(last,2).hp,18);assert.equal(get(last,2).poison,undefined);
-  world=waitFor(world,w=>!!get(w,1).lastHealTick);assert.equal(get(world,2).poison,undefined);assert.equal(get(world,2).hp,30);
+  assert.equal(get(advance(unattended,29),2).hp,defs.warrior.maxHp-3);
+  const last=advance(unattended,90);assert.equal(get(last,2).hp,defs.warrior.maxHp-12);assert.equal(get(last,2).poison,undefined);
+  world=waitFor(world,w=>!!get(w,1).lastHealTick);assert.equal(get(world,2).poison,undefined);assert.equal(get(world,2).hp,defs.warrior.maxHp);
 });
 
 test("Phoenix talons ignite the target; its egg does not spread fire, and friendly Rain extinguishes a burning ally",()=>{
@@ -174,7 +174,7 @@ test("a bite turns a living human on contact, preserves its ID, and pays only fo
   room.world.bases=["red","blue"].map(t=>makeBase("duel",t));
   get(room.world,1).nextAttackTick=1;room.advance();
   const turned=get(room.world,2);
-  assert.deepEqual([turned.kind,turned.team,turned.hp],["zombie","red",23]);
+  assert.deepEqual([turned.kind,turned.team,turned.hp],["zombie","red",defs.musketeer.maxHp]);
   assert.deepEqual(turned.zombified,{kind:"musketeer",team:"blue",tick:1});
   assert.equal(turned.nextAttackTick,1+defs.zombie.turnTicks);assert.equal(room.gold.red,120);
   const saved=JSON.parse(JSON.stringify(room.world));

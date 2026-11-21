@@ -85,7 +85,7 @@ button:disabled { cursor: default; }
 .tool, .brush-tool { font-size: .94rem; }
 .brush-choices { display: flex; gap: 5px; margin-right: 4px; }
 .brush-tool { gap: 5px; padding-left: 8px; }
-.brush-tool[aria-pressed="true"], .roster-open[data-selected="true"] { background: #f3cc7a; box-shadow: inset 0 -3px #c7974c, 2px 3px var(--ink); transform: rotate(-2deg); }
+.brush-tool[aria-pressed="true"] { background: #f3cc7a; box-shadow: inset 0 -3px #c7974c, 2px 3px var(--ink); transform: translateY(-3px); }
 .brush-icon { width: 31px; height: 31px; }
 .team-tools { display: flex; align-items: center; gap: 5px; margin-right: 3px; }
 .swatch { display: grid; place-items: center; width: 27px; height: 31px; padding: 0; border: 2px solid var(--ink); background: var(--dye); border-radius: 9px 7px 9px 6px; box-shadow: 0 2px var(--ink); }
@@ -164,7 +164,18 @@ kbd { padding: 2px 5px; border: 1px solid #799066; border-bottom-width: 2px; bor
   .bottom-hud { padding-bottom: 10px; }
   .brush-tool, .tool, .play { min-height: 37px; padding-block: 3px; }
 }
-.roster-open { gap: 5px; }
+.roster-open { gap: 5px; align-self: center; }
+#brush-tool[hidden] + .roster-open { display: none; }
+.tool-strip { align-items: center; }
+.brush-choices { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: min(42vw, 432px); gap: 4px; }
+.tool-strip > :is(.tool, .roster-open) { padding-inline: 9px; }
+.brush-choices .quick-card { position: relative; display: grid; grid-template-rows: 1fr 23px; justify-items: center; align-items: end; gap: 0; min-height: 0; height: 76px; padding: 2px 2px 4px; white-space: normal; }
+.quick-card .brush-icon { align-self: center; width: 46px; height: 46px; }
+.quick-card .quick-name { align-self: center; display: block; text-align: center; font: 800 .88rem/.92 var(--display); }
+.quick-card kbd { position: absolute; left: 3px; top: 3px; padding: 0 2px; color: #526347; background: var(--paper); border: 0; font: 800 .68rem/1 var(--display); }
+.quick-card .quick-price { position: absolute; right: 2px; top: 2px; background: #ffdf91; padding: 1px 2px; border-radius: 3px; font-size: .75rem; }
+.quick-card[data-editing] { outline: 3px dashed #396242; outline-offset: 1px; }
+.roster-assignment { margin: 7px 4px 4px; font-size: .78rem; line-height: 1.2; }
 .roster-mark { width: 18px; height: 18px; transform: rotate(-7deg); border: 2px solid var(--ink); border-radius: 2px; background: linear-gradient(90deg,transparent 44%,var(--ink) 45% 55%,transparent 56%),linear-gradient(transparent 44%,var(--ink) 45% 55%,transparent 56%),#e3b565; }
 .roster-panel { position: absolute; z-index: 5; pointer-events: auto; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); width: min(535px,95vw); padding: 8px; border: 2px solid var(--ink); border-radius: 7px 10px 5px 8px; box-shadow: 3px 4px var(--ink); background: #fff5d8; }
 .roster-tabs { display: flex; align-items: center; gap: 3px; padding-bottom: 6px; border-bottom: 1px solid #b5ad8e; }
@@ -192,8 +203,28 @@ kbd { padding: 2px 5px; border: 1px solid #799066; border-bottom-width: 2px; bor
   .roster-card b { grid-column: 1; grid-row: 2; text-align: center; }
   .roster-card > span { grid-row: span 2; }
   .roster-tabs button { padding-inline: 7px; }
-  .roster-open .brush-icon { width: 22px; }
 }
-@media (max-width: 670px) {
-  .brush-choices { flex: 0 0 100%; order: -1; justify-content: center; }
+@media (max-width: 850px) {
+  .brush-choices { flex: 0 0 100%; order: 2; margin: 2px 0 0; width: 100%; }
+  .tools { width: min(465px,95vw); }
+  .tool-strip { justify-content: center; }
+  .brush-choices .quick-card { height: 62px; grid-template-rows: 1fr 19px; padding: 1px 1px 3px; }
+  .quick-card .brush-icon { width: 37px; height: 37px; }
+  .quick-card .quick-name { font-size: .76rem; }
+  .quick-card .quick-price { font-size: .66rem; }
+  .roster-panel { max-height: calc(100svh - 156px); overflow-y: auto; }
+}
+@media (pointer: coarse) {
+  .quick-card kbd { display: none; }
+}
+@media (max-width: 525px) {
+  .tool-strip > :is(#undo, #clear) { width: 44px; min-height: 44px; padding: 0; gap: 0; font-size: 0; }
+  .tool-strip > #undo i { font-size: 1.25rem; }
+  .tool-strip > .play { padding-inline: 10px; }
+}
+@media (max-height: 450px) and (min-aspect-ratio: 1/1) {
+  .brush-choices .quick-card { height: 49px; grid-template-rows: 1fr 14px; }
+  .quick-card .brush-icon { width: 30px; height: 30px; }
+  .quick-card .quick-name { font-size: .73rem; }
+  .roster-panel { max-height: calc(100svh - 130px); overflow-y: auto; }
 }

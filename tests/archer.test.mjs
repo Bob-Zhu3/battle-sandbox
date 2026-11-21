@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { battleOutcome, createBattle, stepBattle } from "../src/simulation.ts";
 import { archerScreen, battleFromDeployment } from "../src/deployment.ts";
 
@@ -20,17 +21,17 @@ test("one arrow leaves a stationary enemy at full health until its first and onl
     if (target.hp !== lastHp) changes.push([tick, lastHp, target.hp]);
     lastHp = target.hp;
     if (tick === 1) {
-      assert.equal(target.hp, 20);
+      assert.equal(target.hp, defs.archer.maxHp);
       assert.equal(target.lastHitTick, null);
       assert.equal(battle.arrows[0].x, 240, "release leaves the arrow at the bow");
     }
-    if (tick < 19) assert.equal(target.hp, 20);
+    if (tick < 19) assert.equal(target.hp, defs.archer.maxHp);
     assert.equal(battle.arrows.length, tick < 19 ? 1 : 0);
   }
-  assert.deepEqual(changes, [[19, 20, 12]]);
+  assert.deepEqual(changes, [[19, defs.archer.maxHp, defs.archer.maxHp - 8]]);
   battle = stepBattle(battle);
   assert.equal(battle.arrows.length, 1, "the next cooldown expires on tick 49");
-  assert.equal(battle.units[1].hp, 12);
+  assert.equal(battle.units[1].hp, defs.archer.maxHp - 8);
 });
 
 test("Archers approach at their own speed, stop in reach, and use the Warrior targeting tie-break", () => {
@@ -60,9 +61,9 @@ test("a swept arrow ignores allies and hits only the first enemy along the segme
   // Both ends of this deliberately long step are clear of every circle.
   battle.arrows.push({ team: "red", x: 132, y: 150, vx: 140, vy: 0, damage: 8, releasedTick: 0 });
   battle = stepBattle(battle);
-  assert.deepEqual(battle.units.map(unit => unit.hp), [20, 20, 20, 12]);
+  assert.deepEqual(battle.units.map(unit => unit.hp), [defs.archer.maxHp, defs.archer.maxHp, defs.archer.maxHp, defs.archer.maxHp - 8]);
   assert.equal(battle.arrows.length, 0);
-  assert.deepEqual(stepBattle(battle).units.map(unit => unit.hp), [20, 20, 20, 12]);
+  assert.deepEqual(stepBattle(battle).units.map(unit => unit.hp), [defs.archer.maxHp, defs.archer.maxHp, defs.archer.maxHp, defs.archer.maxHp - 8]);
 });
 
 test("a released arrow continues after its Archer falls and can turn the result into a draw", () => {
@@ -84,7 +85,7 @@ test("an enemy can walk into an arrow's path between two clear endpoints", () =>
   battle.arrows.push({ team: "red", x: 164, y: 150, vx: 60, vy: 0, damage: 8, releasedTick: 0 });
   const next = stepBattle(battle);
   assert.ok(next.units[1].y < 161);
-  assert.equal(next.units[1].hp, 22);
+  assert.equal(next.units[1].hp, defs.warrior.maxHp - 8);
   assert.equal(next.arrows.length, 0);
 });
 
@@ -117,7 +118,7 @@ test("a shot keeps its release direction when the target moves aside and clears 
   }
   assert.equal(battle.tick, 174);
   assert.equal(battle.arrows.length, 0);
-  assert.equal(battle.units[1].hp, 30);
+  assert.equal(battle.units[1].hp, defs.warrior.maxHp);
   assert.ok(battle.units[1].y > 170);
 });
 
@@ -133,7 +134,7 @@ test("the screen meets the enemy while five protected Archers deliver two volley
     if (released.length) {
       assert.equal(released.length, 5);
       assert.equal(screen.length, 5);
-      assert.ok(archers.every(a => a.hp === 20 && screen.every(w => w.x > a.x)));
+      assert.ok(archers.every(a => a.hp === defs.archer.maxHp && screen.every(w => w.x > a.x)));
       volleys++;
     }
     if (battle.arrows.length && screen.some(w => opposing.some(b => Math.hypot(w.x - b.x, w.y - b.y) <= 22.05))) {

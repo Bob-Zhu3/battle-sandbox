@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { characterPose, HIT_FLASH_TICKS, phoenixFlight } from "../src/character-pose.ts";
 import { afflict } from "../src/conditions.ts";
 import { battleFromDeployment, overTheShoulder } from "../src/deployment.ts";
@@ -88,7 +89,7 @@ test("a covered Archer releases, peers over its screen, then its Warrior ducks b
       assert.equal(poseOf(battle, archer).loose, 1);
       assert.equal(warrior.lastAttentionTick, null);
       assert.equal(poseOf(battle, target).hurt, 0);
-      assert.equal(target.hp, 20);
+      assert.equal(target.hp, defs.archer.maxHp);
     }
     if (tick === 10) assert.equal(poseOf(battle, archer).peek, 1);
     if (warrior.lastAttentionTick === tick) {
@@ -100,9 +101,9 @@ test("a covered Archer releases, peers over its screen, then its Warrior ducks b
       assert.equal(impact, undefined);
       impact = tick;
       assert.equal(poseOf(battle, target).hurt, 1);
-      assert.equal(target.hp, 12);
+      assert.equal(target.hp, defs.archer.maxHp - 8);
     }
-    assert.equal(warrior.hp, 30);
+    assert.equal(warrior.hp, defs.warrior.maxHp);
   }
   assert.ok(duck > 1 && impact > duck);
 });

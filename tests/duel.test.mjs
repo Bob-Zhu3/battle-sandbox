@@ -2,22 +2,28 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { battleOutcome, createBattle, stepBattle } from "../src/simulation.ts";
 
-test("Warriors in reach hit together on ticks 1, 31 and 61, then both die", () => {
+for (const [startingHp, hitsExpected] of [
+  [40, [[1,30,30], [31,20,20], [61,10,10], [91,0,0]]],
+  [30, [[1,20,20], [31,10,10], [61,0,0]]],
+]) test(`Warriors in reach with ${startingHp} HP trade simultaneous hits until both die`, () => {
   let battle = createBattle([
     { id: 1, team: "red", x: 100, y: 100 },
     { id: 2, team: "blue", x: 148, y: 100 },
   ]);
+  assert.equal(battle.warriors[0].hp, 40);
+  for (const unit of battle.warriors) unit.hp = startingHp;
+  const finalTick = hitsExpected.at(-1)[0];
   const hits = [];
-  for (let tick = 1; tick <= 61; tick++) {
+  for (let tick = 1; tick <= finalTick; tick++) {
     const before = battle;
     battle = stepBattle(battle);
     assert.equal(battle.tick, tick);
     const [red, blue] = battle.warriors;
     assert.equal(red.hp, blue.hp, `unequal health on tick ${tick}`);
     if (red.hp !== before.warriors[0].hp) hits.push([tick, red.hp, blue.hp]);
-    if (tick < 61) assert.equal(battleOutcome(battle), null);
+    if (tick < finalTick) assert.equal(battleOutcome(battle), null);
   }
-  assert.deepEqual(hits, [[1, 20, 20], [31, 10, 10], [61, 0, 0]]);
+  assert.deepEqual(hits, hitsExpected);
   assert.equal(battleOutcome(battle), "draw");
 });
 
@@ -30,9 +36,9 @@ test("equal-distance targets resolve by ID even when storage order is reversed",
   for (const order of [placements, [...placements].reverse()]) {
     const battle = stepBattle(createBattle(order));
     const health = new Map(battle.warriors.map((unit) => [unit.id, unit.hp]));
-    assert.equal(health.get(4), 20);
-    assert.equal(health.get(9), 30);
-    assert.equal(health.get(1), 10, "both incoming hits are applied");
+    assert.equal(health.get(4), 30);
+    assert.equal(health.get(9), 40);
+    assert.equal(health.get(1), 20, "both incoming hits are applied");
   }
 });
 
@@ -48,7 +54,7 @@ test("movement closes on the nearest living enemy at the fixed speed", () => {
   const next = stepBattle(start);
   assert.equal(next.warriors[0].x, 201.5);
   assert.equal(next.warriors[0].y, 100);
-  assert.equal(next.warriors[0].hp, 30);
+  assert.equal(next.warriors[0].hp, 40);
   assert.equal(next.warriors[2].x, 195);
   assert.equal(start.warriors[0].x, 200, "the previous frame stays available for drawing");
 });

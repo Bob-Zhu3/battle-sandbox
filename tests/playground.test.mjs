@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { Playground } from "../src/playground.ts";
 import { characterPose } from "../src/character-pose.ts";
 
@@ -11,24 +12,24 @@ test("allies idle anywhere; enemies can join a fight and another fight can follo
   field.place("red", troop(740, 110));
   ticks(field, 35);
   const idle = field.world.units[0];
-  assert.deepEqual([idle.x,idle.y,idle.hp,idle.targetId], [740,110,30,null]);
+  assert.deepEqual([idle.x,idle.y,idle.hp,idle.targetId], [740,110,defs.warrior.maxHp,null]);
   const a = characterPose(idle, undefined, field.world.tick);
   ticks(field, 12);
   assert.notEqual(characterPose(idle, undefined, field.world.tick).breath, a.breath);
   field.place("blue", troop(765, 110));
   field.advance();
-  assert.deepEqual(field.world.units.map(u => u.hp), [20,20]);
+  assert.deepEqual(field.world.units.map(u => u.hp), [30,30]);
   const current = field.world, time = current.tick;
   field.place("amber", troop(35, 205, true));
   assert.equal(field.world.tick, time);
   assert.deepEqual(field.world.units.slice(0,2), current.units);
-  ticks(field, 130);
+  ticks(field, 145);
   assert.deepEqual(field.world.units.map(u => u.team), ["amber"]);
   const survivor = field.world.units[0];
   field.place("violet", troop(survivor.x + 35, survivor.y));
   field.advance();
   assert.equal(field.world.units.at(-1).targetId, survivor.id);
-  assert.equal(field.world.units[0].hp, 10);
+  assert.equal(field.world.units[0].hp, defs.archer.maxHp - 10);
 });
 
 test("a live drag is one removable squad and the solo brush can exceed a match budget", () => {

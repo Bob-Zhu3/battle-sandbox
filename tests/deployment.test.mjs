@@ -92,8 +92,8 @@ test("a mixed formation remembers the brush at pointerdown for the entire stroke
   assert.deepEqual(commands.map(c => [c.type, c.positions.length]), [["place-archers", 5], ["place-warriors", 1]]);
   const opening = battleFromDeployment(commands);
   assert.deepEqual(opening.units.map(u => [u.id, u.kind, u.team, u.hp]), [
-    [1, "archer", "red", 20], [2, "archer", "red", 20], [3, "archer", "blue", 20],
-    [4, "archer", "blue", 20], [5, "archer", "blue", 20], [6, "warrior", "red", 30],
+    [1, "archer", "red", 27], [2, "archer", "red", 27], [3, "archer", "blue", 27],
+    [4, "archer", "blue", 27], [5, "archer", "blue", 27], [6, "warrior", "red", 40],
   ]);
   assert.ok(stepBattle(opening).arrows.length > 0);
   assert.deepEqual(battleFromDeployment(commands), opening);

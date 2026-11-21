@@ -14,14 +14,30 @@ const shelves: {name: string; items: Brush[]}[] = [
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
 function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key); }
 
+const starters: Brush[] = ["warrior", "archer", "lancer", "medic", "meteor", "rain"];
+function loadSlots(key: string): Brush[] {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) ?? "null");
+    if (Array.isArray(saved) && saved.length === starters.length && new Set(saved).size === saved.length &&
+        saved.every(item => shelves.some(group => group.items.includes(item)))) return saved;
+  } catch { /* The bar also works when browser storage is unavailable. */ }
+  return [...starters];
+}
+
 export function createRoster(strip: HTMLElement, priced: boolean) {
-  let selected: Brush = "warrior", team: Team = "red", shelf = 0;
+  const storageKey = "battle.quickbar." + location.pathname;
+  const slots = loadSlots(storageKey);
+  const useOrder = [2, 3, 0, 1, 5, 4];
+  let selected: Brush = slots.find(kind => !isSpell(kind))!, team: Team = "red", shelf = 0;
+  let editSlot: number | undefined;
   let balance: number | undefined, casting = !priced;
   const panel = document.createElement("section");
   panel.className = "roster-panel"; panel.id = "roster-panel"; panel.hidden = true;
   panel.setAttribute("aria-label","Troops and spells");
   const tabs = document.createElement("div"), cards = document.createElement("div"), note = document.createElement("p");
   tabs.className="roster-tabs"; cards.className="roster-cards"; note.className="roster-note"; note.hidden=true;
+  const assignment = document.createElement("p");
+  assignment.className="roster-assignment"; assignment.setAttribute("aria-live","polite");
   const close = document.createElement("button");
   close.type="button";close.textContent="×";close.className="roster-close";close.setAttribute("aria-label","Close roster");
 
@@ -29,6 +45,9 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   const opener = document.createElement("button");
   opener.type="button";opener.id="roster-open";opener.className="brush-tool roster-open";
   opener.setAttribute("aria-label","Roster");opener.setAttribute("aria-controls",panel.id);
+  const tiles=document.createElement("i");tiles.className="roster-mark";tiles.setAttribute("aria-hidden","true");
+  opener.append(tiles,"Roster");opener.title="Choose troops or change a quick slot";
+  strip.after(opener);
 
   function icon(key: Brush) {
     const art = document.createElement("canvas");art.width=art.height=144;art.className="brush-icon";art.setAttribute("aria-hidden","true");
@@ -47,33 +66,55 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     return art;
   }
   function toggle(open: boolean) {
+    editSlot=undefined;
     panel.hidden=!open;opener.setAttribute("aria-expanded",String(open));
-    if(open) renderShelf();
+    if(open) renderShelf(); else refresh();
+  }
+  function unavailable(key: Brush) {
+    return (balance!==undefined && balance<catalog[key].cost) || (isSpell(key) && !casting);
+  }
+  function remember(index: number) {
+    useOrder.splice(useOrder.indexOf(index),1);useOrder.push(index);
   }
   function choose(key: Brush) {
-    selected=key;toggle(false);renderQuick();refresh();
+    selected=key;
+    remember(slots.indexOf(key));
+    toggle(false);
     strip.dispatchEvent(new Event("brushchange",{bubbles:true}));
   }
-  function textLabel(key: Brush, withCost: boolean) {
-    const label=document.createElement("span");
-    label.textContent=catalog[key].name;
-    if(priced && withCost){const price=document.createElement("small");price.textContent=catalog[key].cost+"g";price.setAttribute("aria-hidden","true");label.append(price);}
-    return label;
+  function equip(key: Brush) {
+    const existing=slots.indexOf(key);
+    const index=editSlot ?? (existing>=0 ? existing : useOrder.find(i=>isSpell(slots[i])===isSpell(key)) ?? useOrder[0]);
+    if (slots[index] !== key) {
+      if(existing>=0) slots[existing]=slots[index];
+      slots[index]=key;
+      try { sessionStorage.setItem(storageKey,JSON.stringify(slots)); } catch { /* Use the in-memory bar. */ }
+      renderQuick();
+    }
+    if(unavailable(key)){
+      if(!slots.includes(selected)) choose(slots.find(kind=>!unavailable(kind)) ?? slots.find(kind=>!isSpell(kind))!);
+      else toggle(false);
+      remember(index);opener.focus({preventScroll:true});
+    } else {
+      choose(key);quick.get(key)?.focus({preventScroll:true});
+    }
   }
   function renderQuick() {
     strip.replaceChildren();quick.clear();
-    for(const kind of ["warrior","archer"] as const){
-      const button=document.createElement("button");button.type="button";button.id="brush-"+kind;button.className="brush-tool";
-      button.title=catalog[kind].description;button.setAttribute("aria-pressed",String(selected===kind));
-      button.append(icon(kind),textLabel(kind,true));button.addEventListener("click",()=>choose(kind));
+    for(const [i,kind] of slots.entries()){
+      const button=document.createElement("button");button.type="button";button.id="brush-"+kind;button.className="brush-tool quick-card";
+      button.setAttribute("aria-label",catalog[kind].name);button.setAttribute("aria-keyshortcuts",String(i+1));
+      button.title=(i+1)+" · "+catalog[kind].name+" · "+catalog[kind].description;
+      const number=document.createElement("kbd");number.textContent=String(i+1);number.setAttribute("aria-hidden","true");
+      const label=document.createElement("span");label.className="quick-name";label.textContent=catalog[kind].name;
+      button.append(number,icon(kind),label);
+      if(priced){const cost=document.createElement("small");cost.className="quick-price";cost.textContent=catalog[kind].cost+"g";button.append(cost);button.setAttribute("aria-description",catalog[kind].cost+" gold");}
+      button.addEventListener("click",()=>{
+        if(panel.hidden) choose(kind);
+        else {editSlot=i;refresh();}
+      });
       quick.set(kind,button);strip.append(button);
     }
-    const special=selected!=="warrior" && selected!=="archer";
-    opener.replaceChildren();opener.dataset.selected=String(special);
-    if(special){opener.append(icon(selected),textLabel(selected,true));opener.title=catalog[selected].description;}
-    else {const tiles=document.createElement("i");tiles.className="roster-mark";tiles.setAttribute("aria-hidden","true");opener.append(tiles,"Roster");opener.title="Choose troops, buildings or spells";}
-    const arrow=document.createElement("small");arrow.textContent="▴";arrow.setAttribute("aria-hidden","true");
-    opener.append(arrow);strip.append(opener);
   }
   function renderShelf() {
     cards.replaceChildren();options.clear();
@@ -84,37 +125,50 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
       const text=document.createElement("span"), name=document.createElement("strong"), hint=document.createElement("small");
       name.textContent=catalog[key].name;hint.textContent=catalog[key].description;text.append(name,hint);card.append(icon(key),text);
       if(priced){const price=document.createElement("b");price.textContent=catalog[key].cost+"g";card.append(price);}
-      card.addEventListener("click",()=>{ choose(key);opener.focus({preventScroll:true}); });
+      card.addEventListener("click",()=>equip(key));
       cards.append(card);options.set(key,card);
     }
     refresh();
   }
   function refresh() {
-    const unavailable=(key:Brush)=>(balance!==undefined && balance<catalog[key].cost) || (isSpell(key) && !casting);
-    for(const [key,button] of quick) button.disabled=unavailable(key);
+    for(const [key,button] of quick){
+      button.disabled=panel.hidden && unavailable(key);
+      button.setAttribute("aria-pressed",String(selected===key));
+      button.toggleAttribute("data-editing",editSlot!==undefined && slots[editSlot]===key);
+    }
     if(!panel.hidden){
-      for(const [key,button] of options)button.disabled=unavailable(key);
+      assignment.textContent=editSlot===undefined ? "Pick a card to keep it on your bar, or tap a slot below to replace it." :
+        "Choose a card for slot "+(editSlot+1)+" · "+catalog[slots[editSlot]].name;
+      for(const [key,button] of options)button.disabled=editSlot===undefined && unavailable(key);
       note.hidden=shelves[shelf].name!=="Spells";
-      note.textContent=casting?"Tap any spot on the field to cast.":"Spells unlock after the countdown.";
+      note.textContent=casting?"Tap any spot on the field to cast.":"Equip spells in a slot now. Cast them after the countdown.";
     }
   }
   shelves.forEach((group,i)=>{
     const button=document.createElement("button");button.type="button";button.className="shelf";button.textContent=group.name;
     button.addEventListener("click",()=>{shelf=i;renderShelf();});tabs.append(button);
   });
-  tabs.append(close);panel.append(tabs,note,cards);
+  tabs.append(close);panel.append(tabs,assignment,note,cards);
   strip.closest(".tools")!.append(panel);
   opener.addEventListener("click",()=>toggle(!!panel.hidden));
   close.addEventListener("click",()=>{toggle(false);opener.focus();});
-  document.addEventListener("pointerdown",event=>{if(!panel.hidden && event.target instanceof Node && !panel.contains(event.target) && !strip.contains(event.target))toggle(false);});
-  document.addEventListener("keydown",event=>{if(event.key==="Escape" && !panel.hidden){toggle(false);opener.focus();}});
+  document.addEventListener("pointerdown",event=>{if(!panel.hidden && event.target instanceof Node && !panel.contains(event.target) && !strip.contains(event.target) && !opener.contains(event.target))toggle(false);});
+  document.addEventListener("keydown",event=>{
+    if(event.key==="Escape" && !panel.hidden){toggle(false);opener.focus();return;}
+    if(strip.hidden || event.defaultPrevented || event.repeat || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey ||
+        (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable=true]"))) return;
+    if(/^[1-6]$/.test(event.key)){
+      const button=quick.get(slots[Number(event.key)-1])!;
+      if(!button.disabled){event.preventDefault();button.click();}
+    }
+  });
   toggle(false);renderQuick();refresh();
   return {
     selectedKind: (): RecruitKind => isSpell(selected)?"warrior":selected,
     selectedSpell: (): SpellKind | undefined => isSpell(selected)?selected:undefined,
     colorBrush(color:Team){team=color;renderQuick();if(!panel.hidden)renderShelf();refresh();},
-    setCasting(enabled:boolean){if(casting===enabled)return;casting=enabled;if(!enabled && isSpell(selected))choose("warrior");else refresh();},
-    closeRoster(){toggle(false);},
-    setBudget(gold:number|undefined){balance=gold;refresh();},
+    setCasting(enabled:boolean){if(casting===enabled)return;casting=enabled;if(!enabled && isSpell(selected))choose(slots.find(kind=>!isSpell(kind))!);else refresh();},
+    closeRoster(){if(!panel.hidden)toggle(false);},
+    setBudget(gold:number|undefined){if(balance!==gold){balance=gold;refresh();}},
   };
 }

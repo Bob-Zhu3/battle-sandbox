@@ -21,6 +21,8 @@ The playground opens in your browser. To play together on the same network, have
 | Duel (`/room`) | 2 | Your half, or anywhere for a Miner | Destroy the opposing base |
 | Free-for-all (`/ffa`) | 3–4 | Your corner, or anywhere for a Miner | Be the last player with a standing base |
 
+In every mode, tap one of the six cards along the bottom or press **1–6**, then tap the field. Picking a new card from **Roster** adds it to the bar. To change a specific slot, open **Roster**, tap that slot, then pick its replacement. You can equip spells before the countdown. Your layout stays with this tab when you reload. [Watch a one-tap Meteor and an Archer reinforcement](media/quick-bar.mp4)
+
 ### Playground
 
 Click to place one troop. Hold and drag to add another every 24 arena units. Friendly troops breathe and blink while they wait. Place an enemy nearby and they react while your pointer is still down. Gold is unlimited. When a fight ends, you can paint the next one straight onto the same field. **Undo** removes the last stroke. **Clear** empties the field.
@@ -75,14 +77,14 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Storm Kirin | 23 | 11 | Lightning travels through up to four enemies, stunning every contact for 0.35 seconds. Metal and shields carry the next jump up to 110 units. Other targets carry it up to 78. |
 | Frost Queen | 24 | 12 | Her crystal bursts on impact. Enemies inside the frost walk at 48% speed for 100 ticks. |
 | Phoenix | 22 | 11 | A talon strike sets its target on fire for three pulses of 2 damage. On its first defeat it becomes a 1 HP ember egg and hatches at half health after 1.5 seconds if protected. |
-| Zombie | 10 | 5 | One bite immediately turns a surviving human green and changes its team. Look for the former troop's headgear. The new Zombie keeps its ID and up to 25 remaining HP, then can spread the bite. |
+| Zombie | 10 | 5 | One bite immediately turns a surviving human green and changes its team. Look for the former troop's headgear. The new Zombie keeps its ID and up to 33 remaining HP, then can spread the bite. |
 | Reaper | 25 | 12 | Its scythe seeks a living enemy at or below one-third health within 118 units, even if a healthy foe is nearer. Cutting down a living enemy draws one soul into its lantern and restores up to 8 HP. |
 | Witch | 29 | 14 | The pink spiral turns an enemy person or creature into a Hex Pig on impact. It fights its old allies for three seconds. Survivors change back with the same ID and remaining health. Bases and machines take a direct magic hit. |
 
 | Spell | Gold | What happens |
 | --- | ---: | --- |
 | Gust | 10 | Shoves enemies and scatters hostile arrows and bolts in its circle. Bullets and lobbed bombs keep flying. A friendly Phoenix egg hatches immediately. |
-| Meteor | 20 | Marks the ground for 0.8 seconds before dealing 17 damage to enemies still inside or 6 to a base. |
+| Meteor | 20 | Enters from the top edge and lands on the marked ground after 0.8 seconds, dealing 17 damage to enemies still inside or 6 to a base. |
 | Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies and puts out an enemy Phoenix egg. |
 
 Stars overhead mark a stun. Ice around the feet marks a slow. Violet bubbles mean poison. Green skin and a torn coat show that a human has already become a Zombie. Small orange flames on an enemy mean it is taking burn damage. The Phoenix's cracked ember egg counts down to its own rebirth. A Phoenix in flight sheds sparks and a passing Frost Queen leaves small ice crystals. These trails follow their actual movement and fade when they stop.
@@ -107,7 +109,7 @@ Browser checks use Playwright Chromium when available or installed Chrome. Use `
 
 ## How the field works
 
-The browser playground and Node match server share a deterministic 60-tick simulation. Targets break distance ties by stable ID. Troops have circular footprints, separate when crowded and stay inside the arena. Buildings stay rooted. Arrows fly at 300 arena units per second, starting on the tick after release. They pass allies and strike the first living enemy troop or base along their line. Damage on a tick resolves together. Instant lightning and completed ground smashes interrupt wind-ups before charged attacks land. A Warrior duel beginning in reach deals simultaneous hits on ticks 1, 31 and 61. [Combat simulation](src/simulation.ts) · [Troop definitions](src/units.ts)
+The browser playground and Node match server share a deterministic 60-tick simulation. Targets break distance ties by stable ID. Troops have circular footprints, separate when crowded and stay inside the arena. Buildings stay rooted. Arrows fly at 300 arena units per second, starting on the tick after release. They pass allies and strike the first living enemy troop or base along their line. Damage on a tick resolves together. Instant lightning and completed ground smashes interrupt wind-ups before charged attacks land. A Warrior duel beginning in reach deals simultaneous hits on ticks 1, 31, 61 and 91. Both 40 HP Warriors fall on the fourth hit. [Combat simulation](src/simulation.ts) · [Troop definitions](src/units.ts)
 
 The server validates territory and funds, assigns IDs and broadcasts the same world to every browser. It normally sends 20 snapshots per second, with additional updates for purchases, payouts and changes of phase. Each browser projects the same 960 × 360 arena onto its own canvas.
 
