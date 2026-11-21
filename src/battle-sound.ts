@@ -95,22 +95,37 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
 }
 
 export function createBattleSound(button: HTMLButtonElement) {
-  const recordings=prepareRecordings(), mix=createCueMixer();
+  const recordings = prepareRecordings();
   const storage = "battle.sound.muted";
   let muted = false;
   let paused = false;
   try { muted = localStorage.getItem(storage) === "true"; } catch { /* Optional preference. */ }
-  let ctx: AudioContext | undefined, master: GainNode | undefined, play: ReturnType<typeof instrument> | undefined;
-  function unlock() {
-    if (paused || muted || document.hidden || typeof AudioContext === "undefined") return;
-    if (!ctx) {
-      ctx = new AudioContext({latencyHint:"interactive"});
-      master = ctx.createGain(); master.gain.value = .9;
-      const compressor = ctx.createDynamicsCompressor(); compressor.threshold.value = -11; compressor.ratio.value = 5;
-      master.connect(compressor); compressor.connect(ctx.destination);
-      recordings.unlock(ctx);play = instrument(ctx,master,recordings);
+  function createOutput() {
+    const ctx = new AudioContext({latencyHint:"interactive"});
+    const master = ctx.createGain();
+    master.gain.value = .9;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -11; compressor.ratio.value = 5;
+    master.connect(compressor); compressor.connect(ctx.destination);
+    recordings.unlock(ctx);
+    const play = instrument(ctx,master,recordings), mix = createCueMixer();
+    function hear(cues: readonly Cue[]) {
+      for (const cue of mix(cues,ctx.currentTime)) play(cue);
     }
+    return {ctx, master, hear};
+  }
+  let battle: ReturnType<typeof createOutput> | undefined;
+  let pausedBrush: ReturnType<typeof createOutput> | undefined;
+  function wake(ctx: AudioContext) {
     if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+  }
+  function unlock() {
+    if (muted || document.hidden || typeof AudioContext === "undefined") return;
+    if (!paused) {
+      battle ??= createOutput();
+      wake(battle.ctx);
+    }
+    if (pausedBrush) wake(pausedBrush.ctx);
   }
   function label() {
     button.setAttribute("aria-pressed",String(muted));
@@ -118,25 +133,41 @@ export function createBattleSound(button: HTMLButtonElement) {
   }
   function toggle() {
     muted = !muted; label(); unlock();
-    if (ctx && master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(muted ? 0 : .9,ctx.currentTime,.008); }
+    for (const output of [battle, pausedBrush]) {
+      if (!output) continue;
+      const now = output.ctx.currentTime;
+      output.master.gain.cancelScheduledValues(now);
+      output.master.gain.setTargetAtTime(muted ? 0 : .9,now,.008);
+    }
     try { localStorage.setItem(storage,String(muted)); } catch { /* Optional preference. */ }
   }
   label(); button.addEventListener("click",toggle);
   window.addEventListener("pointerdown",unlock,{capture:true,passive:true});
+  // On touch screens a first tap can unlock audio only when the finger lifts.
+  window.addEventListener("pointerup",unlock,{capture:true,passive:true});
   window.addEventListener("keydown",e => {
     if (e.altKey || e.ctrlKey || e.metaKey || e.target instanceof Element && e.target.closest("input,textarea,select,[contenteditable=true]")) return;
     if (e.key.toLowerCase() === "m" && !e.repeat) { e.preventDefault(); toggle(); }
     else unlock();
   });
   function hear(before: World | undefined, world: World) {
-    if (paused || !ctx || !play || ctx.state !== "running" || muted || document.hidden) return;
-    for (const cue of mix(battleCues(before,world),ctx.currentTime)) play(cue);
+    if (muted || document.hidden) return;
+    if (paused) {
+      const cues = battleCues(before,world).filter(cue => cue.kind === "place");
+      if (!cues.length || typeof AudioContext === "undefined") return;
+      // A separate audio clock lets the brush play while a roar or spell is held mid-sound.
+      pausedBrush ??= createOutput();
+      wake(pausedBrush.ctx);
+      pausedBrush.hear(cues);
+    } else if (battle?.ctx.state === "running") {
+      battle.hear(battleCues(before,world));
+    }
   }
   function pauseSound(hold: boolean) {
     if (hold === paused) return;
     paused = hold;
-    if (hold) void ctx?.suspend().catch(() => {});
-    else if (ctx && !muted) void ctx.resume().catch(() => {});
+    if (hold) void battle?.ctx.suspend().catch(() => {});
+    else if (battle && !muted) void battle.ctx.resume().catch(() => {});
     else unlock();
   }
   return {hear, pauseSound};

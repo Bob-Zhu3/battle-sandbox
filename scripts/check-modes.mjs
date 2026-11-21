@@ -10,6 +10,7 @@ import { createGameServer } from "../server/http.ts";
 import { ARENA, ARMIES, TEAMS } from "../src/battlefield.ts";
 import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { FACE, INK } from "../src/ink.ts";
+import { checkPausedPlacement } from "./check-paused-placement.mjs";
 
 const { values } = parseArgs({ options: { channel: { type: "string" }, output: { type: "string" } } });
 const browser = await chromium.launch({ headless: true, channel: values.channel ?? (existsSync(chromium.executablePath()) ? undefined : "chrome") });
@@ -736,6 +737,7 @@ async function match(url,size) {
 }
 
 try {
+  await withField(url => checkPausedPlacement(browser, url));
   await withField(pausePlayground);
   await withField(phoenixDuringDeployment);
   await withField(arrowFlash);

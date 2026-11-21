@@ -146,7 +146,8 @@ const cancel = attachDeploymentBrush(field.canvas, {
     const before = play.world;
     if (soundHint) {soundHint=false;updateBrushHint();}
     play.place(strokeTeam, { type: UNIT_DEFINITIONS[kind].command, positions: points }, !first);
-    if (!play.paused) { field.hear(before,play.world); previous = play.world; }
+    field.hear(before,play.world);
+    if (!play.paused) previous = play.world;
     update(); paint();
   },
 });
