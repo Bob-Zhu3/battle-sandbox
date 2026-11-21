@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { SPELLS, spellKind } from "../src/spells.ts";
 import { BRUSH_SPACING, type ArenaPoint } from "../src/deployment.ts";
 import { Battle, battleOutcome, createBattle, stepBattle, TICKS_PER_SECOND, ARENA, type Outcome, type Placement, type Team } from "../src/simulation.ts";
@@ -15,6 +14,16 @@ export function record(value: unknown): value is Record<string, unknown> {
 interface Stroke { team: Team; units: Placement[] }
 interface Receipt { ack: PlacementAck; type: string; points: readonly ArenaPoint[] }
 interface Player { token: string; receipts: Map<number, Receipt> }
+
+// This server-only checkpoint includes the private reconnect tokens and purchase receipts.
+// Only snapshot() returns data suitable for a player.
+export interface RoomCheckpoint {
+  state: Snapshot;
+  countdownTicks: number;
+  nextId: number;
+  strokes: Stroke[];
+  players: {team: Team; token: string; receipts: [number,Receipt][]}[];
+}
 
 export class Room {
   round = 1;
@@ -56,7 +65,7 @@ export class Room {
         ?? (this.phase === "deploy" ? sides.find(side => !this.players[side]) : undefined);
     if (!team) return;
     const isNew = !this.players[team];
-    const player = this.players[team] ??= { token: randomUUID(), receipts: new Map() };
+    const player = this.players[team] ??= { token: crypto.randomUUID(), receipts: new Map() };
     this.seats[team]!.connected = true;
     this.seats[team]!.reserved = false;
     if (isNew) this.rebuild();
@@ -229,6 +238,29 @@ export class Room {
     this.outcome = battleOutcome(this.world);
     if (this.outcome !== null) this.phase = "finished";
     return paid || this.outcome !== null;
+  }
+
+  checkpoint(revision: number): RoomCheckpoint {
+    const players = this.sides.flatMap(team => {
+      const player = this.players[team];
+      return player ? [{team,token:player.token,receipts:[...player.receipts.entries()]}] : [];
+    });
+    return {state:this.snapshot(revision),countdownTicks:this.countdownTicks,nextId:this.nextId,strokes:this.strokes,players};
+  }
+
+  static restore(saved: RoomCheckpoint) {
+    const state = saved.state, world = state.world, room = new Room(state.mode);
+    room.round = state.round;
+    room.phase = state.phase;
+    room.outcome = state.outcome;
+    room.countdownTicks = saved.countdownTicks;
+    room.nextId = saved.nextId;
+    room.strokes = saved.strokes;
+    Object.assign(room.seats,state.seats);
+    Object.assign(room.gold,state.gold);
+    room.world = new Battle(world.tick,world.units,world.arrows,world.bases,world.spells,world.effects);
+    for (const player of saved.players) room.players[player.team] = {token:player.token,receipts:new Map(player.receipts)};
+    return room;
   }
 
   snapshot(revision: number): Snapshot {

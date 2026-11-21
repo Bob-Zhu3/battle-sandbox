@@ -30,5 +30,6 @@ export interface PlacementAck { type: "placement-ack"; round: number; commandId:
 export interface Joined { type: "joined"; team: Team; resumeToken: string }
 export type ClientMessage = { type: "join"; resumeToken?: string; remembered?: string[] } | PlacementMessage | { round: number; seq: number; action: ControlAction };
 export type ServerMessage = Snapshot | Joined | PlacementAck | { type: "error"; message: string; round?: number; commandId?: number };
+export interface OnlineExchange { events: ServerMessage[]; close?: number; retry?: boolean }
 
 export const CLOSE = { leave: 4000, full: 4001, expired: 4002, replaced: 4003 } as const;

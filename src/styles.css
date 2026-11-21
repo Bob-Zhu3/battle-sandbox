@@ -102,6 +102,8 @@ button:not(:disabled):active { transform: translate(2px, 2px); box-shadow: 0 1px
 .tool:disabled, .play:disabled { color: #616d4e; border-color: #84916b; box-shadow: 1px 2px 0 #84916b; background: #e3ecc4; }
 
 .demo-controls { display: flex; align-items: start; gap: 9px; }
+#room-invite { cursor: pointer; white-space: nowrap; }
+#invite-url { position: absolute; right: 0; top: calc(100% + 6px); width: min(290px, 80vw); padding: 9px; background: var(--paper); color: var(--ink); border: 2px solid var(--ink); border-radius: 7px; }
 .sound-toggle { padding: 0; width: 39px; transform: rotate(-3deg); }
 .sound-cross, .sound-toggle[aria-pressed="true"] .sound-waves { display: none; }
 .sound-toggle[aria-pressed="true"] .sound-cross { display: block; }

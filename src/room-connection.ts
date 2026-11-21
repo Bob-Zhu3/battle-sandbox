@@ -1,5 +1,7 @@
 import { CLOSE, type ClientMessage, type PlacementMessage, type RoomAction, type ServerMessage, type Snapshot } from "./room-protocol.ts";
 import { MATCHES, type MatchMode, type Team } from "./battlefield.ts";
+import { isMatchId } from "./match-link.ts";
+import { OnlineWire } from "./online-wire.ts";
 
 export type ConnectionState = "joining" | "online" | "reconnecting" | "full" | "expired" | "replaced";
 interface Callbacks {
@@ -21,17 +23,24 @@ function stored(storageKey: string, team?: Team): TabSession {
   return emptySession();
 }
 
+interface Wire extends EventTarget { readyState: number; send(data: string): void; close(code?: number, reason?: string): void }
+
 export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
-  const storageKey = mode === "duel" ? "battle-room.session.v1" : "battle-ffa.session.v1";
+  const id = new URL(location.href).searchParams.get("match");
+  const storageKey = (mode === "duel" ? "battle-room.session.v1" : "battle-ffa.session.v1") + (id ? "." + id : "");
   let session = stored(storageKey);
-  let socket: WebSocket;
+  let socket: Wire;
   let online = false;
   let stopped = false;
   let seq = 0;
   let backoff = 350;
   let retryTimer: number | undefined;
   const url = new URL(MATCHES[mode].socket, location.href);
+  if (id !== null) url.searchParams.set("match",id);
   url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const hosted = !!document.querySelector('meta[name="battle-online"]');
+  const api = new URL("/api/matches/"+mode+"/"+(id ?? "lobby"),location.origin);
+  let useHttp = false;
 
   function save() {
     try {
@@ -58,22 +67,28 @@ export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
   }
   function transmit(message: ClientMessage) { socket.send(JSON.stringify(message)); }
 
-  function connect() {
-    socket = new WebSocket(url);
+  function connect(client = hosted ? crypto.randomUUID() : "") {
+    const current = socket = useHttp ? new OnlineWire(api,client) : new WebSocket(url);
+    let welcomed = false;
+    const fallback = () => {
+      if (stopped || current !== socket || welcomed || !hosted || useHttp) return;
+      useHttp = true; connect(client); current.close();
+    };
+    const handshake = hosted && !useHttp ? window.setTimeout(fallback,2600) : undefined;
     seq = 0;
     socket.addEventListener("open", () => {
-      if (stopped) return;
-      if (session.resumeToken) transmit({ type: "join", resumeToken: session.resumeToken });
-      else {
-        const remembered = MATCHES[mode].teams.map(team => stored(storageKey, team)).flatMap(seat => seat.resumeToken ? [seat.resumeToken] : []);
-        transmit({ type: "join", remembered });
-      }
+      if (stopped || current !== socket) return;
+      const remembered = MATCHES[mode].teams.map(team => stored(storageKey, team)).flatMap(seat => seat.resumeToken ? [seat.resumeToken] : []);
+      const seat = session.resumeToken ? {resumeToken:session.resumeToken} : {remembered};
+      current.send(JSON.stringify({type:"join",...seat,...(hosted?{client}:{})}));
     });
-    socket.addEventListener("message", ({ data }) => {
-      if (stopped) return;
+    socket.addEventListener("message", (raw) => {
+      if (stopped || current !== socket) return;
+      const { data } = raw as MessageEvent<string>;
       const event = JSON.parse(data) as ServerMessage;
       switch (event.type) {
         case "joined": {
+          welcomed = true; window.clearTimeout(handshake);
           if (session.resumeToken !== event.resumeToken) session = emptySession();
           const previous = stored(storageKey, event.team);
           if (previous.resumeToken === event.resumeToken &&
@@ -107,7 +122,10 @@ export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
           break;
       }
     });
-    socket.addEventListener("close", ({ code }) => {
+    socket.addEventListener("close", raw => {
+      const {code} = raw as CloseEvent;
+      window.clearTimeout(handshake);
+      if (current !== socket) return;
       online = false;
       if (stopped) return;
       if (code === CLOSE.full) { callbacks.state("full"); return; }
@@ -116,6 +134,7 @@ export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
         callbacks.state(code === CLOSE.expired ? "expired" : "replaced");
         return;
       }
+      if (hosted && !useHttp && !welcomed) { fallback(); return; }
       callbacks.state("reconnecting");
       retryTimer = window.setTimeout(connect, backoff);
       backoff = Math.min(backoff * 2, 3000);
@@ -136,11 +155,13 @@ export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
     if (stopped) return;
     stopped = true;
     window.clearTimeout(retryTimer);
+    if (!socket) return;
     if (leave) {
       clearSession(true);
       socket.close(CLOSE.leave, "Left room");
     } else socket.close();
   }
-  connect();
+  if (id !== null && !isMatchId(id)) queueMicrotask(() => { callbacks.state("full"); callbacks.error("This invite link is incomplete. Ask the host to copy it again."); });
+  else connect();
   return { send, close };
 }

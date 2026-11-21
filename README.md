@@ -2,6 +2,8 @@
 
 Draw a squad into a meadow and watch it fight. The illustrated row along the bottom holds twenty-five troops and buildings and nine spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
+**Play online.** Open the game, choose **Play modes**, then **Duel** or **Free-for-all**. Click **Copy invite** and send the link to the other players. Each match has its own field. Everyone can join from a phone or computer, draw a starting army, and press **Ready**. [Open Battle Sandbox](https://battle-sandbox.zhubob3.chatgpt.site/)
+
 ![Four armies in a live free-for-all, with a base in each corner and recruitment controls below the field](media/free-for-all.png)
 
 ## Play locally
@@ -13,7 +15,7 @@ npm ci
 npm run play
 ```
 
-The playground opens in your browser. To play together on the same network, have everyone open the **same Network URL** printed in the terminal and choose the same mode. Separate browsers or fresh tabs can also take different seats on one computer.
+The playground opens in your browser. To host on your Wi-Fi, open the **Network URL** printed in the terminal before choosing a mode. Use **Copy invite** to share that match. For two seats on one computer, open the invite in a second browser.
 
 | Mode | Players | Where you can draw | Objective |
 | --- | --- | --- | --- |
@@ -118,6 +120,7 @@ A connection loss reserves your seat for 60 seconds. Reopen the match to reclaim
 | `npm run demo:room -- --headed` | Two browser windows drawing at the same time, then recruiting during a base battle |
 | `npm run demo:retry` | Drop confirmation of a five-Warrior stroke, disconnect and return with the original five IDs and one charge |
 | `npm run demo:reconnect` | Disconnect Blue after the first hit, catch up to the live fight and verify both browsers agree through the fall of a base |
+| `npm run check:invites` | Create two independent duels, share an invite between desktop and phone-sized browsers, reconnect during combat, and start a three-player free-for-all. Pass a running site's URL to exercise the deployed game. |
 
 Browser checks use Playwright Chromium when available or installed Chrome. Use `npx playwright install chromium` to install the test browser. The two disconnect demos leave their result windows open until you close one. Add `-- --headless` for unattended use or `-- --output <directory>` to save both views and the comparison.
 
@@ -125,6 +128,8 @@ Browser checks use Playwright Chromium when available or installed Chrome. Use `
 
 The browser playground and Node match server share a deterministic 60-tick simulation. Targets break distance ties by stable ID. Troops have circular footprints, separate when crowded and stay inside the arena. Buildings stay rooted. Arrows fly at 300 arena units per second, starting on the tick after release. They pass allies and strike the first living enemy troop or base along their line. Damage on a tick resolves together. Instant lightning and completed ground smashes interrupt wind-ups before charged attacks land. A Warrior duel beginning in reach deals simultaneous hits on ticks 1, 31, 61 and 91. Both 40 HP Warriors fall on the fourth hit. [Combat simulation](src/simulation.ts) · [Troop definitions](src/units.ts)
 
-The server validates territory and funds, assigns IDs and broadcasts the same world to every browser. It normally sends 20 snapshots per second, with additional updates for purchases, payouts and changes of phase. Each browser projects the same 960 × 360 arena onto its own canvas.
+The server validates territory and funds, assigns IDs and sends snapshots of the same 960 × 360 arena to every browser. The local Node server broadcasts over WebSockets. The hosted game also supports HTTPS when a network blocks the socket connection. The invite identifies the field. Each browser stores its own separate seat token for that match.
+
+The hosted server saves the world, seat reservations and purchase receipts together in a database. Each update checks the previous version before committing, so purchases from two players can land together. When a match wakes, the shared simulation advances by the elapsed number of ticks. Expired room records are reclaimed as new matches are created. Run `npm run build:site` to build the hosted game and its database migration.
 
 For a local development server on loopback, use `npm run dev`. To serve the production build, run `npm run build` and `npm start`. The Node server defaults to `127.0.0.1:4173` and accepts `HOST` and `PORT`.

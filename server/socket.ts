@@ -4,21 +4,53 @@ import type { Duplex } from "node:stream";
 import { WebSocketServer, WebSocket } from "ws";
 import { CLOSE, SNAPSHOT_EVERY, type ServerMessage } from "../src/room-protocol.ts";
 import { TICKS_PER_SECOND, type Team } from "../src/simulation.ts";
-import { spellKind } from "../src/spells.ts";
-import { placementKind } from "../src/units.ts";
+import { isMatchId } from "../src/match-link.ts";
+import { applyRoomMessage } from "./room-message.ts";
 import { Room, record } from "./room.ts";
 
 import { MATCHES, type MatchMode } from "../src/battlefield.ts";
 
 export function attachRoom(server: Server, { rejoinGraceMs = 60_000 } = {}) {
-  const duel = attachMatch(server, "duel", rejoinGraceMs);
-  const ffa = attachMatch(server, "ffa", rejoinGraceMs);
-  return () => { duel(); ffa(); };
+  const sockets = new WebSocketServer({noServer:true,maxPayload:16*1024});
+  const matches = new Map<string,ReturnType<typeof createMatch>>();
+  function upgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+    let url: URL;
+    try { url = new URL(req.url ?? "/","http://localhost"); }
+    catch { socket.destroy(); return; }
+    const mode = url.pathname === MATCHES.duel.socket ? "duel" : url.pathname === MATCHES.ffa.socket ? "ffa" : null;
+    if (!mode) return;
+    const id = url.searchParams.get("match");
+    if (id !== null && !isMatchId(id)) { socket.destroy(); return; }
+    if (req.headers.origin) {
+      try { if (new URL(req.headers.origin).host !== req.headers.host) { socket.destroy(); return; } }
+      catch { socket.destroy(); return; }
+    }
+    const key = mode + "/" + (id ?? "");
+    if (!matches.has(key) && matches.size >= 256) { socket.destroy(); return; }
+    sockets.handleUpgrade(req,socket,head,ws => {
+      let match = matches.get(key);
+      if (!match) {
+        match = createMatch(mode,rejoinGraceMs,() => matches.delete(key));
+        matches.set(key,match);
+      }
+      match.register(ws);
+    });
+  }
+  server.on("upgrade",upgrade);
+  function close() {
+    server.off("close",close);
+    server.off("upgrade",upgrade);
+    for (const match of matches.values()) match.close();
+    matches.clear();
+    sockets.close();
+  }
+  server.once("close",close);
+  return close;
 }
 
-function attachMatch(server: Server, mode: MatchMode, rejoinGraceMs: number) {
+function createMatch(mode: MatchMode, rejoinGraceMs: number, remove: () => void) {
   const room = new Room(mode);
-  const sockets = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
+  const connections = new Set<WebSocket>();
   const players = new Map<WebSocket, Team>();
   const expiry = new Map<Team, NodeJS.Timeout>();
   let revision = 0;
@@ -57,9 +89,12 @@ function attachMatch(server: Server, mode: MatchMode, rejoinGraceMs: number) {
     room.leave(team);
     if (!ticking()) stopClock();
     publish();
+    if (!connections.size && !expiry.size) { stopClock(); remove(); }
   }
 
   function register(socket: WebSocket) {
+    connections.add(socket);
+    const joinDeadline = setTimeout(() => socket.close(1008,"Join timed out."),10_000).unref();
     const send = (event: ServerMessage) => socket.send(JSON.stringify(event));
     const error = (message: string) => send({ type: "error", message });
     let team: Team | undefined;
@@ -86,6 +121,7 @@ function attachMatch(server: Server, mode: MatchMode, rejoinGraceMs: number) {
           return;
         }
         team = joined.team;
+        clearTimeout(joinDeadline);
         clearTimeout(expiry.get(team));
         expiry.delete(team);
         for (const [previous, side] of players) {
@@ -100,26 +136,18 @@ function attachMatch(server: Server, mode: MatchMode, rejoinGraceMs: number) {
         return;
       }
       if (!players.has(socket)) return;
-      const { action, commandId, round, seq } = message;
-      if (record(action) && (placementKind(action.type) || spellKind(action.type))) {
-        if (typeof round !== "number" || typeof commandId !== "number") return error("A placement needs its round and command ID.");
-        const result = room.place(team, round, commandId, action);
-        if (typeof result === "string") return send({ type: "error", message: result, round, commandId });
-        if (result.fresh) publish();
-        send(result.ack);
-        return;
-      }
-      if (round !== room.round) return error("That round has ended.");
-      if (typeof seq !== "number" || !Number.isSafeInteger(seq) || seq < 1) return error("Invalid command number.");
-      if (seq <= lastSeq) return error("That command was already received.");
-      lastSeq = seq;
-      const problem = room.control(team, action);
-      if (problem) return error(problem);
-      publish();
-      startClock();
+      const result = applyRoomMessage(room,team,message,lastSeq);
+      lastSeq = result.seq;
+      if (result.changed) { publish(); startClock(); }
+      if (result.reply) send(result.reply);
     });
     socket.on("close", code => {
-      if (!team || !players.delete(socket)) return;
+      clearTimeout(joinDeadline);
+      connections.delete(socket);
+      if (!team || !players.delete(socket)) {
+        if (!connections.size && !expiry.size) { stopClock(); remove(); }
+        return;
+      }
       if (code === CLOSE.leave) { release(team); return; }
       const side = team;
       room.disconnect(side);
@@ -128,26 +156,12 @@ function attachMatch(server: Server, mode: MatchMode, rejoinGraceMs: number) {
     });
   }
 
-  function upgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
-    if (req.url !== MATCHES[mode].socket) return;
-    if (req.headers.origin) {
-      try {
-        if (new URL(req.headers.origin).host !== req.headers.host) { socket.destroy(); return; }
-      } catch { socket.destroy(); return; }
-    }
-    sockets.handleUpgrade(req, socket, head, register);
-  }
-  server.on("upgrade", upgrade);
   function close() {
     stopClock();
-    server.off("close", close);
-    server.off("upgrade", upgrade);
     for (const timeout of expiry.values()) clearTimeout(timeout);
     expiry.clear();
     players.clear();
-    for (const socket of sockets.clients) socket.terminate();
-    sockets.close();
+    for (const socket of connections) socket.terminate();
   }
-  server.once("close", close);
-  return close;
+  return {register,close};
 }

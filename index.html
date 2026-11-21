@@ -26,11 +26,13 @@
             <summary class="demo-button"><span class="flag-icon" aria-hidden="true"></span>Play modes <span aria-hidden="true">▾</span></summary>
             <div class="demo-options">
               <a href="/" aria-current="page">Playground <small>Solo</small></a>
-              <a href="/room">Duel <small>2 players</small></a>
-              <a href="/ffa">Free-for-all <small>3–4 players</small></a>
+              <a href="/room?new">Duel <small>2 players</small></a>
+              <a href="/ffa?new">Free-for-all <small>3–4 players</small></a>
             </div>
           </details>
+          <button id="room-invite" class="demo-button" type="button" hidden>Copy invite</button>
           <a id="room-leave" class="demo-button" href="/" hidden>Leave match</a>
+          <input id="invite-url" readonly hidden aria-label="Match invite link" />
         </div>
         <div id="result" class="result" role="status" hidden>
           <strong id="result-title"></strong><span id="result-detail"></span>

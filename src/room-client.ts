@@ -8,6 +8,7 @@ import { connectRoom, type ConnectionState } from "./room-connection.ts";
 import type { RoomAction, Snapshot, World } from "./room-protocol.ts";
 import { bountyFor } from "./transformations.ts";
 import { UNIT_DEFINITIONS, placementKind, type RecruitKind } from "./units.ts";
+import { matchLink } from "./match-link.ts";
 
 const mode: MatchMode = location.pathname.replace(/\/$/, "") === "/ffa" ? "ffa" : "duel";
 const match = MATCHES[mode];
@@ -23,6 +24,8 @@ const empty: World = { tick: 0, units: [], arrows: [] };
 const showIds = new URLSearchParams(location.search).get("ids") === "1";
 let latest: Snapshot | undefined, team: Team | undefined;
 let heardSnapshot = false;
+const hosted = !!document.querySelector('meta[name="battle-online"]');
+let fromFrame: World | undefined, frameStart = 0, frameDuration = 0, animation = 0;
 let link: ConnectionState = "joining", notice = "";
 let bounty: { tick: number; amount: number } | undefined;
 let draft: readonly ArenaPoint[] = [], draftKind: RecruitKind = "warrior";
@@ -31,6 +34,22 @@ document.title = match.name + " · Battle Sandbox";
 game.dataset.room = ""; game.dataset.mode = mode;
 element("demo-picker").hidden = element("team-tools").hidden = true;
 element("room-leave").hidden = scenario.hidden = false;
+const invite = element<HTMLButtonElement>("room-invite"), manualInvite = element<HTMLInputElement>("invite-url");
+invite.hidden = false;
+let inviteTimer = 0;
+invite.addEventListener("click",async () => {
+  const id = new URL(location.href).searchParams.get("match");
+  const link = matchLink(location.origin,mode,id).href;
+  try {
+    await navigator.clipboard.writeText(link);
+    invite.textContent = "Copied!";
+    window.clearTimeout(inviteTimer);
+    inviteTimer = window.setTimeout(() => { invite.textContent = "Copy invite"; },1800);
+  } catch {
+    manualInvite.value = link; manualInvite.hidden = false; manualInvite.focus(); manualInvite.select();
+  }
+});
+manualInvite.addEventListener("blur",() => { manualInvite.hidden = true; });
 
 function canDraw() {
   if (link !== "online" || !team || !latest) return false;
@@ -39,7 +58,9 @@ function canDraw() {
 }
 function paint() {
   const world = latest?.world ?? empty;
-  drawArena(field.ctx, world, world, 1, !latest || latest.phase === "deploy", draft, draft.length ? draftKind : field.selectedKind(), { mode, ownTeam: team, showIds });
+  const blend = fromFrame ? Math.min(1,(performance.now()-frameStart)/frameDuration) : 1;
+  drawArena(field.ctx, fromFrame ?? world, world, blend, !latest || latest.phase === "deploy", draft, draft.length ? draftKind : field.selectedKind(), { mode, ownTeam: team, showIds });
+  if (blend < 1 && !animation) animation = requestAnimationFrame(() => { animation=0; paint(); });
 }
 function problem(points: readonly ArenaPoint[], kind: RecruitKind) {
   if (!team || !latest) return "Joining the match…";
@@ -93,7 +114,7 @@ function updateInterface() {
   if (deploy && snap) {
     const missing = Math.max(0, match.minimum - roster.length);
     if (roster.some(side => snap.seats[side]?.reserved)) status = "Waiting for a player to reconnect.";
-    else if (missing) status = "Waiting for " + missing + " more player" + (missing === 1 ? "" : "s") + " to join.";
+    else if (missing) status = "Waiting for " + missing + " more player" + (missing === 1 ? "" : "s") + ". Share the match with Copy invite.";
     else if (ready) status = "Formation locked. Waiting for everyone to be ready.";
     else if (ownCount) status = "Press Ready when your army is set.";
   }
@@ -151,6 +172,13 @@ const connection = connectRoom(mode, {
   snapshot(event) {
     const previous = latest;
     latest = event;
+    fromFrame = undefined;
+    if (hosted && heardSnapshot && previous?.phase === "running" && event.phase === "running" && previous.round === event.round) {
+      const gap = event.world.tick-previous.world.tick;
+      if (gap > 0 && gap <= 24) {
+        fromFrame=previous.world; frameStart=performance.now(); frameDuration=Math.min(165,gap*1000/60);
+      }
+    }
     if (heardSnapshot && previous?.round === event.round) field.hear(previous.world,event.world);
     heardSnapshot = true;
     if (!canDraw() || (previous && previous.round !== event.round)) cancelStroke();
