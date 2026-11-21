@@ -24,22 +24,19 @@ try {
   await page.clock.install({time:clock});
   await page.clock.pauseAt(new Date(clock.getTime()+1000));
   await page.goto("http://127.0.0.1:"+http.address().port+"/");
-  await page.getByRole("button",{name:"Roster",exact:true}).waitFor();
+  await page.getByRole("tab",{name:"People",exact:true}).waitFor();
   await page.evaluate(()=>document.fonts.ready);
   const panel=page.getByRole("region",{name:"Troops and spells"});
   const click=button=>button.click({force:true});
   const button=(container,name)=>container.getByRole("button",{name,exact:true});
   const shelves = {
-    People:["Warrior","Archer","Lancer","Musketeer","Venom Scout","Bomber","Miner","Clown","Shieldbearer","Engineer"],
+    People:["Warrior","Archer","Lancer","Musketeer","Venom Scout","Bomber","Miner","Clown","Shieldbearer","Engineer","Field Medic"],
     Machines:["Watchpost"], Mythical:["Storm Kirin","Cyclops","Frost Queen","Phoenix","Reaper","Witch","Zombie"], Spells:["Healing Rain","Gust"],
   };
   async function brush(team,name) {
     await click(button(page,team+" army"));
-    const quick=button(page.locator("#brush-tool"),name);
-    if(await quick.count()){await click(quick);return;}
     const shelf=Object.keys(shelves).find(key=>shelves[key].includes(name));
-    await click(button(page,"Roster"));
-    await click(button(panel,shelf));
+    await click(panel.getByRole("tab",{name:shelf,exact:true}));
     await click(button(panel,name));
   }
   const arena=await page.locator("#arena").boundingBox();
@@ -125,9 +122,9 @@ try {
     ];
     const cards=[];
     for(const [team,shelf,name,skill] of characters){
-      await click(button(page,team+" army"));await click(button(page,"Roster"));await click(button(panel,shelf));
+      await click(button(page,team+" army"));await click(panel.getByRole("tab",{name:shelf,exact:true}));
       const portrait=await button(panel,name).locator("canvas").evaluate(c=>c.toDataURL());
-      cards.push({name,skill,portrait});await click(button(panel,"Close roster"));
+      cards.push({name,skill,portrait});
     }
     const sheet=await page.evaluate(async cards=>{
       await document.fonts.load('800 22px "Barlow Condensed"');

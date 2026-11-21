@@ -1,6 +1,7 @@
 import { drawLandscape } from "./landscape.ts";
 import { maxHealth } from "./transformations.ts";
 import { createRoster } from "./roster.ts";
+import { createBattleSound } from "./battle-sound.ts";
 import { UNIT_DEFINITIONS, UNIT_KINDS } from "./units.ts";
 import { ARMIES, BASE_HP, TEAMS, MATCHES, type MatchMode, type Team } from "./battlefield.ts";
 import type { World } from "./room-protocol.ts";
@@ -86,5 +87,6 @@ export function createField(mode?: MatchMode) {
     roster.setBudget(amount);
   }
   setGold(undefined);
-  return { canvas, ctx, ...roster, watchSize, updateScore, setGold };
+  const hear = createBattleSound(element<HTMLButtonElement>("sound-toggle"));
+  return { canvas, ctx, ...roster, hear, watchSize, updateScore, setGold };
 }

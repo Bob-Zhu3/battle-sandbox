@@ -46,12 +46,14 @@ for (const color of TEAMS) {
 }
 choose(team);
 
-game.addEventListener("brushchange", () => {
+function updateBrushHint() {
   const spell = field.selectedSpell(), hint = element("deploy-hint");
   hint.textContent = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." : "";
   hint.hidden = !hint.textContent;
   field.canvas.setAttribute("aria-label", hint.textContent || "Playground. Choose a color and draw troops anywhere.");
-});
+}
+game.addEventListener("brushchange",updateBrushHint);
+updateBrushHint();
 
 function paint(blend = 1) {
   drawArena(field.ctx, previous, play.world, blend);
@@ -63,13 +65,16 @@ function update() {
   field.updateScore(play.world);
 }
 attachSpellBrush(field.canvas, field.selectedSpell, (spell, point) => {
-  play.cast(team, spell, point.x, point.y); previous = play.world; update(); paint();
+  const before = play.world;
+  play.cast(team, spell, point.x, point.y); field.hear(before,play.world); previous = play.world; update(); paint();
 });
 const cancel = attachDeploymentBrush(field.canvas, {
   canDraw: () => !field.selectedSpell(),
   selectedKind() { strokeTeam = team; return field.selectedKind(); },
   livePlace(points, kind, first) {
+    const before = play.world;
     play.place(strokeTeam, { type: UNIT_DEFINITIONS[kind].command, positions: points }, !first);
+    field.hear(before,play.world);
     previous = play.world;
     update(); paint();
   },
@@ -84,12 +89,13 @@ document.addEventListener("visibilitychange", () => { lastTime = performance.now
 function frame(time: number) {
   remainder += Math.min(250, Math.max(0, time - lastTime));
   lastTime = time;
-  const before = play.world.tick;
+  const startWorld = play.world, before = startWorld.tick;
   const beforeCount = play.world.units.length;
   const beforeSpells = (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0);
   while (remainder >= tickMs) {
     remainder -= tickMs; previous = play.world; play.advance();
   }
+  if (before !== play.world.tick) field.hear(startWorld,play.world);
   if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
   if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
   requestAnimationFrame(frame);

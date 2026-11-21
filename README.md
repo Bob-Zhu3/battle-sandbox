@@ -1,6 +1,6 @@
 # Battle Sandbox
 
-Draw a squad into a meadow and watch it fight. Open **Roster** to choose from twenty-two troops and buildings or three spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
+Draw a squad into a meadow and watch it fight. The illustrated row along the bottom holds twenty-two troops and buildings and three spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
 ![Four armies in a live free-for-all, with a base in each corner and recruitment controls below the field](media/free-for-all.png)
 
@@ -21,7 +21,9 @@ The playground opens in your browser. To play together on the same network, have
 | Duel (`/room`) | 2 | Your half, or anywhere for a Miner | Destroy the opposing base |
 | Free-for-all (`/ffa`) | 3–4 | Your corner, or anywhere for a Miner | Be the last player with a standing base |
 
-In every mode, tap one of the six cards along the bottom or press **1–6**, then tap the field. Picking a new card from **Roster** adds it to the bar. To change a specific slot, open **Roster**, tap that slot, then pick its replacement. You can equip spells before the countdown. Your layout stays with this tab when you reload. [Watch a one-tap Meteor and an Archer reinforcement](media/quick-bar.mp4)
+Pick **People**, **Machines**, **Mythical** or **Spells**, then tap a portrait to arm it. Swipe the row sideways, roll the mouse wheel over it, or use its arrows. Browsing keeps the current brush armed until you pick another portrait. The category and brush are remembered when you reload. Number keys **1–9** select the first nine portraits in the open category, and **0** selects the tenth. In matches, spells unlock when the countdown ends.
+
+An Archer's bowstring sounds at release. The hit sounds when the arrow reaches its target. A Meteor whistles on the way down and lands with a low thump. Press **M** or use the speaker button to mute or unmute. [Watch two Meteor strikes and a mid-fight troop switch with sound](media/field-palette.mp4)
 
 ### Playground
 
@@ -84,7 +86,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Spell | Gold | What happens |
 | --- | ---: | --- |
 | Gust | 10 | Shoves enemies and scatters hostile arrows and bolts in its circle. Bullets and lobbed bombs keep flying. A friendly Phoenix egg hatches immediately. |
-| Meteor | 20 | Enters from the top edge and lands on the marked ground after 0.8 seconds, dealing 17 damage to enemies still inside or 6 to a base. |
+| Meteor | 20 | A white-hot stone sheds flame and cinders from the top edge. It strikes the marked ground after 0.8 seconds, dealing 17 damage to enemies still inside or 6 to a base. |
 | Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies and puts out an enemy Phoenix egg. |
 
 Stars overhead mark a stun. Ice around the feet marks a slow. Violet bubbles mean poison. Green skin and a torn coat show that a human has already become a Zombie. Small orange flames on an enemy mean it is taking burn damage. The Phoenix's cracked ember egg counts down to its own rebirth. A Phoenix in flight sheds sparks and a passing Frost Queen leaves small ice crystals. These trails follow their actual movement and fade when they stop.
@@ -100,7 +102,7 @@ A connection loss reserves your seat for 60 seconds. Reopen the match to reclaim
 | `npm test` | Fixed-tick combat, troop interactions, towers, spells, returning to a full-roster fight, brush spacing, spending and two real WebSocket clients |
 | `npm run demo:encounters` | A charged Lancer meets chain lightning, a Cyclops smashes and swallows, and a Phoenix hatches from its ember egg. |
 | `npm run demo:oddities` | See the new troops in six short fights, then try turning an Archer in the live playground. [Watch the gameplay clip](media/tunnels-and-turncoats.mp4) |
-| `npm run check:modes` | Every roster entry, a cross-field Meteor in a desktop-and-phone duel, a reconnect after a four-target chain stun, and complete three- and four-player matches with reconnection and rematches |
+| `npm run check:modes` | All 25 portraits, touch scrolling, sound and mute, a cross-field Meteor in a desktop-and-phone duel, a reconnect after a four-target chain stun, and complete three- and four-player matches with reconnection and rematches |
 | `npm run demo:room -- --headed` | Two browser windows drawing at the same time, then recruiting during a base battle |
 | `npm run demo:retry` | Drop confirmation of a five-Warrior stroke, disconnect and return with the original five IDs and one charge |
 | `npm run demo:reconnect` | Disconnect Blue after the first hit, catch up to the live fight and verify both browsers agree through the fall of a base |

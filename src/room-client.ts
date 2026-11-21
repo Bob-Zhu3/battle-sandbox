@@ -22,6 +22,7 @@ const state = element("match-state"), scenario = element("scenario-name"), resul
 const empty: World = { tick: 0, units: [], arrows: [] };
 const showIds = new URLSearchParams(location.search).get("ids") === "1";
 let latest: Snapshot | undefined, team: Team | undefined;
+let heardSnapshot = false;
 let link: ConnectionState = "joining", notice = "";
 let bounty: { tick: number; amount: number } | undefined;
 let draft: readonly ArenaPoint[] = [], draftKind: RecruitKind = "warrior";
@@ -58,6 +59,7 @@ function updateInterface() {
   const camp = team ? campFor(mode, team).label : "";
   const roster = match.teams.filter(side => snap?.seats[side]?.connected || snap?.seats[side]?.reserved);
   field.canvas.dataset.deploying = String(edit);
+  field.setCasting(!!live && edit, !!deploy && edit);
   const spell = live && edit ? field.selectedSpell() : undefined;
   const miner = edit && field.selectedKind() === "miner" && !spell;
   const castingHint = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : miner ? "Choose a tunnel exit anywhere on the field." : "";
@@ -74,8 +76,6 @@ function updateInterface() {
   const rate = element("gold-rate");
   rate.hidden = !live || !edit;
   rate.textContent = bounty && snap && snap.world.tick - bounty.tick < 75 ? "+" + bounty.amount + " bounty" : "+" + GOLD_PER_SECOND + "/s";
-  field.setCasting(!!live && edit);
-  if (!edit) field.closeRoster();
   element("brush-tool").hidden = !edit;
   undo.hidden = clear.hidden = !edit || !deploy;
   undo.disabled = clear.disabled = !ownCount;
@@ -141,7 +141,7 @@ const cancelStroke = attachDeploymentBrush(field.canvas, {
 });
 
 const connection = connectRoom(mode, {
-  state(value) { link = value; if (value !== "online") cancelStroke(); updateInterface(); },
+  state(value) { link = value; if (value !== "online") { heardSnapshot = false; cancelStroke(); } updateInterface(); },
   joined(side) {
     team = side; game.dataset.team = side; game.style.setProperty("--army", ARMIES[side].coat);
     document.title = ARMIES[side].name + " · " + match.name + " · Battle Sandbox";
@@ -151,6 +151,8 @@ const connection = connectRoom(mode, {
   snapshot(event) {
     const previous = latest;
     latest = event;
+    if (heardSnapshot && previous?.round === event.round) field.hear(previous.world,event.world);
+    heardSnapshot = true;
     if (!canDraw() || (previous && previous.round !== event.round)) cancelStroke();
     if (previous?.round !== event.round || previous.phase !== event.phase) { notice = ""; bounty = undefined; }
     if (team && previous?.phase === "running" && event.world.tick > previous.world.tick) {

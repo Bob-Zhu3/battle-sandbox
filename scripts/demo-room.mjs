@@ -90,7 +90,9 @@ async function openPlayer(team, width, height, left, prepare) {
   });
   const box = await page.locator("#arena").boundingBox();
   assert.equal(Math.round(box.width), width);
-  assert.equal(Math.round(box.height), height);
+  assert.ok(box.height > height/2 && box.y+box.height <= height, "The drawable field fits this window");
+  const pixels = await page.locator("#arena").evaluate(canvas => [canvas.width,canvas.height]);
+  assert.deepEqual(pixels,[Math.round(box.width),Math.round(box.height)]);
   return { team, page, width, height, box, frames, errors, connections };
 }
 
@@ -166,8 +168,14 @@ async function runBattleDemo() {
   assert.equal(new Set(units.map(u => u.id)).size, 20);
   for (const [index, team] of teams.entries()) {
     for (const [kind, xs] of [["warrior",[360,600]],["archer",[288,672]]]) {
-      assert.deepEqual(units.filter(u => u.team === team && u.kind === kind).map(u => [u.x,u.y]),
-        [120,144,168,192,216].map(y => [xs[index],y]));
+      const squad=units.filter(u => u.team === team && u.kind === kind);
+      assert.equal(squad.length,5);
+      // Browser pointer coordinates have subpixel rounding on a resized canvas.
+      // The two clients' complete authoritative snapshots are compared exactly above.
+      squad.forEach((unit,i) => {
+        assert.ok(Math.abs(unit.x-xs[index])<.0001 && Math.abs(unit.y-(120+24*i))<.0001);
+        if (i) assert.ok(Math.abs(unit.y-squad[i-1].y-24)<1e-8);
+      });
     }
   }
   await Promise.all(players.map(p => checkCanvas(p, units)));

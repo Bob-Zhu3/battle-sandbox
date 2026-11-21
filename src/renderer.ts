@@ -3,6 +3,7 @@ import type { World } from "./room-protocol.ts";
 import { type ArenaPoint } from "./deployment.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { drawFieldSpell } from "./magic-art.ts";
+import { drawMeteor } from "./meteor-art.ts";
 import { drawTrail, drawTunnel, drawChange, drawSoul } from "./field-effects.ts";
 import { drawChain, drawConditions, drawGroundEffect, drawSpecialShot, drawStun } from "./combat-art.ts";
 import { drawKeep } from "./keeps.ts";
@@ -155,6 +156,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       drawArrow(ctx,x,y-height*scale,Math.atan2(arrow.vy*sy,arrow.vx*sx),scale*(arrow.kind==="dart"?.73:1),arrow.team,length);
     }
   }
+  for (const spell of current.spells ?? []) if (spell.kind === "meteor") drawMeteor(ctx,spell,tick,sx,sy);
   if (view.showIds) {
     ctx.save();
     ctx.font = '800 16px "Barlow Condensed", sans-serif';

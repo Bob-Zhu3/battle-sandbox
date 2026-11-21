@@ -40,11 +40,9 @@ async function open(url, width = 1000, height = 600, pauseClock = false) {
   }
   return { page, frames, joins, point, waitForUnits };
 }
-async function selectFromRoster(page, shelf, name) {
-  await page.getByRole("button",{name:"Roster",exact:true}).click();
-  const panel=page.getByRole("region",{name:"Troops and spells"});
-  await panel.getByRole("button",{name:shelf,exact:true}).click();
-  await panel.getByRole("button",{name,exact:true}).click();
+async function chooseCard(page, shelf, name) {
+  await page.getByRole("tab",{name:shelf,exact:true}).click();
+  await page.getByRole("tabpanel").getByRole("button",{name,exact:true}).click();
 }
 async function picture(page, name) {
   if (values.output) await page.screenshot({ path: join(values.output, name + ".png") });
@@ -54,7 +52,7 @@ async function phoenixDuringDeployment(url) {
   const {page, point, waitForUnits} = await open(url + "/room", 390, 700);
   try {
     await page.waitForFunction(() => document.querySelector(".game").dataset.team === "red");
-    await selectFromRoster(page, "Mythical", "Phoenix");
+    await chooseCard(page, "Mythical", "Phoenix");
     await page.mouse.click(...point(326, 187));
     await waitForUnits(1);
     await page.waitForFunction(() => document.querySelector("#red-count").textContent === "1");
@@ -127,43 +125,68 @@ async function arrowFlash(url) {
   } finally { await page.context().close(); }
 }
 
-async function quickBarAndMeteor(url) {
+async function paletteAndMeteor(url) {
   for(const [width,height,targetX] of [[960,540,880],[390,700,48]]){
     const {page,point}=await open(url,width,height,true);
     try {
-      const bar=page.locator("#brush-tool"), panel=page.getByRole("region",{name:"Troops and spells"});
+      const bar=page.locator("#brush-tool"), panel=page.getByRole("tabpanel");
       const pick=(scope,name)=>scope.getByRole("button",{name,exact:true}).click({force:true});
-      const layout=()=>bar.locator("button").evaluateAll(cards=>cards.map(card=>card.getAttribute("aria-label")));
-      await pick(page,"Roster");await pick(panel,"Mythical");await pick(panel,"Phoenix");
-      assert.equal((await layout())[2],"Phoenix");
-      await pick(page,"Roster");await pick(bar,"Field Medic");await pick(panel,"Spells");await pick(panel,"Gust");
-      const arranged=await layout();assert.equal(arranged[3],"Gust");
-      await page.reload();await page.locator("#brush-meteor").waitFor();
-      assert.deepEqual(await layout(),arranged);
-      await page.keyboard.press("2");assert.equal(await bar.locator("[aria-pressed=true]").getAttribute("aria-label"),"Archer");
-      await pick(page,"Blue army");await pick(page,"Roster");await pick(panel,"Machines");await pick(panel,"Watchpost");
+      const tab=name=>bar.getByRole("tab",{name,exact:true});
+      assert.deepEqual(await bar.getByRole("tab").allTextContents(),["People","Machines","Mythical","Spells"]);
+      assert.equal(await panel.getByRole("button").count(),11);
+      assert.equal(await page.getByRole("button",{name:"Roster",exact:true}).count(),0);
+      const track=bar.locator("#palette-track");
+      await pick(bar,"Scroll troops right"); assert.ok(await track.evaluate(el=>el.scrollLeft>0));
+      await pick(bar,"Scroll troops left"); assert.equal(await track.evaluate(el=>el.scrollLeft),0);
+      await track.dispatchEvent("wheel",{deltaY:155}); assert.ok(await track.evaluate(el=>el.scrollLeft>0));
+      await page.keyboard.press("2"); assert.equal(await bar.locator("button[aria-pressed=true]").getAttribute("aria-label"),"Archer");
+      await tab("Mythical").click({force:true});await pick(panel,"Phoenix");
+      await page.reload();await page.locator("#brush-phoenix").waitFor();
+      assert.equal(await tab("Mythical").getAttribute("aria-selected"),"true");
+      assert.equal(await page.locator("#brush-phoenix").getAttribute("aria-pressed"),"true");
+      await tab("Spells").click({force:true}); assert.ok(await tab("Mythical").evaluate(el=>el.hasAttribute("data-armed")));
+      await tab("People").focus(); await page.keyboard.press("Home"); await page.keyboard.press("ArrowRight");
+      assert.equal(await tab("Machines").getAttribute("aria-selected"),"true");
+      await pick(page,"Blue army");await pick(panel,"Watchpost");
       const groundY=224;
       await page.mouse.click(...point(targetX,groundY));await page.clock.runFor(32);
-      await pick(page,"Red army");await pick(bar,"Meteor");
-      assert.equal(await panel.isVisible(),false);
+      await pick(page,"Red army");await tab("Spells").click({force:true});await pick(panel,"Meteor");
+      assert.equal(await panel.isVisible(),true);
       await page.mouse.click(...point(targetX,groundY));
-      // Locate the orange core on the transparent battlefield layer.
+      // Locate the white-hot core on the transparent battlefield layer.
       async function core() {
         return page.locator("#arena").evaluate(canvas=>{
           const pixels=canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data;
           let x=0,y=0,n=0;
           for(let i=0;i<pixels.length;i+=4) {
-            if(pixels[i+3]<190 || Math.abs(pixels[i]-231)>8 || Math.abs(pixels[i+1]-146)>8 || Math.abs(pixels[i+2]-76)>8) continue;
+            if(pixels[i+3]<190 || Math.abs(pixels[i]-255)>4 || Math.abs(pixels[i+1]-252)>5 || Math.abs(pixels[i+2]-232)>7) continue;
             const px=i/4;x+=px%canvas.width;y+=Math.floor(px/canvas.width);n++;
           }
-          return n ? {x:x/n/canvas.width*960,y:y/n/canvas.height*360} : null;
+          if (!n) return null;
+          x/=n; y/=n;
+          // Compare the flame relative to its moving head, excluding the bright core itself.
+          const wake=Array(14).fill(0);
+          for(let dy=9;dy<79;dy++){
+            const row=Math.round(y)-dy; if(row<0) break;
+            for(let col=Math.max(0,Math.round(x)-45);col<Math.min(canvas.width,Math.round(x)+46);col++){
+              const i=(row*canvas.width+col)*4, r=pixels[i], g=pixels[i+1], b=pixels[i+2];
+              if(pixels[i+3]>110 && r>178 && r>g*1.15 && g>b*1.4) wake[Math.floor((dy-9)/5)]++;
+            }
+          }
+          return {x:x/canvas.width*960,y:y/canvas.height*360,wake};
         });
       }
       await page.clock.runFor(48);const entry=await core();
       assert.ok(entry && entry.y<18 && entry.x>0 && entry.x<960,"The Meteor enters through the top edge");
       await page.clock.runFor(350);const middle=await core();
       assert.ok(middle && middle.y>groundY*.28 && middle.y<groundY*.56);
-      await page.clock.runFor(366);const near=await core();
+      await page.clock.runFor(100);const later=await core();
+      if(width===960) {
+        const difference=later.wake.reduce((total,pixels,i)=>total+Math.abs(pixels-middle.wake[i]),0);
+        assert.ok(difference>middle.wake.reduce((a,b)=>a+b,0)*.10,"The wake changes shape after aligning the two moving cores");
+        assert.deepEqual(await core(),later,"The same frozen frame holds the same cinders");
+      }
+      await page.clock.runFor(266);const near=await core();
       assert.ok(near && Math.abs(near.x-targetX)<13 && near.y>groundY*.86 && near.y<groundY);
       assert.equal(await page.locator("#blue-hp").textContent(),String(defs.post.maxHp));
       await page.clock.runFor(130);
@@ -171,7 +194,68 @@ async function quickBarAndMeteor(url) {
       assert.equal(await core(),null);
     } finally {await page.context().close();}
   }
-  console.log("Six one-tap slots, keyboard selection, saved layouts and top-edge Meteor strikes on desktop and phone.");
+  console.log("Direct category browsing, horizontal scrolling, keyboard selection, restored brushes and top-edge Meteor strikes on desktop and phone.");
+}
+
+async function touchAndSound(url) {
+  const context = await browser.newContext({viewport:{width:390,height:700},isMobile:true,hasTouch:true});
+  const page = await context.newPage();
+  try {
+    // Read the real game mix just before the speaker, including its mute envelope.
+    await page.addInitScript(() => {
+      const connect = AudioNode.prototype.connect;
+      AudioNode.prototype.connect = function(...args) {
+        const result = connect.apply(this,args);
+        if (args[0] === this.context.destination && !window.gameMeter) {
+          const meter = this.context.createAnalyser(); meter.fftSize=1024;
+          connect.call(this,meter); window.gameMeter=meter;
+        }
+        return result;
+      };
+    });
+    await page.goto(url);
+    const track = page.getByRole("tabpanel"), bounds = await track.boundingBox();
+    const cdp = await context.newCDPSession(page), x = bounds.x+bounds.width*.83, y = bounds.y+bounds.height*.48;
+    await cdp.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x,y}]});
+    for (let i=1; i<=8; i++) {
+      await cdp.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:x-i*18,y}]});
+      await delay(17);
+    }
+    await cdp.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+    await page.waitForFunction(() => document.querySelector("#palette-track").scrollLeft>70);
+    assert.equal(await page.locator("#tick").textContent(),"000","Swiping portraits leaves the field untouched");
+    await page.getByRole("tab",{name:"Spells"}).tap();
+    await track.getByRole("button",{name:"Meteor",exact:true}).tap();
+    const hit = await page.locator("#arena").boundingBox();
+    async function castAndMeasure() {
+      await page.evaluate(() => {
+        window.castAudio = new Promise(resolve => {
+          document.querySelector("#arena").addEventListener("pointerdown",() => {
+            const began = performance.now(), meter = window.gameMeter, samples = new Float32Array(meter.fftSize), peaks = [0,0];
+            function read() {
+              meter.getFloatTimeDomainData(samples);
+              const t = performance.now()-began, section = t<735 ? 0 : 1;
+              for (const s of samples) peaks[section]=Math.max(peaks[section],Math.abs(s));
+              if (t < 1450) requestAnimationFrame(read); else resolve(peaks);
+            }
+            read();
+          },{once:true,capture:true});
+        });
+      });
+      await page.touchscreen.tap(hit.x+hit.width*.52,hit.y+hit.height*.54);
+      return page.evaluate(() => window.castAudio);
+    }
+    const [flight,landing] = await castAndMeasure();
+    assert.ok(flight>.002 && landing>flight*1.4,"The airy descent and stronger impact reach the speaker: "+[flight,landing]);
+    await page.keyboard.press("m");
+    assert.equal(await page.locator("#sound-toggle").getAttribute("aria-pressed"),"true");
+    const muted=await castAndMeasure(); assert.ok(muted.every(peak=>peak<.0005),"A muted cast is silent");
+    await page.reload();
+    assert.equal(await page.locator("#sound-toggle").getAttribute("aria-pressed"),"true");
+    await page.locator("#sound-toggle").tap();
+    assert.equal(await page.locator("#sound-toggle").getAttribute("aria-pressed"),"false");
+    console.log("Phone touch scrolling, two audible Meteor cues, silent muted casts and a saved mute preference.");
+  } finally { await context.close(); }
 }
 
 async function playground(url) {
@@ -217,9 +301,8 @@ async function browseRoster(url) {
     let placed=0;
     for(const [shelf,names] of Object.entries(catalog)) {
       for(const [i,name] of names.entries()) {
-        await page.getByRole("button",{name:"Roster",exact:true}).click();
-        const panel=page.getByRole("region",{name:"Troops and spells"});
-        await panel.getByRole("button",{name:shelf,exact:true}).click();
+        await page.getByRole("tab",{name:shelf,exact:true}).click();
+        const panel=page.getByRole("tabpanel");
         const card=panel.getByRole("button",{name,exact:true});
         assert.equal(await card.isEnabled(),true);
         portraits.add(await card.locator("canvas").evaluate(c=>c.toDataURL()));
@@ -238,10 +321,9 @@ async function browseRoster(url) {
     const panel=page.getByRole("region",{name:"Troops and spells"});
     for(const team of TEAMS) {
       await page.getByRole("button",{name:ARMIES[team].name+" army",exact:true}).click();
-      await page.getByRole("button",{name:"Roster",exact:true}).click();
       for(const shelf of ["People","Machines","Mythical"]) {
-        await panel.getByRole("button",{name:shelf,exact:true}).click();
-        const clipped=await panel.locator(".roster-card canvas").evaluateAll(canvases=>canvases.flatMap(canvas=>{
+        await panel.getByRole("tab",{name:shelf,exact:true}).click();
+        const clipped=await panel.locator(".palette-card canvas").evaluateAll(canvases=>canvases.flatMap(canvas=>{
           const {width,height}=canvas;
           const ink=canvas.getContext("2d").getImageData(0,0,width,height).data;
           for(let y=0;y<height;y++) for(let x=0;x<width;x++) {
@@ -252,22 +334,21 @@ async function browseRoster(url) {
         }));
         assert.deepEqual(clipped,[],team+" portraits need space around each silhouette");
       }
-      await panel.getByRole("button",{name:"Close roster",exact:true}).click();
     }
-    await selectFromRoster(page,"Machines","Mouse Workshop");
+    await chooseCard(page,"Machines","Mouse Workshop");
     for(const width of [320,375,390,601,790,1024]) {
       await page.setViewportSize({width,height:650});
-      const outside=await page.locator(".tool-strip button:visible").evaluateAll(buttons=>buttons.filter(button=>{
+      const outside=await page.locator(".tool-strip button:visible:not(.palette-card)").evaluateAll(buttons=>buttons.filter(button=>{
         const r=button.getBoundingClientRect();
         return r.left<0 || r.right>innerWidth || r.bottom>innerHeight;
       }).map(button=>button.textContent));
       assert.deepEqual(outside,[],"Controls outside the field at "+width+"px");
-      const slots=await page.locator("#brush-tool button").evaluateAll(cards=>cards.map(card=>{
+      const slots=await page.locator(".palette-card").evaluateAll(cards=>cards.map(card=>{
         const {width,height,bottom}=card.getBoundingClientRect();return {width,height,bottom};
       }));
-      assert.equal(slots.length,6);
+      assert.equal(slots.length,4);
       assert.ok(slots.every(s=>s.width>=44 && s.height>=44 && Math.abs(s.bottom-slots[0].bottom)<=3.5),
-        "All six slots fit in one tappable row at "+width+"px");
+        "Portraits form one horizontally scrollable, tappable row at "+width+"px");
     }
     assert.equal(await page.locator("#gold-balance").textContent(),"∞");
     console.log("Roster: every entry has a distinct portrait, each troop fits its card in all four colors, all 22 pieces place, and all three spells cast.");
@@ -279,27 +360,25 @@ async function magicDuel(url) {
   try {
     for (const [player,side] of [[red,"red"],[blue,"blue"]])
       await player.page.waitForFunction(team=>document.querySelector(".game").dataset.team===team,side);
-    await selectFromRoster(red.page,"People","Shieldbearer");
+    await chooseCard(red.page,"People","Shieldbearer");
     await red.page.mouse.click(...red.point(320,170));await red.waitForUnits(1);
-    await selectFromRoster(blue.page,"Mythical","Cyclops");
+    await chooseCard(blue.page,"Mythical","Cyclops");
     await blue.page.mouse.click(...blue.point(675,170));await blue.waitForUnits(2);
-    await blue.page.getByRole("button",{name:"Roster",exact:true}).click();
     const panel=blue.page.getByRole("region",{name:"Troops and spells"});
-    await panel.getByRole("button",{name:"Spells",exact:true}).click();
+    await panel.getByRole("tab",{name:"Spells",exact:true}).click();
     assert.equal(await panel.getByRole("button",{name:"Meteor",exact:true}).isEnabled(),false);
     const fits=await panel.boundingBox(),viewport=blue.page.viewportSize();
     assert.ok(fits.x>=0 && fits.x+fits.width<=viewport.width+1 && fits.y>=0);
     await picture(blue.page,"roster-spells-phone");
-    await blue.page.locator("#brush-medic").click();
-    await panel.getByRole("button",{name:"Gust",exact:true}).click();
     assert.equal(await blue.page.locator("#brush-gust").isEnabled(),false);
-    await blue.page.keyboard.press("4");
-    assert.equal(await blue.page.locator("#brush-cyclops").getAttribute("aria-pressed"),"true");
+    await blue.page.keyboard.press("2");
+    assert.equal(await blue.page.locator("#brush-meteor").getAttribute("aria-pressed"),"false");
+    assert.ok(await blue.page.getByRole("tab",{name:"Mythical"}).evaluate(tab=>tab.hasAttribute("data-armed")));
     assert.equal(Number(await blue.page.locator("#gold-balance").textContent()),120-defs.cyclops.cost);
     await Promise.all([red,blue].map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
     await red.page.getByText("Live",{exact:true}).waitFor();
     await blue.page.waitForFunction(()=>!document.querySelector("#brush-gust").disabled);
-    await red.page.locator("#brush-meteor").click();
+    await chooseCard(red.page,"Spells","Meteor");
     const before=red.frames.at(-1);
     await red.page.mouse.move(...red.point(856,180));await red.page.mouse.down();
     await red.page.mouse.move(...red.point(880,210));await red.page.mouse.up();
@@ -314,7 +393,9 @@ async function magicDuel(url) {
     await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" &&
       document.querySelector("#blue-score").dataset.baseHp==="154");
     assert.equal(blue.joins[1].resumeToken,blue.joins[0].resumeToken);
-    assert.ok(await blue.page.locator("#brush-cyclops").isVisible(),"The opening troop is still on the returning player's bar");
+    assert.equal(await blue.page.getByRole("tab",{name:"Spells"}).getAttribute("aria-selected"),"true");
+    await blue.page.getByRole("tab",{name:"Mythical"}).click();
+    assert.equal(await blue.page.locator("#brush-cyclops").getAttribute("aria-pressed"),"true");
     const frame=blue.frames.at(-1);
     const until=Date.now()+3000;
     while(!red.frames.some(f=>f.revision===frame.revision) && Date.now()<until) await delay(10);
@@ -329,11 +410,11 @@ async function stormDuel(url) {
   try {
     await red.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="red");
     await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue");
-    await selectFromRoster(red.page,"Mythical","Storm Kirin");
+    await chooseCard(red.page,"Mythical","Storm Kirin");
     await red.page.mouse.click(...red.point(438,165));await red.waitForUnits(1);
-    await selectFromRoster(blue.page,"People","Lancer");
+    await chooseCard(blue.page,"People","Lancer");
     await blue.page.mouse.click(...blue.point(666,165));await blue.waitForUnits(2);
-    await selectFromRoster(blue.page,"Machines","Watchpost");
+    await chooseCard(blue.page,"Machines","Watchpost");
     for(const [i,x] of [660,716,772].entries()) {
       await blue.page.mouse.click(...blue.point(x,190));await blue.waitForUnits(3+i);
     }
@@ -369,14 +450,14 @@ async function turncoatDuel(url) {
     await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue");
     await red.page.mouse.click(...red.point(700,245));
     assert.match(await red.page.locator("#deploy-hint").textContent(),/whole stroke/);
-    await selectFromRoster(red.page,"People","Miner");
+    await chooseCard(red.page,"People","Miner");
     assert.match(await red.page.locator("#deploy-hint").textContent(),/exit anywhere/);
     await red.page.mouse.click(...red.point(700,245));await red.waitForUnits(1);
-    await selectFromRoster(red.page,"Mythical","Witch");await red.page.mouse.click(...red.point(445,105));await red.waitForUnits(2);
-    await selectFromRoster(red.page,"Mythical","Zombie");await red.page.mouse.click(...red.point(462,270));await red.waitForUnits(3);
+    await chooseCard(red.page,"Mythical","Witch");await red.page.mouse.click(...red.point(445,105));await red.waitForUnits(2);
+    await chooseCard(red.page,"Mythical","Zombie");await red.page.mouse.click(...red.point(462,270));await red.waitForUnits(3);
     await blue.page.getByRole("button",{name:"Archer",exact:true}).click();await blue.page.mouse.click(...blue.point(488,270));await blue.waitForUnits(4);
-    await selectFromRoster(blue.page,"People","Shieldbearer");await blue.page.mouse.click(...blue.point(516,105));await blue.waitForUnits(5);
-    await selectFromRoster(blue.page,"Machines","Watchpost");await blue.page.mouse.click(...blue.point(585,92));
+    await chooseCard(blue.page,"People","Shieldbearer");await blue.page.mouse.click(...blue.point(516,105));await blue.waitForUnits(5);
+    await chooseCard(blue.page,"Machines","Watchpost");await blue.page.mouse.click(...blue.point(585,92));
     await Promise.all(players.map(p=>p.waitForUnits(6)));
     const destination=red.frames.at(-1).world.units[0].tunnel;
     assert.deepEqual([destination.toX,destination.toY].map(Math.round),[700,245]);
@@ -392,7 +473,7 @@ async function turncoatDuel(url) {
     const returned=blue.frames.at(-1),limit=Date.now()+3000;
     while(!red.frames.some(f=>f.revision===returned.revision) && Date.now()<limit)await delay(10);
     assert.deepEqual(red.frames.find(f=>f.revision===returned.revision)?.world,returned.world);
-    await selectFromRoster(red.page,"People","Miner");await red.page.mouse.click(...red.point(738,206));
+    await chooseCard(red.page,"People","Miner");await red.page.mouse.click(...red.point(738,206));
     await Promise.all(players.map(p=>p.waitForUnits(7)));
     assert.ok(blue.frames.at(-1).world.units[6].tunnel.toX>700);
     await red.page.waitForFunction(()=>Number(document.querySelector("#tick").textContent)>210);
@@ -487,7 +568,8 @@ async function match(url,size) {
 try {
   await withField(phoenixDuringDeployment);
   await withField(arrowFlash);
-  await withField(quickBarAndMeteor);
+  await withField(paletteAndMeteor);
+  await withField(touchAndSound);
   await withField(playground);
   await withField(browseRoster);
   await withField(magicDuel);
