@@ -17,6 +17,18 @@ export function line(c: Pens, x1: number, y1: number, x2: number, y2: number, co
   c.strokeStyle = color; c.lineWidth = width; c.stroke();
 }
 
+// A single profile eye has to read through a helmet at playing size.
+export function eye(c: Pens, x: number, y: number, rx: number, ry: number, lookX: number, lookY: number) {
+  if (ry < .48) {
+    line(c, x - rx + .3, y, x + rx - .1, y - .18, INK, .95);
+    return;
+  }
+  c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 2 * Math.PI);
+  c.fillStyle = "#fffdf2"; c.fill();
+  c.strokeStyle = INK; c.lineWidth = .7; c.stroke();
+  oval(c, x + lookX * rx * .44, y + lookY * ry * .35, rx * .43, ry * .64, INK);
+}
+
 const paths = new Map<string, Path2D>();
 export function cut(c: Pens, path: string, paint: string, width = 1.35) {
   let cached = paths.get(path);

@@ -86,6 +86,7 @@ test("a covered Archer releases, peers over its screen, then its Warrior ducks b
     if (tick === 1) {
       assert.equal(archer.lastAttackTick, tick);
       assert.equal(archer.lastAttentionTick, tick);
+      assert.equal(characterPose(archer, target, tick - .15).loose, 0);
       assert.equal(poseOf(battle, archer).loose, 1);
       assert.equal(warrior.lastAttentionTick, null);
       assert.equal(poseOf(battle, target).hurt, 0);
@@ -117,6 +118,47 @@ test("a Warrior outside the firing lane prompts neither a peek nor a duck", () =
     assert.equal(poseOf(battle, archer).peek, 0);
     assert.equal(poseOf(battle, warrior).duck, 0);
   }
+});
+
+test("an Archer recoils as a living opponent closes under the bow and still follows a released shot", () => {
+  let battle = createBattle([
+    { id: 1, team: "red", kind: "archer", x: 200, y: 140 },
+    { id: 2, team: "blue", kind: "warrior", x: 290, y: 154 },
+  ]);
+  for (const unit of battle.units) unit.nextAttackTick = 1000;
+  battle = stepBattle(battle);
+  assert.equal(poseOf(battle, battle.units[0]).cornered, 0);
+  assert.ok(poseOf(battle, battle.units[0]).lookY > 0);
+  let previous = 0;
+  while (battle.tick < 50) {
+    battle = stepBattle(battle);
+    const archer = battle.units[0], pose = poseOf(battle, archer);
+    assert.ok(pose.cornered >= previous);
+    previous = pose.cornered;
+  }
+  assert.equal(previous, 1);
+  battle.units[0].nextAttackTick = battle.tick + 1;
+  battle = stepBattle(battle);
+  const shot = poseOf(battle, battle.units[0]);
+  assert.equal(shot.loose, 1);
+  assert.equal(shot.cornered, 0);
+  const rejoined = JSON.parse(JSON.stringify(battle));
+  assert.deepEqual(poseOf(rejoined, rejoined.units[0]), shot);
+});
+
+test("idle glances are staggered by unit ID and yield to the actual target", () => {
+  const battle = createBattle([
+    { id: 1, team: "red", x: 200, y: 140 },
+    { id: 2, team: "red", x: 250, y: 140 },
+  ]);
+  const [first, second] = battle.units;
+  const tick = 214;
+  assert.ok(characterPose(first, undefined, tick).lookX < -.8);
+  assert.ok(characterPose(second, undefined, tick).lookX > 0);
+  const aiming = characterPose({ ...first, aimX: -.8, aimY: -.6 }, second, tick);
+  assert.equal(aiming.side, -1);
+  assert.equal(aiming.lookX, .8);
+  assert.equal(aiming.lookY, -.6);
 });
 
 test("a released shot holds the Archer's gaze if its combat target changes sides", () => {

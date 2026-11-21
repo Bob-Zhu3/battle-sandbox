@@ -80,7 +80,7 @@ function claw(c: Pens, x: number, y: number, rake: number, far: boolean) {
   c.restore();
 }
 
-function body(c: Pens, gaze: number, blink: number) {
+function body(c: Pens, gaze: number, pose: CharacterPose, call: number) {
   cut(c, "M-10.4 -.8 Q-7.5 -5.8 -1.5 -5.3 Q3.4 -5.6 4.8 -10.7 L5.2 -13.4 L11.3 -12.7 Q12.7 -8.4 10.7 -3 Q8.6 4.7 2.6 5.7 Q-4.5 6.9 -10.4 -.8Z", plumage, 1.55);
   cut(c, "M-.9 4.6 Q6.4 4 7.3 -3 L10.7 -7 Q11 -1.3 7.3 2.9 Q4.4 5.9 -.9 4.6Z", gold, 0);
   c.save();
@@ -90,10 +90,15 @@ function body(c: Pens, gaze: number, blink: number) {
   cut(c, "M-3.5 2.8 Q-3.8 .1 -2.4 -3.4 Q-5.2 -3.1 -7.4 -4.9 Q-5.3 -4.9 -3.5 -5.9 Q-8.4 -6.5 -11.4 -11 Q-7.3 -9.6 -2.6 -10.1 Q-4 -11.4 -4.9 -13.5 Q-1.9 -11.9 1.9 -11.5 Q7.2 -11.1 8.4 -7.1 Q10 -4.1 7.1 -1.1 Q5.2 1 3.4 1.4 L.2 4.5 L.5 2.0 L-3.6 4.3Z", emberRed, 1.4);
   cut(c, "M-7.5 -9.3 Q-4.1 -8.4 -1.7 -9 Q1.3 -9.8 4.1 -8.7 Q1.3 -8.6 -.4 -7.6 Q-4.5 -6.7 -7.5 -9.3Z", gold, 0);
   cut(c, "M-1.8 -5.7 Q2.4 -7.45 7.85 -6.1 Q7.8 -3.6 5.4 -2.3 Q2.8 -.9 .65 .9 L1.45 -1.7 Q-.9 -.5 -3.1 .15 Q-1.1 -2.6 -1.5 -4.2 L-2.8 -3.9Z", FACE, 0);
-  const eyeHeight = 1.32 * (1 - .83 * blink);
-  oval(c, 4.4, -4.5, 1.2, eyeHeight, INK);
-  oval(c, 4.75, -4.5 - eyeHeight * .48, .35, eyeHeight * .24, FACE);
-  line(c, 1.15, -6.9, 6.7, -6.0, INK, .95);
+  const eyeHeight = Math.max(.22, 1.45 - .39 * pose.ready - 1.18 * pose.blink);
+  const eyeX = 3.8 + .75 * pose.lookX, eyeY = -4.65 + .55 * pose.lookY + .55 * pose.ready;
+  oval(c, eyeX, eyeY, 1.2, eyeHeight, INK);
+  oval(c, eyeX + .35, eyeY - eyeHeight * .48, .35, eyeHeight * .24, FACE);
+  line(c, 1.15, -6.9 - .52 * pose.ready, 6.7, -6 + .65 * pose.ready, INK, .95);
+  if (call > .05) {
+    c.save(); c.translate(7, -3.6); c.rotate(.55 * call);
+    cut(c, "M-.8 -.65 Q1.5 -.75 4 -.75 Q3.8 .8 1.4 1.2 Q-.55 1.15 -.8 -.65Z", "#da9b61", .85); c.restore();
+  }
   cut(c, "M7.2 -6.7 Q10.7 -6.3 11.9 -4.7 Q12.5 -3.8 11.0 -2.0 L10.3 -3.5 Q8.5 -3.8 6.7 -3.6Z", gold, 1.05);
   c.restore();
 }
@@ -127,6 +132,6 @@ export function phoenix(c: Pens, dye: Dye, pose: CharacterPose, unit: Unit | und
   tail(c, flight.tail, flight.tailTip, flight.pullUp, flight.talons);
   claw(c, .2, 2.2, flight.talons * .72, true);
   claw(c, 4, 2.2, flight.talons, false);
-  body(c, .17 * pose.pitch - .38 * flight.pitch - .06 * pose.ready, pose.blink);
+  body(c, .17 * pose.pitch - .38 * flight.pitch + .14 * pose.ready, pose, Math.max(flight.talons, flight.takeoff * .75));
   wing(c, dye, stroke, flight.wrist, flight.talons, false);
 }

@@ -15,7 +15,7 @@ export function eventFade(tick: number, event: number | null | undefined, durati
 }
 
 function since(tick: number, event: number | null) {
-  return event === null ? Infinity : Math.max(0, tick - event);
+  return event == null || tick < event ? Infinity : tick - event;
 }
 
 export interface CharacterPose {
@@ -23,6 +23,9 @@ export interface CharacterPose {
   blink: number;
   side: number;
   pitch: number;
+  lookX: number;
+  lookY: number;
+  cornered: number;
   step: number;
   lift: number;
   pace: number;
@@ -37,7 +40,7 @@ export interface CharacterPose {
 }
 
 export function restingPose(side: number): CharacterPose {
-  return { side, breath: 0, blink: 0, pitch: 0, step: 0, lift: 0, pace: 0, guard: 0, ready: 0, strike: 0, loose: 0, peek: 0, duck: 0, hurt: 0, hitFlash: 0 };
+  return { side, breath: 0, blink: 0, pitch: 0, lookX: .2, lookY: 0, cornered: 0, step: 0, lift: 0, pace: 0, guard: 0, ready: 0, strike: 0, loose: 0, peek: 0, duck: 0, hurt: 0, hitFlash: 0 };
 }
 
 export function characterPose(unit: Unit, target: Target | undefined, tick: number, travel = unit.walkDistance, previousHitTick = unit.lastHitTick, impactTick = tick): CharacterPose {
@@ -46,6 +49,11 @@ export function characterPose(unit: Unit, target: Target | undefined, tick: numb
     const phase = tick + unit.id * 53;
     pose.breath = Math.sin(phase / (unit.kind === "warrior" ? 17 : 14)) * .85;
     pose.blink = Math.max(0, 1 - Math.abs(phase % 163 - 3) / 3) * 1.05;
+    // An idle unit occasionally checks behind it, then looks forward again.
+    // Offsets keep a newly deployed row from all turning at once.
+    const glance = 1 - smooth((Math.abs(phase % 233 - 34) - 9) / 8);
+    pose.lookX -= 1.1 * glance;
+    pose.lookY = -.35 * glance;
   }
   const kind: UnitKind = unit.kind;
   const definition = UNIT_DEFINITIONS[kind];
@@ -84,6 +92,17 @@ export function characterPose(unit: Unit, target: Target | undefined, tick: numb
   const dy = unit.aimY + ((unit.attackDirection?.y ?? unit.aimY) - unit.aimY) * follow;
   if (Math.abs(dx) > .08) pose.side = Math.sign(dx);
   pose.pitch = Math.atan2(dy, Math.abs(dx));
+  if (target || follow > 0) {
+    pose.lookX = Math.abs(dx);
+    pose.lookY = dy;
+  }
+  if (kind === "archer" && target && target.team !== unit.team && target.kind !== "base") {
+    const opponent = UNIT_DEFINITIONS[target.kind];
+    if (opponent.speed > 0) {
+      const gap = range - definition.radius - opponent.radius;
+      pose.cornered = (1 - smooth((gap - 9) / 32)) * (1 - follow);
+    }
+  }
   return pose;
 }
 

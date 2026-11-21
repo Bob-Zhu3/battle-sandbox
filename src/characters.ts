@@ -4,7 +4,7 @@ import type { UnitKind } from "./units.ts";
 import { ARMIES } from "./battlefield.ts";
 
 import { drawSpecialist, fallenSpecialist } from "./roster-art.ts";
-import { INK, FACE, IRON, WOOD, shape, line, oval, type Pens, type Dye } from "./ink.ts";
+import { INK, FACE, IRON, WOOD, shape, line, oval, eye, type Pens, type Dye } from "./ink.ts";
 export { INK } from "./ink.ts";
 export const palette = ARMIES;
 
@@ -21,7 +21,7 @@ const shapes = {
   blade: new Path2D("M-1.8 0 L-1.5 -11 L.7 -16 L2.5 -11 L1.6 0 Z"),
   cloak: new Path2D("M-4.8 -4.3 Q.35 -7.6 4.15 -3.5 Q3.9 .3 5.0 2.15 Q5.75 4.05 7.25 4.75 Q4.95 6.8 1.25 6.45 Q-1.75 7.6 -4.5 5.85 Q-6 6.35 -7.45 5.45 Q-5.6 1.1 -4.8 -4.3Z"),
   hood: new Path2D("M-10.45 -9.6 Q-7.65 -9.65 -5.65 -11.35 Q-2.6 -15.6 1.5 -14.2 Q5.65 -14.3 7.65 -9.45 L9.05 -6.6 Q8.75 -3 5.9 -.8 Q.65 2.95 -4.55 1.3 Q-7.85 .55 -7.3 -3.9 Q-7.65 -7.15 -10.45 -9.6Z"),
-  hoodFace: new Path2D("M-.05 -6.9 Q3.8 -9.2 7.85 -7.15 Q8 -3.9 5.75 -1.85 Q3.45 -.35 1.75 -1.65 Q.15 -3.25 -.05 -6.9Z"),
+  hoodFace: new Path2D("M-.85 -6.95 Q3.7 -9.45 8 -7.15 Q8.4 -3.7 5.85 -1.65 Q3.15 .1 1.15 -1.55 Q-.65 -3.4 -.85 -6.95Z"),
   feather: new Path2D("M-2.6 -9.95 C-6.75 -11 -10.65 -12.15 -11.3 -16.85 Q-7.0 -17.85 -3.9 -14.25 Q-2.35 -12.6 -2.6 -9.95Z"),
   quiver: new Path2D("M-9.35 -6.15 Q-7.9 -7.4 -5 -7.1 L-2.9 1.95 Q-2.8 4.25 -5.2 4.7 Q-6.8 4.85 -7.1 3.4Z"),
   bow: new Path2D("M-3 -11 C-3 -8 3 -7 3 0 C3 7 -3 8 -3 11"),
@@ -69,7 +69,10 @@ function warrior(c: Pens, dye: Dye, p: CharacterPose) {
   c.translate(-1 + p.guard * .9 - p.duck * 1.6, -3 + p.duck * 1.2 + p.hurt);
   c.rotate(p.duck * .19 + p.pitch * .13);
   shape(c, shapes.faceplate, FACE);
-  oval(c, 2.8 - 2.5 * p.duck, .55 + p.pitch * .7, 1.1, 1.45 - p.blink, INK);
+  const lookBack = p.lookX * (1 - p.duck) - p.duck;
+  eye(c, 2.4 - 1.15 * p.duck, -.1, 2.55, 1.68 + .43 * p.duck - .67 * p.strike - 1.6 * p.blink,
+    lookBack, p.lookY * (1 - p.duck) - .9 * p.duck);
+  line(c, 3.25, 2.45 - .5 * p.strike, 5.65, 1.95 + .32 * p.strike, "#786047", .76);
   shape(c, shapes.helmet, IRON);
   line(c, -5.3, -8, -2.8, -10.5, "#f4efce", 1.25);
   shape(c, shapes.brim, dye.coat);
@@ -89,20 +92,23 @@ function warrior(c: Pens, dye: Dye, p: CharacterPose) {
 function archer(c: Pens, dye: Dye, p: CharacterPose) {
   feet(c, p, false);
   c.save();
-  c.translate(p.peek * 2.2 - p.hurt * 3.2, -p.lift * 1.65 - p.peek * 2 - p.breath);
-  c.rotate(-.08 + p.pace * .17 - p.hurt * .12);
+  c.translate(p.peek * 2.2 - p.hurt * 3.2 - 1.7 * p.cornered, -p.lift * 1.65 - p.peek * 2 - p.breath);
+  c.rotate(-.08 + p.pace * .17 - p.hurt * .12 - .23 * p.cornered);
   line(c, -6, -3, -10, -10, WOOD, 1.4);
   line(c, -6, -3, -8.2, -11, FACE, 1.4);
   shape(c, shapes.quiver, "#886846");
   shape(c, shapes.cloak, dye.coat);
   line(c, -.2, -4, 1.5 + p.peek * 2.3, -5 - p.peek * 3.1, FACE, 2.8);
   c.save();
-  c.translate(.5 + p.peek * 2.7 - p.loose * .9, -2 - p.peek * 2.4);
+  c.translate(.5 + p.peek * 2.7 - p.loose * .9 - 1.4 * p.cornered, -2 - p.peek * 2.4 - p.cornered);
   c.rotate(p.pitch * .17 + p.peek * .12);
   shape(c, shapes.feather, WOOD, 1);
   shape(c, shapes.hood, dye.coat);
   shape(c, shapes.hoodFace, FACE, 1);
-  oval(c, 5.6 + p.peek * .4, -4.9 + p.pitch * .72, 1, 1.45 - p.blink, INK);
+  const focus = p.ready * (1 - p.cornered);
+  eye(c, 3.9 + .4 * p.peek, -5, 2.32, 1.49 - .65 * focus + .64 * p.cornered + .28 * p.peek - 1.45 * p.blink,
+    p.lookX, p.lookY);
+  if (p.cornered > .2) oval(c, 4.75, -2.05, .42 + .45 * p.cornered, .38 + .58 * p.cornered, INK);
   c.restore();
   c.save(); c.rotate(p.pace * .24 - p.peek * .12);
   shape(c, shapes.scarf, dye.light, .95); c.restore();
@@ -112,8 +118,8 @@ function archer(c: Pens, dye: Dye, p: CharacterPose) {
   c.save();
   c.translate(.8, -.6);
   c.rotate(p.pitch);
-  const handX = 7.2 + p.ready * 2.3 + p.loose * 2.2 - p.peek * 1.1;
-  const handY = .8 - p.ready * 2 + p.peek * 4.4 + p.step * .75;
+  const handX = 7.2 + p.ready * 2.3 + p.loose * 2.2 - p.peek * 1.1 + 2.8 * p.cornered;
+  const handY = .8 - p.ready * 2 + p.peek * 4.4 + p.step * .75 + p.cornered;
   line(c, 0, .7, handX, handY, INK, 2.8);
   c.save();
   c.translate(handX, handY);
@@ -134,23 +140,20 @@ function archer(c: Pens, dye: Dye, p: CharacterPose) {
   c.restore();
 }
 
-function drawBody(c: Pens, team: Team, kind: UnitKind, pose: CharacterPose, unit: Unit | undefined, tick: number) {
+export function drawBody(c: Pens, team: Team, kind: UnitKind, pose: CharacterPose, unit: Unit | undefined, tick: number) {
   c.lineCap = "round"; c.lineJoin = "round";
   if (kind === "warrior") warrior(c, palette[team], pose);
   else if (kind === "archer") archer(c, palette[team], pose);
   else drawSpecialist(c, palette[team], kind, pose, unit, tick);
 }
 
-// One transparent layer fits any animated pose, including the outstretched
-// lance and club. Tinting this layer leaves shadows, neighbors and trails alone.
+// The body and its ink silhouette exclude shadows, neighbors and trails.
 const spriteExtent = 100;
-const hitOutline = [[-.7,0],[.7,0],[0,-.7],[0,.7]] as const;
+const hitOutline = [[-1,0],[1,0],[0,-1],[0,1]] as const;
 let hitLayer: Pens | undefined;
+let hitInk: Pens | undefined;
 
-export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(ARMIES[team].facing), unit?: Unit, tick = 0) {
-  c.save();
-  c.translate(x, y);
-  c.scale(radius / 11, radius / 11);
+export function drawUnitShadow(c: Pens, kind: UnitKind, unit: Unit | undefined, pose: CharacterPose, tick: number) {
   if (kind === "phoenix" && unit?.emberUntil === undefined) {
     const height = phoenixFlight(unit, pose, tick).height;
     c.save(); c.globalAlpha *= 1 - height * .025;
@@ -158,14 +161,23 @@ export function drawUnitToken(c: Pens, x: number, y: number, radius: number, tea
   } else {
     oval(c, -.3, 8.7, kind === "warrior" ? 9.8 : 8.1, 2.8, "rgba(45,57,40,.22)");
   }
+}
+
+export function drawUnitToken(c: Pens, x: number, y: number, radius: number, team: Team, kind: UnitKind, pose = restingPose(ARMIES[team].facing), unit?: Unit, tick = 0) {
+  c.save();
+  c.translate(x, y);
+  c.scale(radius / 11, radius / 11);
+  drawUnitShadow(c, kind, unit, pose, tick);
   c.scale(pose.side, 1);
   const flash = pose.hitFlash;
   if (flash > 0) {
     const layer = hitLayer ??= document.createElement("canvas").getContext("2d")!;
+    const ink = hitInk ??= document.createElement("canvas").getContext("2d")!;
     const transform = c.getTransform();
     const pixels = spriteExtent * Math.max(1, Math.ceil(Math.hypot(transform.a, transform.b)));
     if (layer.canvas.width !== layer.canvas.height || layer.canvas.width < pixels) {
       layer.canvas.width = layer.canvas.height = pixels;
+      ink.canvas.width = ink.canvas.height = pixels;
     }
     // Filtered pixels at the crop edge can otherwise pick up the last larger sprite.
     layer.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
@@ -173,11 +185,16 @@ export function drawUnitToken(c: Pens, x: number, y: number, radius: number, tea
     layer.setTransform(pixels / spriteExtent, 0, 0, pixels / spriteExtent, pixels / 2, pixels / 2);
     drawBody(layer, team, kind, pose, unit, tick);
     layer.restore();
-    // Leave a hairline of the original outline where two struck bodies overlap.
+    // Keep a continuous dark rim even around a white shield or a tiny mouse.
+    ink.clearRect(0, 0, ink.canvas.width, ink.canvas.height);
+    ink.drawImage(layer.canvas, 0, 0, pixels, pixels, 0, 0, pixels, pixels);
+    ink.save(); ink.globalCompositeOperation = "source-in"; ink.fillStyle = INK;
+    ink.fillRect(0, 0, pixels, pixels); ink.restore();
     const edge = -spriteExtent / 2;
-    c.save(); c.globalAlpha *= .72 * flash;
+    const rim = Math.max(.72, Math.min(2.75, 15.4 / radius));
+    c.save(); c.globalAlpha *= flash;
     for (const [dx,dy] of hitOutline) {
-      c.drawImage(layer.canvas, 0, 0, pixels, pixels, edge + dx, edge + dy, spriteExtent, spriteExtent);
+      c.drawImage(ink.canvas, 0, 0, pixels, pixels, edge + dx * rim, edge + dy * rim, spriteExtent, spriteExtent);
     }
     c.restore();
     layer.save();

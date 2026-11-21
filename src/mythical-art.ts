@@ -36,12 +36,20 @@ export function cyclops(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, 
   cut(c, "M-7.7 -11 Q-10.5 -11.2 -10.3 -13.8 Q-10 -16 -7.8 -14.4Z", shade, .95);
   cut(c, "M-8 -15 C-9.1 -19 -6.5 -22 -2.9 -22.2 Q-1.1 -22.4 -.4 -24.2 Q2.6 -23.7 2.6 -21.8 Q6.9 -22.5 8.2 -18.5 Q5.9 -19.7 2.8 -18.8 Q-1 -17.4 -4.3 -18 Q-5.8 -16.1 -8 -15Z", hair, 1.2);
   cut(c, "M-5.9 -18.8 Q-10.2 -19.6 -9.9 -25.9 Q-8.1 -22.3 -3.4 -21.7 Q-3.45 -20 -5.9 -18.8Z", ivory, 1);
-  cut(c, "M-3.3 -13.9 Q-.5 -17.2 4.4 -16.4 Q6.4 -16.1 7.6 -14.5 Q6.9 -10.3 2.7 -9.4 Q-1.8 -8.8 -3.3 -13.9Z", "#fff0b5", 1.05);
-  const eyeX = 2.65 + .48 * Math.cos(p.pitch), eyeY = -13.05 + .55 * Math.sin(p.pitch) + 1.65 * flinch;
-  oval(c, eyeX, eyeY, 2.35, 2.65, "#dd9854"); oval(c, eyeX + .35, eyeY, 1.25, 1.8, INK);
-  oval(c, eyeX + .78, eyeY - .9, .52, .49, FACE);
+  c.save(); c.translate(2, -13.6);
+  c.scale(1 + .07 * flinch, Math.max(.12, 1 + .33 * flinch - .22 * lift - .82 * p.blink)); c.translate(-2, 13.6);
+  cut(c, "M-3.3 -13.9 Q-.5 -17.2 4.4 -16.4 Q6.4 -16.1 7.6 -14.5 Q6.9 -10.3 2.7 -9.4 Q-1.8 -8.8 -3.3 -13.9Z", "#fff1c4", 1.05);
+  // A squeak draws the giant's eye down to its boots even while its club is aloft.
+  const eyeX = 1.95 + 1.5 * p.lookX * (1 - flinch) - .4 * flinch;
+  const eyeY = -13.25 + .95 * p.lookY * (1 - flinch) + 1.45 * flinch + .85 * scoop;
+  oval(c, eyeX, eyeY, 2.35 - .7 * flinch, 2.6 - .62 * flinch, "#d8954e");
+  oval(c, eyeX + .25, eyeY, 1.23 - .4 * flinch, 1.75 - .4 * flinch, INK);
+  oval(c, eyeX + .55, eyeY - .72, .47, .44, FACE); c.restore();
+  c.save(); c.translate(2, -15.4 - 2.25 * flinch); c.rotate(-.25 * flinch + .11 * lift); c.translate(-2, 15.4);
   cut(c, "M-4.7 -15.8 Q-3.3 -18.1 -.4 -17.55 Q3.45 -16.55 7.65 -15.45 Q8.1 -14.6 7.25 -13.85 Q2.55 -14 -1.45 -15.25 Q-3.1 -15.78 -4.7 -15.1Z", hair, .8);
-  c.save(); c.translate(0, scoop * .7 + chew * .45); c.scale(1, 1 + scoop * .12);
+  c.restore();
+  c.save(); c.translate(5.6, -6.5 + chew * .45); c.rotate(-.18 * flinch);
+  c.scale(1 - .28 * flinch, 1 + 1.35 * scoop + 1.05 * flinch); c.translate(-5.6, 6.5);
   cut(c, "M.25 -5.7 Q3.45 -8.35 8.4 -7.55 Q9.05 -6.75 8.25 -5.4 Q5.05 -6.25 2.7 -5.25 Q1.1 -4.55 .25 -5.7Z", "#55424a", .75);
   cut(c, "M6.2 -5.75 Q6.75 -7.3 7.55 -8.25 Q8.25 -7.1 7.6 -5.65Z", ivory, .6);
   c.restore(); c.restore();
@@ -82,9 +90,14 @@ export function frostQueen(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefine
   cut(c, "M-10.7 -12.65 C-12.2 -18.8 -8.4 -24.2 -2.8 -24.9 Q3.2 -27.1 6.8 -23.6 Q10.6 -22.3 11.4 -18 Q12.4 -14.3 9.4 -11.6 Q10 -16 6.2 -18.7 Q4.2 -20.1 3.1 -21 Q1.8 -18.1 -1.2 -16.65 C-4.7 -15.2 -7.2 -15.1 -7.4 -12 Q-8 -9.3 -5.4 -8.3 Q-2.6 -7.3 -4.25 -5.15 Q-5.95 -3.5 -8.45 -4.75 Q-5.65 -5.15 -6.4 -6.75 Q-10.9 -7.85 -10.7 -12.65Z", "#dcecf4", 1.3);
   cut(c, "M-8.95 -16.5 Q-7.9 -22.2 -2 -23.3 Q-5.9 -21.15 -7.4 -17.45Z", "#fffdf3", 0);
   cut(c, "M8.8 -17 C10.8 -15.9 11.85 -13.15 10 -10.5 Q8.7 -8.7 9.9 -7.25 Q11.8 -4.7 9.25 -3.7 Q7.6 -3.1 6.55 -4.1 Q8.4 -4.4 7.9 -6.1 Q6.8 -8.7 8.35 -10.9 Q10 -12.85 8.8 -17Z", "#c5dce9", 1);
-  cut(c, "M-3.65 -13.9 Q-.9 -13.7 1.8 -13.2 Q1.6 -11.45 -.2 -11.6 Q-2.2 -11.9 -3.65 -13.9Z M4.25 -13.2 Q6.65 -13.8 8.5 -14.1 Q7.9 -11.9 6.3 -11.6 Q4.75 -11.35 4.25 -13.2Z", "#fff9ef", 0);
-  oval(c, .35, -12.8, 1, 1.1, "#60779c"); oval(c, 6.2, -12.75, .93, 1.04, "#60779c");
+  // She lowers both lids as the staff rises, then looks straight down the shot.
+  c.save(); c.translate(0, -12.95);
+  c.scale(1, Math.max(.12, 1 - .76 * p.ready - .82 * p.blink + .27 * cast)); c.translate(0, 12.95);
+  cut(c, "M-3.65 -13.9 Q-.9 -13.7 1.8 -13.2 Q1.6 -11.05 -.2 -11.3 Q-2.2 -11.6 -3.65 -13.9Z M4.25 -13.2 Q6.65 -13.8 8.5 -14.1 Q7.9 -11.55 6.3 -11.3 Q4.75 -11.05 4.25 -13.2Z", "#fff9ef", 0);
+  oval(c, -.08 + .7 * p.lookX, -12.75 + .35 * p.lookY, 1.03, 1.13, "#465e87");
+  oval(c, 6.12 + .63 * p.lookX, -12.75 + .35 * p.lookY, .96, 1.05, "#465e87");
   line(c, -3.4, -13.85, 1.65, -13.2, "#705f6a", .62); line(c, 4.4, -13.18, 8.3, -14, "#705f6a", .62);
+  c.restore();
   line(c, -3.2, -15.1, 1.55, -14.3, "#fff6e9", 1.1); line(c, 4.5, -14.35, 8.4, -15.35, "#fff6e9", 1.1);
   line(c, 2.5, -8.7, 4.05, -8.9, "#785e60", .7);
   // Three crystal tips stay sharp against the large, soft locks below them.
@@ -130,10 +143,14 @@ export function kirin(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, ti
   // Two tapered, branching antlers emerge from separate roots above the ears.
   cut(c, "M8.35 -16.6 Q10.75 -19.2 12.45 -22.1 Q13.5 -23.75 14.4 -25.9 Q14.6 -23.65 13.75 -21.8 Q15.95 -22.4 17.5 -24.2 Q16.9 -21.5 13.2 -19.6 L10.25 -16.3Z", "#bd966a", .85);
   cut(c, "M6.3 -16.85 C5.75 -19.95 3.9 -21.0 2.5 -23.25 Q.95 -25.45 1.5 -28.65 Q2.25 -25.8 4.4 -24.1 Q4.15 -26.3 5.35 -28.15 Q5 -25.15 6.2 -23.05 Q8.1 -21.05 8.1 -18.0Z", "#e7c38a", .95);
-  cut(c, "M6.15 -16.6 Q2.25 -19.45 -.75 -18.95 Q.25 -15.45 4.85 -14.5Z", "#a5cdb4", .85);
+  c.save(); c.translate(5.6, -15.9); c.rotate(.48 * p.ready - .96 * rear); c.translate(-5.6, 15.9);
+  cut(c, "M6.15 -16.6 Q2.25 -19.45 -1.65 -19.55 Q-.2 -15.45 4.85 -14.5Z", "#a5cdb4", .85);
+  line(c, 1.1, -17.8, 4.15, -16.1, "#927a62", .75); c.restore();
+  c.save(); c.translate(10, -13.15); c.scale(1, Math.max(.12, 1 - .80 * p.blink - .42 * rear)); c.translate(-10, 13.15);
   cut(c, "M7.25 -13.85 Q9.55 -15.5 12.65 -14.0 Q12.25 -11.5 10.1 -10.95 Q8.15 -11.25 7.25 -13.85Z", "#fff0c4", .8);
-  oval(c, 10.7, -13.05, 1, 1.35, INK); oval(c, 11.0, -13.55, .35, .38, FACE);
-  line(c, 6.9, -15.2, 10.45, -14.6, "#526b68", 1.05);
+  const irisX = 10 + .82 * p.lookX, irisY = -13.05 + .48 * p.lookY;
+  oval(c, irisX, irisY, 1, 1.35, INK); oval(c, irisX + .3, irisY - .5, .35, .38, FACE); c.restore();
+  line(c, 7.2, -15.5 - .8 * p.ready, 11.5, -14.6 + .7 * rear, "#506564", 1.05);
   oval(c, 16.25, -9.5, .65, .48, INK);
   if (rear > 0) {
     c.save(); c.globalAlpha *= rear;
