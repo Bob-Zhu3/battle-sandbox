@@ -234,7 +234,7 @@ function drone(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
 export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?: Unit,tick=0) {
   const t=tick+(u?.id??0)*11;
   switch(kind) {
-    case "wrestler": case "liondancers": case "rhinorider": case "trojanhorse":
+    case "monk": case "liondancers": case "rhinorider": case "trojanhorse":
     case "windmill": case "harpoon": case "prism": case "snowman":
       drawExpedition(c,d,p,kind,u,tick); break;
     case "hydra": case "medusa": case "vampire": case "sandworm": case "slime": case "horseman":

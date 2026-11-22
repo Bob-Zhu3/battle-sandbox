@@ -66,7 +66,7 @@ export function openWormhole(spell: FieldSpell, units: readonly Unit[], tick: nu
   passenger.x=Math.max(r,Math.min(ARENA.width-r,spell.x)); passenger.y=Math.max(r,Math.min(ARENA.height-r,spell.y));
   passenger.warpedTick=tick; passenger.targetId=null; passenger.pace=0;
   if (passenger.runUp !== undefined) passenger.runUp=0;
-  delete passenger.windup; delete passenger.knockback; delete passenger.trail;
+  delete passenger.windup; delete passenger.flurryStartedTick; delete passenger.knockback; delete passenger.trail;
 }
 
 export function pulses(spell: FieldSpell, tick: number) {

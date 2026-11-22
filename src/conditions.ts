@@ -50,6 +50,7 @@ export function interrupt(unit: Unit) {
   delete unit.wrappingSince;
   delete unit.constructingSince;
   delete unit.burstLeft;
+  delete unit.flurryStartedTick;
   delete unit.nextBurstTick;
   delete unit.focusSince;
   if (unit.kind==="prism") { unit.targetId=null; delete unit.prismSides; }

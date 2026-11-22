@@ -11,7 +11,7 @@ export const windmillField: readonly (readonly [Team, RecruitKind, number, numbe
 ];
 export const reinforcements: readonly (readonly [Team, RecruitKind, number, number])[] = [
   ["red","trojanhorse",220,111], ["blue","werewolf",321,112], ["blue","archer",347,104],
-  ["red","wrestler",202,245], ["blue","warrior",249,241],
+  ["red","monk",202,245], ["blue","warrior",249,241],
   ["red","harpoon",519,132], ["blue","firedragon",655,135],
   ["red","liondancers",567,245], ["blue","slime",636,243], ["blue","warrior",665,261],
 ];

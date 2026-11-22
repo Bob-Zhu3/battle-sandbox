@@ -2,12 +2,21 @@ import type { SpellType } from "./spells.ts";
 import type { ArenaPoint, PlacementCommand } from "./deployment.ts";
 import type { Battle, Outcome, Team } from "./simulation.ts";
 import { MATCHES, STARTING_GOLD, type MatchMode } from "./battlefield.ts";
-import { RECRUIT_KINDS, UNIT_DEFINITIONS } from "./units.ts";
+import { currentUnitKind, RECRUIT_KINDS, UNIT_DEFINITIONS } from "./units.ts";
 
 export const ROOM_SOCKET = MATCHES.duel.socket;
 export const TEAM_LIMIT = Math.floor(STARTING_GOLD / Math.min(...RECRUIT_KINDS.map(kind => UNIT_DEFINITIONS[kind].cost)));
 export const SNAPSHOT_EVERY = 3;
 export type World = Pick<Battle, "tick" | "units" | "arrows" | "bases" | "spells" | "effects">;
+// An older match can also name the original troop inside a pig, zombie or Cyclops meal.
+export function restoreUnitKinds(world: World) {
+  for (const u of world.units) {
+    u.kind = currentUnitKind(u.kind);
+    if (u.hex) u.hex.kind = currentUnitKind(u.hex.kind);
+    if (u.zombified) u.zombified.kind = currentUnitKind(u.zombified.kind);
+    if (u.lastSwallow) u.lastSwallow.kind = currentUnitKind(u.lastSwallow.kind);
+  }
+}
 export type ControlAction = { type: "ready" | "undo" | "clear" | "new-round" };
 export type PurchaseCommand = PlacementCommand | {type: SpellType; positions: readonly ArenaPoint[]};
 export type RoomAction = PurchaseCommand | ControlAction;

@@ -13,8 +13,8 @@ import { finishTreatments, medicDuty } from "./medic.ts";
 import { nearestEnemy } from "./targeting.ts";
 import type { Arrow } from "./arrows.ts";
 import { advanceShot, applyClouds, deflectHead, releaseShot } from "./shots.ts";
-import { footprint, isHuman, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
-import { eruptWorm, releaseTelegraph, rosterStrike, rosterTarget, startTelegraph, type Impulse } from "./roster-attacks.ts";
+import { currentUnitKind, footprint, isHuman, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { continueFlurry, eruptWorm, releaseTelegraph, rosterStrike, rosterTarget, startTelegraph, type Impulse } from "./roster-attacks.ts";
 import { settleTroopBodies } from "./roster-life.ts";
 import { blowFan, firstFanContact, type FanContact } from "./windmill.ts";
 import { ARENA, ARMIES, BASE_RADIUS, TEAMS, type Base, type Team } from "./battlefield.ts";
@@ -45,6 +45,7 @@ export interface Unit extends Placement {
   walkDistance: number;
   pace: number;
   lastAttackTick: number | null;
+  flurryStartedTick?: number;
   attackDirection: { x: number; y: number } | null;
   // Archer peeking past cover, or Warrior hearing a friendly shaft pass behind.
   lastAttentionTick: number | null;
@@ -146,14 +147,14 @@ export function boundCenter(value: number, extent: number, radius: number = WARR
   return Math.max(radius, Math.min(extent - radius, value));
 }
 
-export function createBattle(placements: readonly Placement[], tick = 0, bases?: Base[]): Battle {
+export function createBattle(placements: readonly (Omit<Placement,"kind"> & { kind?: UnitKind | "wrestler" })[], tick = 0, bases?: Base[]): Battle {
   const ids = new Set(placements.map((unit) => unit.id));
   if (ids.size !== placements.length) {
     throw new Error("Each unit needs a unique ID.");
   }
 
   const units = placements.map((placement) => {
-    const kind = placement.kind ?? "warrior";
+    const kind = currentUnitKind(placement.kind) ?? "warrior";
     const { radius, maxHp } = UNIT_DEFINITIONS[kind];
     const unit: Unit = {
       ...placement, kind, x: boundCenter(placement.x, ARENA.width, radius), y: boundCenter(placement.y, ARENA.height, radius),
@@ -418,6 +419,7 @@ export function stepBattle(battle: Battle): Battle {
       return next;
     }
     if (next.frozenUntil !== undefined || unit.warpedTick===tick) return next;
+    if (unit.kind==="monk" && continueFlurry(next,targets,tick,hit)) return next;
     if (arc || unit.windup) {
       releaseTelegraph(next,targets,tick,control.gaze.fired.has(unit.id),hit,effects,burns);
       return next;

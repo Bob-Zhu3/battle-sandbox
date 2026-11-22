@@ -65,8 +65,9 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
         tone(170,459,.079,.17,"sine",0,.016);tone(427,95,.12,.19,"triangle",.052);noise(920,340,.085,.12,.009,.057);break;
       case "cymbals":
         noise(6100,3350,.27,.31);tone(1920,1850,.18,.07,"triangle");tone(2961,2870,.13,.065);break;
-      case "heave":
-        noise(880,350,.21,.34,.034);tone(154,93,.18,.17,"sawtooth",.014,.02);break;
+      case "punch":
+        noise(780,2380,.062,.27,.014); noise(1950,710,.038,.20,.005,.023);
+        tone(172,76,.063,.14,"triangle",.029); break;
       case "snort":
         noise(490,1060,.13,.28,.026);noise(960,330,.22,.34,.018,.09);tone(125,73,.20,.11,"sawtooth",.10,.023);break;
       case "hiss":

@@ -5,54 +5,107 @@ import type { Unit } from "./simulation.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 import { FAN_HUB_HEIGHT, FAN_HUB_OFFSET, fanGustProgress, MILL_MODEL_SCALE } from "./fan-wind.ts";
 
-export type ExpeditionKind = "wrestler" | "liondancers" | "rhinorider" | "trojanhorse" |
+export type ExpeditionKind = "monk" | "liondancers" | "rhinorider" | "trojanhorse" |
   "windmill" | "harpoon" | "prism" | "snowman";
 
 const brass = "#dfaa52", ivory = "#fff0cb", leather = "#936544", oak = "#c59158", grain = "#795640";
 const hide = "#99a49d", farHide = "#76847f", snow = "#f5fbf7", ice = "#bad4d5";
 
-function boot(c: Pens, hip: number, knee: number, foot: number, floor: number, color: string) {
-  limb(c, hip, 1, knee, 4, color, 2.8);
-  limb(c, knee, 4, foot, floor - 1, color, 2.5);
-  line(c, foot - 1.5, floor, foot + 2.8, floor, INK, 3);
-}
-
-function palm(c: Pens, x: number, y: number, turn: number, dye: Dye) {
-  c.save(); c.translate(x, y); c.rotate(turn);
-  cut(c, "M-2.2 1 Q-3.45 -.2 -2.4 -1.75 L-1.2 -1.25 L-.9 -3.75 Q-.45 -4.7 .35 -3.55 L.55 -1.85 L1.35 -3.3 Q2 -4.1 2.35 -2.8 L2 -1.1 L3.1 -2 Q4 -2.35 3.7 -.95 L2.25 1.75 Q.6 3.45 -1.45 2.6Z", FACE, .95);
-  line(c, -1.9, 2.2, .65, 3, dye.light, 1.1);
+function monkLeg(c: Pens, hip: number, step: number, near: boolean, brace: number) {
+  const side = near ? 1 : -1;
+  const floor = 8.8 - 2 * Math.max(0, -step);
+  c.save(); c.translate(hip, 0); c.rotate(-.24 * step - side * .08 * brace);
+  limb(c, .5 * side, 4.8, 1.4 * side, floor - 1.2, "#cab69b", 2.4);
+  cut(c, "M-3.1 -1.85 Q-.1 -3.1 3.35 -1.55 Q5.45 1.5 4.65 4.05 L2.2 6 Q-.05 6.95 -2.5 5.15 Q-4.75 3.05 -4.6 .65Z", near ? "#4d5055" : "#393e43", 1.05);
+  line(c, -.45, 3.7, 1.45, 2.85, near ? "#767572" : "#585b59", .75);
+  line(c, 1.4 * side - 1.1, floor, 1.4 * side + 2.9, floor - .15, INK, 2.55);
   c.restore();
 }
 
-function wrestler(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
-  const release = eventFade(tick, u?.lastAttackTick, 17);
-  const stumble = u?.knockback ? release : 0;
-  const throwPose = release * (1 - stumble);
-  const grasp = .85 * p.ready * (1 - release);
-  boot(c, -4.4, -6.2 - p.step, -6.3 - 3 * p.step, 8.4 - 1.6 * Math.max(0, p.step), d.hem);
-  boot(c, 4.3, 6.8 + p.step, 6.2 + 3 * p.step, 8.6 - 1.6 * Math.max(0, -p.step), d.coat);
-  c.translate(2 * grasp - 1.6 * throwPose - p.hurt - 2.3 * stumble, 2 * grasp - 2.3 * throwPose - p.lift - .6 * p.breath);
-  c.rotate(.1 * grasp - .21 * throwPose - .3 * stumble);
-  const farX = 5.4 + 6 * grasp - 8.5 * throwPose, farY = -.7 - 11.7 * throwPose;
-  limb(c, -5.2, -5.3, -7.4, -1.2, FACE, 3.8);
-  limb(c, -7.4, -1.2, farX, farY, FACE, 3.2);
-  palm(c, farX, farY, .6 - throwPose, d);
-  cut(c, "M-9 -5.2 C-8.5 -10.5 -2.9 -9.6 .3 -8.2 Q5 -10.6 8.1 -7.8 Q10.55 -5.45 8.15 -2.35 L5.5 4 Q.1 7.1 -6.8 4.25 Q-7.05 1.1 -8.4 -.8Z", FACE, 1.3);
-  cut(c, "M-8 -6.9 L-5.8 -7.9 Q-5.2 -2 1.2 .6 Q5.2 -.15 7.2 -3.2 L6.3 1.45 L5.7 4.3 Q-.25 7.35 -6.9 4.25 L-7.6 .5Z", d.coat, 1.05);
-  cut(c, "M-6.8 1.55 Q-.7 4.2 6.6 1.1 L5.95 3.7 Q-.55 6.4 -6.7 3.95Z", d.hem, .65);
-  cut(c, "M-1 2.3 L2.55 2 L3.3 4.25 L.75 5.4 L-1.5 4.25Z", brass, .7);
-  c.save(); c.translate(.65 * grasp, -.8 * throwPose); c.rotate(.07 * p.pitch);
-  cut(c, "M-4.8 -11.4 Q-5.4 -16.55 -.05 -18.15 Q5.15 -19.4 7.15 -15.3 L7.75 -12.85 L9.5 -11.1 Q9.7 -9.85 7.9 -9.35 Q7.3 -5.2 3 -5.6 Q-3.35 -5.65 -4.8 -11.4Z", d.coat, 1.2);
-  cut(c, "M.4 -17.65 L3.3 -18 L4.7 -14.6 L7.5 -15.1 L7.55 -12.45 Q5.1 -13.2 3.8 -11.65 L1.7 -13.6 L-1.3 -11.8Z", d.light, .7);
-  eye(c, 4.8, -12.25, 2.1, 1.43 - .55 * grasp - 1.18 * p.blink + .5 * stumble, p.lookX, p.lookY);
-  cut(c, "M1.5 -8.7 Q3.9 -7.4 6.75 -9.15 Q6.15 -6.5 4.05 -6.4 Q2.2 -6.5 1.5 -8.7Z", FACE, .7);
+const monkSkin = "#dfa77a", shadowSkin = "#bd835b", wristLinen = "#efe4c9";
+
+function monkArm(c: Pens, near: boolean, thrust: number, other: number, pitch: number, guard: number) {
+  const shoulderX = near ? 3.9 : -3.5, shoulderY = near ? -4.85 : -7.1;
+  const angle = Math.max(-1.1, Math.min(1.1, pitch)) + (near ? .05 : -.10);
+  const guardX = (near ? 6.9 : 9) + .75 * guard - 2.2 * other;
+  const guardY = (near ? -3.55 : -10.65) - 1.05 * guard - .85 * other;
+  const reach = near ? 17.9 : 22;
+  const wristX = guardX + (shoulderX + Math.cos(angle) * reach - guardX) * thrust;
+  const wristY = guardY + (shoulderY + Math.sin(angle) * reach - guardY) * thrust;
+  const foldedX = near ? 1.55 : -.6, foldedY = near ? 1.7 : -4.8;
+  const elbowX = foldedX + ((shoulderX + wristX) * .5 - foldedX) * thrust;
+  const elbowY = foldedY + ((shoulderY + wristY) * .5 + 1 - foldedY) * thrust;
+  const color = near ? monkSkin : shadowSkin;
+  limb(c, shoulderX, shoulderY, elbowX, elbowY, color, near ? 4.75 : 3.75);
+  const forearmLength = Math.hypot(wristX - elbowX, wristY - elbowY);
+  c.save(); c.translate(elbowX, elbowY); c.rotate(Math.atan2(wristY - elbowY, wristX - elbowX));
+  limb(c, 0, 0, forearmLength, 0, color, near ? 3.9 : 3.35);
+  limb(c, forearmLength * .3 + .3, 0, forearmLength, 0, near ? wristLinen : "#cdbd9f", near ? 3.7 : 3.3);
+  for (const at of [.56, .82]) {
+    const x = forearmLength * at;
+    line(c, x - .55, -1.4, x + .55, 1.3, "#9a886e", .66);
+  }
+  c.translate(forearmLength, 0); c.rotate((near ? -.14 : .1) * (1 - thrust));
+  cut(c, "M-1.35 -1.85 Q-.1 -3.1 1.1 -2.6 Q2 -3.05 2.8 -2.15 L3.5 -1.05 Q3.9 -.3 3.1 .55 Q3.45 1.85 2.3 2.4 Q.45 3.05 -1.25 1.95 L-1.95 .55Z", near ? "#f6eed6" : "#ded0af", 1.05);
+  line(c, -.2, .75, 1.65, 1.3, "#9a886e", .7);
   c.restore();
-  const elbowX = 5.5 + 4 * grasp + 4 * throwPose, elbowY = 1 - 9 * throwPose;
-  const handX = 8.7 + 4.3 * grasp + 1.5 * throwPose, handY = -4.8 + 3 * grasp - 15.5 * throwPose;
-  limb(c, 4.8, -5.2, elbowX, elbowY, FACE, 4.1);
-  limb(c, elbowX, elbowY, handX, handY, FACE, 3.5);
-  line(c, handX - .8, handY + 2, handX + 1.8, handY + 1, d.coat, 2);
-  palm(c, handX, handY, .45 + grasp * .8 - throwPose, d);
+}
+
+function monk(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
+  const start = u?.flurryStartedTick;
+  const last = u?.lastAttackTick;
+  const {punchCount, punchGap} = UNIT_DEFINITIONS.monk;
+  // The newest snapshot can include a punch just beyond the displayed tick.
+  // Stay on the preceding confirmed beat until the on-screen contact time.
+  const inFlurry = start != null && last != null && last >= start && tick >= start && tick < start + punchGap * punchCount;
+  let lead = 0, cross = 0;
+  if (inFlurry) {
+    const beat = Math.min(punchCount - 1, Math.floor((Math.min(last, tick) - start) / punchGap));
+    const age = tick - (start + beat * punchGap);
+    const recovery = Math.max(0, Math.min(1, (age - 1.35) / (punchGap - 2.5)));
+    const extension = (.92 + .08 * Math.min(1, age)) * (1 - recovery * recovery * (3 - 2 * recovery));
+    if (beat % 2 === 0) lead = extension;
+    else cross = extension;
+  }
+  const aim = inFlurry ? u?.attackDirection : null;
+  const pitch = aim ? Math.atan2(aim.y, Math.abs(aim.x)) : p.pitch;
+  if (aim && Math.abs(aim.x) > .08) c.scale(Math.sign(aim.x) * p.side, 1);
+  const breath = u ? Math.sin((tick + u.id * 41) / 21) : .15;
+  const guard = inFlurry ? 1 : Math.min(1, p.ready + .25 * p.pace);
+  const step = p.step * (inFlurry ? .4 : 1);
+  monkLeg(c, -4.4, -step, false, cross);
+  monkLeg(c, 3.8, step, true, lead);
+  c.translate(1.65 * lead + 2.85 * cross - 1.45 * p.hurt, -.95 * p.lift - .54 * breath + .65 * guard);
+  c.rotate(.075 * lead + .10 * cross - .12 * p.hurt);
+  monkArm(c, false, lead, cross, pitch, guard);
+  cut(c, "M-8.5 -4.8 Q-9.35 -8.45 -6 -9.1 Q-4.55 -10.5 -1.55 -9.6 Q.15 -8.4 2.15 -9.1 Q6.65 -10.2 8.35 -6.65 Q8.9 -4.7 6.85 -2.5 L5.35 2.2 Q.15 5.2 -6 2.3 Q-5.85 -.25 -7.7 -2.45Z", monkSkin, 1.25);
+  cut(c, "M-7.65 -3.4 Q-5.8 -3.7 -5.1 -1.3 Q-2.1 .8 3.9 -.25 L5.85 -.65 L5.45 1.85 Q-.25 4.35 -6.15 2.05Z", shadowSkin, 0);
+  cut(c, "M-6.9 .7 Q-.55 2.6 6.5 .05 L6.2 3.65 Q-.35 5.55 -6.9 3.55Z", "#e1ac4d", 1);
+  cut(c, "M-4.75 2.35 Q-6.4 5.4 -6.8 7.55 L-4.9 6.9 L-3.9 8.05 L-2.25 3.25Z", "#d39842", .78);
+  line(c, -5.3, 2.0, .2, 2.55, "#f5d18c", .8);
+  c.save(); c.translate(.35 * lead - .4 * cross - .65 * p.hurt, -.35 * breath);
+  c.rotate(.05 * pitch - .035 * cross);
+  c.save(); c.translate(-5.75, -14.9); c.rotate(.08 * breath + .16 * lead - .23 * cross);
+  cut(c, "M.55 -.75 Q-2.1 -.25 -4.8 -1.85 Q-7.55 -3.5 -10.05 -2.5 Q-8.85 -1.9 -7.6 -.8 Q-5.25 1.9 -2.8 1.35 L.55 .65Z", d.coat, .9);
+  cut(c, "M.35 .15 Q-2.1 1.15 -3.3 3.55 Q-4.6 5.4 -6.75 5.45 Q-5.65 3.9 -5.25 2.4 Q-4.25 -.75 -.1 -1.05Z", d.hem, .76);
+  c.restore();
+  cut(c, "M-5.9 -13.7 C-6.7 -18.75 -4.2 -22.75 .6 -23.05 C5.1 -23.5 7.85 -20.15 7.9 -16.55 L7.8 -14.3 L9.35 -12.5 Q9.65 -11.55 7.95 -11.2 Q7.35 -7.4 4.25 -6.75 Q.7 -6.05 -2.65 -8.55 Q-4.6 -9.85 -4.85 -11.75Z", monkSkin, 1.25);
+  cut(c, "M-4.95 -16.9 Q-4.1 -20.65 -.35 -21.4 Q-2.9 -19.95 -3.75 -17.15Z", "#efbd92", 0);
+  cut(c, "M-5.95 -16.85 Q-.35 -15.95 7.75 -17.1 Q8.25 -15.1 7.7 -13.35 Q1.7 -12.45 -3.6 -12.85 L-5.6 -13.55Z", d.coat, 1.02);
+  line(c, -3.8, -15.5, .15, -15.35, d.light, .83);
+  oval(c, -5.8, -14.7, 1.7, 1.35, INK); oval(c, -5.75, -14.85, 1.1, .83, d.light);
+  line(c, 4.85, -9.5, 6.9, -9.25 + .24 * cross, "#825942", .7);
+  c.restore();
+  // The lowest beads lag behind the turn of the shoulders.
+  c.save(); c.translate(-.55 * cross, .25 * breath);
+  const strand = [[-5.2, -7.45, 1.3], [-4.95, -5.05, 1.5], [-3.35, -3, 1.6], [-.85, -2.05, 1.8], [1.85, -2.9, 1.55], [3.6, -4.85, 1.35]];
+  for (const [x, y, r] of strand) {
+    oval(c, x, y, r + .18, r + .18, INK);
+    oval(c, x - .12, y - .14, r * .70, r * .70, "#5c4b42");
+    if (r >= 1.5) oval(c, x - .48, y - .57, .36, .32, "#b0987d");
+  }
+  c.restore();
+  monkArm(c, true, cross, lead, pitch, guard);
 }
 
 function dancerFeet(c: Pens, hip: number, beat: number, kick: number, color: string) {
@@ -342,7 +395,7 @@ function snowman(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: n
 export function drawExpedition(c: Pens, d: Dye, p: CharacterPose, kind: ExpeditionKind, u: Unit | undefined, tick: number) {
   c.save();
   switch (kind) {
-    case "wrestler": wrestler(c, d, p, u, tick); break;
+    case "monk": monk(c, d, p, u, tick); break;
     case "liondancers": lionDancers(c, d, p, u, tick); break;
     case "rhinorider": rhinoRider(c, d, p, u, tick); break;
     case "trojanhorse": trojanHorse(c, d, p, u, tick); break;

@@ -82,6 +82,12 @@ if (demo === "siege") {
   }
   previous = play.world;
   play.paused = true;
+} else if (demo === "monk") {
+  play.place("red",{type:"place-monks",positions:[{x:424,y:180}]});
+  play.place("blue",{type:"place-archers",positions:[{x:451,y:180},{x:471,y:183}]});
+  previous = play.world;
+  play.paused = true;
+  field.armBrush("monk");
 } else if (demo === "reinforcements" || demo === "windmill") {
   const cast = demo === "windmill" ? windmillField : reinforcements;
   for (const [side,kind,x,y] of cast) play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});

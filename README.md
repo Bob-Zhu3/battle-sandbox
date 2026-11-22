@@ -66,6 +66,8 @@ In the reinforcements playground, press **Play** to watch the Harpoon Tower reel
 
 Press **Play** in the Windmill scene to see the wind bend an Archer's shot. Cast the selected Gust on the mill to speed up its four sails. Across the field a Sandworm dives under a Watchpost while a Prism Tower focuses on an Iron Golem. [Play the Windmill scene](https://bob-zhu3.github.io/battle-sandbox/?demo=windmill)
 
+Press **Play** to watch a Monk plant his feet and punch through two Archers in line. [Play the Monk scene](https://bob-zhu3.github.io/battle-sandbox/?demo=monk)
+
 ![Roster portraits of the nineteen recruits and the Wormhole spell](media/reinforcements.png)
 
 ![Eight roster portraits showing the Cyclops, Storm Kirin, Frost Queen, Phoenix, Bomber, Musketeer, Venom Scout and Zombie](media/mythical-roster.png)
@@ -85,7 +87,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Miner | 19 | 9 | Plant an exit flag anywhere. A traveling dirt ridge starts at home. Fault Line can force it to surface early. Once above ground the Miner can be hit and swings its pick after a short emergence. |
 | Clown | 18 | 9 | Tosses a corked glass bottle. It shatters where it lands and leaves a poison cloud for 1.35 seconds. Late arrivals can inhale the poison. Enemy Gust clears the cloud, and a Medic can treat the poison. |
 | Engineer | 21 | 10 | Hammers together one Watchpost near the fight, then repairs damaged machines. |
-| Wrestler | 18 | 9 | Throws a light opponent over one shoulder. Against a heavy one, it deals damage and stumbles back. |
+| Monk | 18 | 9 | Plants his feet and throws four alternating punches down a short lane. Each punch hits every enemy still in its path. |
 | Lion Dancers | 20 | 10 | The front dancer bites while the rear dancer kicks an enemy crowding the tail. |
 | Rhino Rider | 28 | 14 | A straight run lowers the horn for a shove through the front rank. It can jab from a standing start. |
 | Clockmouse | 8 | 4 | A squeak at a Cyclops's boots can interrupt a raised club, even on its own team. |

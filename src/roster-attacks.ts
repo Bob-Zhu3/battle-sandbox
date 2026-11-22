@@ -115,20 +115,43 @@ export function eruptWorm(u: Unit, targets: readonly Target[], tick: number, hit
   finishSwing(u,tick);
 }
 
+// The fist sweeps a short segment from the Monk toward his original aim.
+// Each beat samples the live footprints, so enemies can enter or leave the lane.
+function punch(u: Unit, targets: readonly Target[], tick: number, hit: Hit) {
+  const spec=defs.monk;
+  u.lastAttackTick=tick;
+  for (const target of targets) {
+    if (target.team===u.team || !exposed(target)) continue;
+    const dx=target.x-u.x, dy=target.y-u.y, ahead=dx*u.aimX+dy*u.aimY;
+    if (ahead<0) continue;
+    const along=Math.min(ahead,spec.reach);
+    const x=dx-along*u.aimX, y=dy-along*u.aimY;
+    const radius=spec.fistRadius+(target.kind==="base" ? BASE_RADIUS : footprint(target));
+    if (x*x+y*y<=radius*radius) hit(target,spec.damage,u.team);
+  }
+}
+
+export function continueFlurry(u: Unit, targets: readonly Target[], tick: number, hit: Hit) {
+  if (u.flurryStartedTick===undefined) return false;
+  const age=tick-u.flurryStartedTick, spec=defs.monk;
+  if (age>=spec.punchCount*spec.punchGap) {
+    delete u.flurryStartedTick;
+    return false;
+  }
+  if (age%spec.punchGap===0) punch(u,targets,tick,hit);
+  return true;
+}
+
 // Secondary hits use the same opening positions and damage ledger as ordinary melee.
 export function rosterStrike(u: Unit, primary: Target, targets: readonly Target[], tick: number, hit: Hit,
   healing: Map<number,number>, impulses: Impulse[]) {
   const spec=defs[u.kind];
   const damage=(t: Target,amount: number)=>hit(t,amount,u.team);
   switch (u.kind) {
-    case "wrestler": {
-      damage(primary,spec.damage);
-      if (mobile(primary) && footprint(primary)<17) {
-        const reach=defs.wrestler.throwDistance;
-        pushToward(impulses,primary,{x:u.x-u.aimX*reach,y:u.y-u.aimY*reach},distance(u,primary)+reach);
-      } else impulses.push({id:u.id,dx:-u.aimX*12,dy:-u.aimY*12});
+    case "monk":
+      u.flurryStartedTick=tick;
+      punch(u,targets,tick,hit);
       break;
-    }
     case "liondancers": {
       damage(primary,spec.damage);
       const rear=enemies(u,targets,spec.reach).find(t=>t.id!==primary.id && (t.x-u.x)*u.aimX+(t.y-u.y)*u.aimY<0);

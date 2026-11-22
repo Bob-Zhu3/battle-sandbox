@@ -114,9 +114,9 @@ const recruits = {
     name: "Phoenix", command: "place-phoenixes", description: "Its talons set enemies on fire. Its first fall leaves an ember egg. Guard it to hatch, fan it with Gust, or douse an enemy egg with Rain.",
     cost: 22, bounty: 11, attack: "melee", radius: 14.5, maxHp: troopHealth(32), speed: 96, reach: 36, damage: 7, cooldownTicks: 39, hatchTicks: 90,
   },
-  wrestler: {
-    name: "Wrestler", command: "place-wrestlers", description: "Grapples and throws lighter enemies over one shoulder. Heavy opponents take the hit and make the Wrestler stumble back.",
-    cost: 18, bounty: 9, attack: "melee", radius: 13, maxHp: troopHealth(47), speed: 78, reach: 37, damage: 11, cooldownTicks: 65, throwDistance: 32,
+  monk: {
+    name: "Monk", command: "place-monks", description: "Plants his feet and throws four quick punches straight ahead. Each fist hits every enemy in its path. Sidestep the first jab to dodge the rest.",
+    cost: 18, bounty: 9, attack: "melee", radius: 13, maxHp: troopHealth(47), speed: 78, reach: 34, damage: 4, cooldownTicks: 56, punchCount: 4, punchGap: 8, fistRadius: 4,
   },
   liondancers: {
     name: "Lion Dancers", command: "place-lion-dancers", description: "Two dancers share a lion costume. The head bites the foe in front while the back dancer kicks anyone crowding the tail.",
@@ -206,7 +206,10 @@ export const airborne = (target: {kind: UnitKind | "base"; emberUntil?: number; 
 export const footprint = (unit: {kind: UnitKind; smallSlime?: boolean}) => unit.kind === "slime" && unit.smallSlime ? 8 : UNIT_DEFINITIONS[unit.kind].radius;
 export const isHuman = (kind: UnitKind) => kind === "warrior" || kind === "archer" || kind === "shieldbearer" ||
   kind === "medic" || kind === "lancer" || kind === "bomber" || kind === "engineer" || kind === "musketeer" || kind === "scout" || kind === "miner" || kind === "clown" ||
-  kind === "wrestler" || kind === "liondancers" || kind === "rhinorider";
+  kind === "monk" || kind === "liondancers" || kind === "rhinorider";
+export function currentUnitKind<K extends UnitKind | undefined>(kind: K | "wrestler"): K | "monk" {
+  return kind === "wrestler" ? "monk" : kind;
+}
 export type PlacementType = (typeof recruits)[RecruitKind]["command"];
 
 export function placementKind(type: PlacementType): RecruitKind;
@@ -214,5 +217,6 @@ export function placementKind(type: unknown): RecruitKind | undefined;
 export function placementKind(type: unknown) {
   if (type === "place-giants") return "cyclops";
   if (type === "place-coopers") return "bomber";
+  if (type === "place-wrestlers") return "monk";
   return RECRUIT_KINDS.find(kind => recruits[kind].command === type);
 }

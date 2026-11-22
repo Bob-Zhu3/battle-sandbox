@@ -387,7 +387,7 @@ async function browseRoster(url) {
   const {page,point}=await open(url);
   try {
     const catalog={
-      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Miner","Clown","Engineer","Wrestler","Lion Dancers","Rhino Rider"],
+      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Miner","Clown","Engineer","Monk","Lion Dancers","Rhino Rider"],
       Machines:["Clockmouse","Bolt Drone","Trojan Horse"],
       Towers:["Watchpost","Mouse Workshop","Stone Lobber","Sun Lens","Bell Tower","Windmill","Harpoon Tower","Prism Tower","Snowman"],
       Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Reaper","Witch","Zombie","Hydra","Medusa","Vampire","Sandworm","Slime","Headless Horseman","Werewolf","Cerberus","Kraken","Fire Dragon","Iron Golem"],

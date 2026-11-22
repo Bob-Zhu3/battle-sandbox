@@ -7,9 +7,10 @@ import { arrowPose } from "../src/arrows.ts";
 import { airborne, footprint, UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { makeFieldSpell, SPELLS } from "../src/spells.ts";
 import { bountyFor } from "../src/transformations.ts";
+import { battleCues } from "../src/sound-events.ts";
 import { reinforcements, windmillField } from "../src/deployment.ts";
 
-const newcomers=["wrestler","liondancers","rhinorider","trojanhorse","windmill","harpoon","prism","snowman",
+const newcomers=["monk","liondancers","rhinorider","trojanhorse","windmill","harpoon","prism","snowman",
   "hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem"];
 const at=(id,kind,team,x,y=180)=>({id,kind,team,x,y});
 const unit=(w,id)=>w.units.find(u=>u.id===id);
@@ -40,12 +41,66 @@ test("all nineteen recruits independently damage an ordinary Warrior",()=>{
   }
 });
 
-test("Wrestler throws by weight, the rear Lion Dancer kicks, and stun stops a ready Rhino",()=>{
-  let w=step(fight("wrestler",[warrior(2,433)]),9);
-  assert.ok(unit(w,2).x<unit(w,1).x);
-  w=step(fight("wrestler",[at(2,"irongolem","blue",435)]));
-  assert.ok(unit(w,1).knockback.x<0);assert.equal(unit(w,2).knockback,undefined);
-  w=step(fight("liondancers",[warrior(2,433),warrior(3,365)]));
+test("the Monk lands four distinct punches, takes a breath, and resumes identically from mid-flurry",()=>{
+  let w=fight("monk",[warrior(2,428)]);
+  const hits=[]; let restored;
+  while(w.tick<57) {
+    const before=w; w=step(w);
+    const lost=unit(before,2).hp-unit(w,2).hp;
+    assert.equal(battleCues(before,w).filter(c=>c.kind==="punch").length,lost ? 1 : 0);
+    if(lost) {
+      assert.equal(lost,defs.monk.damage);
+      assert.equal(unit(w,1).lastAttackTick,w.tick);
+      assert.equal(unit(w,2).lastHitTick,w.tick);
+      hits.push(w.tick);
+    }
+    if(restored){restored=step(restored);assert.deepEqual(json(restored),json(w));}
+    if(w.tick===13)restored=json(w);
+  }
+  assert.deepEqual(hits,[1,9,17,25,57]);
+});
+
+test("a planted Monk hits the current occupants of his lane and cannot swing through a stun or freeze",()=>{
+  const start=fight("monk",[warrior(2,427),warrior(3,449),warrior(4,400,223),warrior(5,360),warrior(6,485)]);
+  let w=step(start);
+  for(const id of [2,3]) assert.equal(unit(w,id).lastHitTick,1);
+  for(const id of [4,5,6]) assert.equal(unit(w,id).lastHitTick,null);
+  const monkX=unit(w,1).x;
+  unit(w,2).y+=66; unit(w,3).y+=66;
+  Object.assign(unit(w,4),{x:monkX+32,y:180}); Object.assign(unit(w,6),{team:"red",x:monkX+12,y:180});
+  w=step(w,8);
+  assert.equal(unit(w,1).aimX,1);assert.equal(unit(w,1).aimY,0);
+  assert.equal(unit(w,4).lastHitTick,9);assert.equal(unit(w,6).lastHitTick,null);
+  assert.equal(unit(w,2).lastHitTick,1);assert.equal(unit(w,3).lastHitTick,1);
+  for(const kind of ["lightning","freeze"]) {
+    let interrupted=step(start,8);
+    interrupted.spells=[spell(interrupted,kind,"blue",unit(interrupted,1).x)];
+    interrupted=step(interrupted,18);
+    assert.equal(unit(interrupted,1).flurryStartedTick,undefined);
+    assert.equal(unit(interrupted,2).lastHitTick,1);
+  }
+});
+
+test("a saved Wrestler stroke and either spelling of its retry restore one paid Monk",()=>{
+  const room=new Room(); room.join(); room.join();
+  const positions=[{x:410,y:180}];
+  const bought=room.place("red",room.round,1,{type:"place-monks",positions});
+  assert.equal(bought.fresh,true);
+  const old=JSON.parse(JSON.stringify(room.checkpoint(1)),(key,value)=>
+    key==="kind" && value==="monk" ? "wrestler" : key==="type" && value==="place-monks" ? "place-wrestlers" : value);
+  const restored=Room.restore(old);
+  for(const type of ["place-monks","place-wrestlers"]) {
+    const retry=restored.place("red",restored.round,1,{type,positions});
+    assert.deepEqual(retry,{ack:bought.ack,fresh:false});
+  }
+  assert.deepEqual(restored.world.units.map(u=>[u.id,u.kind]),[[1,"monk"]]);
+  assert.equal(restored.gold.red,room.gold.red);
+  restored.place("red",restored.round,2,{type:"place-warriors",positions});
+  assert.equal(restored.world.units[0].kind,"monk");
+});
+
+test("the rear Lion Dancer kicks, and stun stops a ready Rhino",()=>{
+  let w=step(fight("liondancers",[warrior(2,433),warrior(3,365)]));
   assert.equal(unit(w,1).lastKickTick,1);
   assert.equal(unit(w,2).hp,defs.warrior.maxHp-defs.liondancers.damage);
   assert.equal(unit(w,3).hp,defs.warrior.maxHp-defs.liondancers.kickDamage);

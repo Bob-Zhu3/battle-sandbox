@@ -1,11 +1,11 @@
 import { makeFieldSpell, SPELLS, spellKind } from "../src/spells.ts";
 import { BRUSH_SPACING, type ArenaPoint } from "../src/deployment.ts";
 import { Battle, battleOutcome, createBattle, stepBattle, TICKS_PER_SECOND, ARENA, type Outcome, type Placement, type Team } from "../src/simulation.ts";
-import { type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
+import { restoreUnitKinds, type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
 
 import { campFor, inCamp, makeBase, COUNTDOWN_TICKS, GOLD_PER_SECOND, MATCHES, STARTING_GOLD, type MatchMode } from "../src/battlefield.ts";
 import { bountyFor } from "../src/transformations.ts";
-import { UNIT_DEFINITIONS, placementKind } from "../src/units.ts";
+import { currentUnitKind, UNIT_DEFINITIONS, placementKind } from "../src/units.ts";
 
 export function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -126,7 +126,8 @@ export class Room {
 
     const saved = player.receipts.get(commandId);
     if (saved) {
-      if (saved.type !== (spell ? SPELLS[spell].command : UNIT_DEFINITIONS[kind!].command) || saved.points.length !== points.length || !saved.points.every((unit, i) => {
+      const samePurchase = spell ? saved.type === SPELLS[spell].command : placementKind(saved.type) === kind;
+      if (!samePurchase || saved.points.length !== points.length || !saved.points.every((unit, i) => {
         const point = points[i];
         return record(point) && unit.x === point.x && unit.y === point.y;
       })) return "That placement ID already belongs to a different stroke.";
@@ -258,6 +259,10 @@ export class Room {
     room.countdownTicks = saved.countdownTicks;
     room.nextId = saved.nextId;
     room.strokes = saved.strokes;
+    for (const stroke of room.strokes) for (const unit of stroke.units) {
+      if (unit.kind !== undefined) unit.kind = currentUnitKind(unit.kind);
+    }
+    restoreUnitKinds(world);
     Object.assign(room.seats,state.seats);
     Object.assign(room.gold,state.gold);
     room.world = new Battle(world.tick,world.units,world.arrows,world.bases,world.spells,world.effects);

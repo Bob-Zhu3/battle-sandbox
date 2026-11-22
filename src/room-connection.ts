@@ -1,4 +1,4 @@
-import { CLOSE, type ClientMessage, type PlacementMessage, type RoomAction, type ServerMessage, type Snapshot } from "./room-protocol.ts";
+import { CLOSE, restoreUnitKinds, type ClientMessage, type PlacementMessage, type RoomAction, type ServerMessage, type Snapshot } from "./room-protocol.ts";
 import { MATCHES, type MatchMode, type Team } from "./battlefield.ts";
 import { isMatchId } from "./match-link.ts";
 import { OnlineWire } from "./online-wire.ts";
@@ -109,6 +109,7 @@ export function connectRoom(mode: MatchMode, callbacks: Callbacks) {
           callbacks.error(event.message);
           break;
         case "snapshot":
+          if (data.includes('"wrestler"')) restoreUnitKinds(event.world);
           if (session.round !== event.round) {
             session = { ...session, round: event.round, nextId: 1, pending: [] };
             save();

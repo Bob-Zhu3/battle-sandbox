@@ -37,7 +37,7 @@ function changeAllegiance(unit: Unit, team: Team, tick: number) {
   delete unit.raging; delete unit.drawingBow;
   unit.nextAttackTick = tick + 5;
   delete unit.windup; delete unit.runUp; delete unit.wrappingSince; delete unit.constructingSince;
-  delete unit.burstLeft; delete unit.nextBurstTick; delete unit.trail;
+  delete unit.burstLeft; delete unit.nextBurstTick; delete unit.flurryStartedTick; delete unit.trail;
   delete unit.headUntil; delete unit.headSpot; delete unit.headLandedTick; delete unit.wolfUntil;
   delete unit.siblingId;
   delete unit.wormBody;

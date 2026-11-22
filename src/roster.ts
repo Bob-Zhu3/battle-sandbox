@@ -6,7 +6,7 @@ import { isBuilding, UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 
 type Brush = RecruitKind | SpellKind;
 const shelves: {name: string; items: Brush[]}[] = [
-  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","miner","clown","engineer","wrestler","liondancers","rhinorider"]},
+  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","miner","clown","engineer","monk","liondancers","rhinorider"]},
   {name: "Machines", items: ["mouse","drone","trojanhorse"]},
   {name: "Towers", items: ["post","workshop","lobber","sunlens","belltower","windmill","harpoon","prism","snowman"]},
   {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","reaper","witch","zombie","hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem"]},
@@ -31,7 +31,8 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   let balance: number | undefined, casting = !priced;
   try {
     const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
-    if (saved && shelves.some(group => group.items.includes(saved.brush))) selected = saved.brush;
+    const brush = saved?.brush === "wrestler" ? "monk" : saved?.brush;
+    if (brush && shelves.some(group => group.items.includes(brush))) selected = brush;
     const savedShelf = saved?.shelf === "Machines" && (saved.brush === "post" || saved.brush === "workshop") && saved.version !== 2 ? "Towers" : saved?.shelf;
     const index = shelves.findIndex(group => group.name === savedShelf);
     if (index >= 0) shelf = index;
@@ -88,7 +89,7 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     } else if (key === "phoenix") {
       drawUnitToken(c, 36 + ARMIES[team].facing * 9.5, 49, 13.5, team, key);
     } else if (["hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem",
-      "wrestler","liondancers","rhinorider","trojanhorse"].includes(key)) {
+      "monk","liondancers","rhinorider","trojanhorse"].includes(key)) {
       const shift=key==="firedragon" ? 2.5 : 0;
       const size=key==="slime" ? 18.5 : key==="vampire" || key==="irongolem" ? 16.5 : key==="firedragon" ? 13 : 13.6;
       const y=key==="slime" ? 43 : 47;
