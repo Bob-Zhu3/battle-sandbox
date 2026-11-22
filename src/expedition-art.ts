@@ -1,7 +1,9 @@
 import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { cut, eye, FACE, INK, IRON, limb, line, oval, type Dye, type Pens } from "./ink.ts";
+import { crystalFocus, crystalLift } from "./prism-art.ts";
 import type { Unit } from "./simulation.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
+import { FAN_HUB_HEIGHT, fanGustProgress } from "./fan-wind.ts";
 
 export type ExpeditionKind = "wrestler" | "liondancers" | "rhinorider" | "trojanhorse" |
   "windmill" | "harpoon" | "prism" | "snowman";
@@ -187,27 +189,43 @@ function masonry(c: Pens, d: Dye) {
   cut(c, "M-2.3 4.75 L2 4.7 L1.65 7.45 L-.35 8.35 L-2.25 7.3Z", d.coat, .65);
 }
 
-function windmill(c: Pens, d: Dye, u: Unit | undefined, tick: number) {
+function windmill(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   masonry(c, d);
-  cut(c, "M-7.65 3.85 L-5.4 -10.3 Q-.9 -12.75 4.65 -10.15 L8 3.65 Q.45 5.45 -7.65 3.85Z", "#dac6a0", 1.2);
-  cut(c, "M-7.7 -8.5 L-5.4 -12 L-.5 -16.5 L5.5 -12.55 L8.6 -8.35 Q1.2 -7 -7.7 -8.5Z", d.coat, 1.15);
-  cut(c, "M-4.4 3.75 L-4.15 1 Q-3.7 -1.9 -1.45 -1 Q-.1 -.7 -.25 1.2 L-.25 4Z", grain, .75);
-  const fire = u?.lastAttackTick ?? -Infinity, block = u?.lastBlockTick ?? -Infinity;
-  const age = tick - Math.max(fire <= tick ? fire : -Infinity, block <= tick ? block : -Infinity);
-  const whipping = age >= 0 && age < 22 ? 1 - (1 - age / 22) ** 3 : 1;
-  const duration = UNIT_DEFINITIONS.windmill.spinTicks;
-  const gust = u?.millFastUntil === undefined ? 0 : Math.max(0, Math.min(1, (tick - u.millFastUntil + duration) / duration));
-  const turn = .37 + (u ? tick * .036 + u.id * .46 : 0) + (whipping - 1) * Math.PI + 4 * Math.PI * gust;
-  c.save(); c.translate(.3, -9.2); c.rotate(turn);
-  for (let sail = 0; sail < 4; sail++) {
-    limb(c, 0, 0, 0, -13.35, oak, 1.15);
-    cut(c, "M.15 -5.1 L3.65 -6.15 L4.75 -13.5 L.15 -13Z", ivory, .9);
-    cut(c, "M.4 -11.55 L4.45 -12.15 L4.75 -13.5 L.15 -13Z", d.coat, .4);
-    line(c, .4, -8.7, 3.8, -9.45, oak, .65);
-    c.rotate(Math.PI / 2);
+  cut(c, "M-7.15 3.95 L-5.6 -4.2 Q-1.1 -5.75 4.85 -4.5 L7.55 3.65 Q.85 5.2 -7.15 3.95Z", "#d8c7aa", 1.15);
+  cut(c, "M-6.5 -3.4 L-5.75 -5.1 Q-.2 -6.45 5.4 -5.15 L6.5 -3.8 Q1.5 -2.65 -6.5 -3.4Z", d.coat, .9);
+  cut(c, "M-3.25 3.9 L-3.05 1.1 Q-2.75 -.5 -1.45 -.4 Q.1 -.35 .15 1.1 L.35 4.1Z", grain, .65);
+  limb(c, -1.1, -4.9, -.4, -9.1, "#969f94", 3.3);
+  const block = eventFade(tick, u?.lastBlockTick, 10);
+  c.save(); c.translate(0, -FAN_HUB_HEIGHT); c.rotate(p.pitch);
+  c.translate(-.55 * block, 0);
+  // The short motor behind the fan and its brass swivel keep the front
+  // unambiguous as the head tracks a unit crossing the tower.
+  cut(c, "M-9.65 -3.6 Q-8.4 -5.85 -5.75 -6.05 L2.55 -5.5 L3.1 5.05 L-5.55 5.05 Q-9.65 4.95 -9.75 1.05Z", d.hem, 1.25);
+  cut(c, "M-8.95 -2.7 Q-8.55 -5.35 -5.5 -5.25 L2.3 -4.75 L1.65 -1.15 L-8.95 -.75Z", d.coat, .65);
+  line(c, -7.75, .6, -5.8, .5, "#e8d9bf", .7);
+  line(c, -7.4, 2, -5.8, 1.9, "#e8d9bf", .65);
+  oval(c, -.5, 3.9, 2.1, 2.1, INK); oval(c, -.5, 3.9, 1.35, 1.35, brass);
+  c.save(); c.translate(3.9, 0); c.scale(.79, 1);
+  oval(c, -.75, .2, 10.85, 10.85, INK);
+  oval(c, -.55, .15, 10.05, 10.05, "#8d9990");
+  oval(c, .35, -.2, 9.45, 9.5, INK);
+  oval(c, .35, -.2, 8.35, 8.4, "#f0efdb");
+  const turn = -.22 + (u ? tick * .105 + u.id * .46 : 0) + fanGustProgress(u, tick) * Math.PI * 4;
+  c.save(); c.rotate(turn);
+  for (let blade = 0; blade < 3; blade++) {
+    cut(c, "M-.5 -1.1 C-1.4 -4.05 -.7 -7.85 2.5 -8.05 Q5.55 -8.2 6.45 -5.6 Q6.85 -4.4 5.15 -3.9 Q2.75 -3.35 .65 -.45Z", d.coat, .9);
+    cut(c, "M.45 -5.9 Q1.2 -7.95 3.55 -7.35 L4.9 -6.75 Q2.2 -7.05 .45 -5.9Z", d.light, 0);
+    c.rotate(2 * Math.PI / 3);
   }
   c.restore();
-  oval(c, .3, -9.2, 2.55, 2.55, INK); oval(c, .3, -9.2, 1.7, 1.7, brass);
+  oval(c, .45, -.1, 2.45, 2.4, INK); oval(c, .5, -.25, 1.55, 1.55, brass);
+  c.restore();
+  if (!u) {
+    c.beginPath(); c.moveTo(13.2, -3.05); c.quadraticCurveTo(16.3, -4.3, 19.45, -3.15);
+    c.moveTo(13.7, .75); c.quadraticCurveTo(16.25, .25, 18.25, 1.3);
+    c.strokeStyle = "#84afb3"; c.lineWidth = 1; c.stroke();
+  }
+  c.restore();
 }
 
 function harpoon(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
@@ -235,26 +253,33 @@ function harpoon(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: n
 }
 
 function prism(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
-  const discharge = eventFade(tick, u?.lastAttackTick, 19);
+  const since = u?.targetId == null ? undefined : u.focusSince;
+  const locked = since !== undefined && tick >= since;
+  const focus = locked ? crystalFocus(tick-since) : 0;
   const breath = u ? Math.sin((tick + u.id * 13) * .063) : 0;
   masonry(c, d);
   cut(c, "M-7.9 3.35 L-5.1 -1.05 L-.45 -3.5 L4.5 -1.35 L7.8 3.3 Q.5 5.3 -7.9 3.35Z", brass, 1.15);
-  c.save(); c.translate(0, -.55 * breath - 1.8 * discharge);
+  c.save(); c.translate(0, u ? -crystalLift(tick,u.id,focus) : 0);
   for (const side of [-1, 1]) {
-    c.save(); c.scale(side, 1); c.translate(4.25, -4.2); c.rotate(.23 * p.ready + .48 * discharge);
+    c.save(); c.scale(side, 1); c.translate(4.25, -4.2); c.rotate(locked ? -.06-.31*focus : .16*p.ready);
     cut(c, "M.25 2.95 Q3.9 -.5 4.75 -4.85 Q4.8 -7.55 4.3 -9.55 Q7.1 -7.85 7.2 -4.15 Q6.45 .75 2.95 3.85Z", oak, .95);
     cut(c, "M4.5 -4.65 L5.6 -10.25 L7.1 -6.9 L6.65 -4.1Z", side > 0 ? "#db8c9e" : "#8abfaf", .75);
     c.restore();
   }
-  c.save(); c.translate(0, -11.65); c.rotate(.055 * breath + .09 * p.pitch - .1 * discharge);
+  c.save(); c.translate(0, -11.65); c.rotate((.055*breath+.09*p.pitch)*(1-focus));
   cut(c, "M-.75 -9.35 L8.3 2.65 L.75 7.2 L-7.85 2.2Z", "#ace2de", 1.4);
   cut(c, "M-.75 -9.35 L.15 1.2 L-7.85 2.2Z", "#d9f6ea", .65);
   cut(c, "M-.75 -9.35 L8.3 2.65 L.15 1.2Z", "#89abc8", .65);
   cut(c, "M.15 1.2 L8.3 2.65 L.75 7.2Z", "#bb9fca", .65);
   line(c, -3.5, -2.5, -1.55, -5.95, "#fff9de", 1.25);
-  if (discharge > 0) {
-    c.save(); c.globalAlpha *= discharge;
-    cut(c, "M.1 -3.25 L.8 -.45 L3.2 .65 L.85 1.1 L.25 3.05 L-.6 1.25 L-2.9 .55 L-.65 -.35Z", "#fffce4", 0);
+  if (locked) {
+    c.save(); const opacity=c.globalAlpha; c.globalAlpha *= .35+.52*focus;
+    cut(c,"M-.75 -8.2 L.1 1 L-6.35 1.95Z","#fffbdc",0);
+    cut(c,"M.3 1.3 L6.85 2.75 L.95 6Z",d.light,0);
+    c.globalAlpha=opacity;
+    const spark=.62+.70*focus;
+    c.scale(spark,spark);
+    cut(c, "M.1 -3.25 L.8 -.45 L3.2 .65 L.85 1.1 L.25 3.05 L-.6 1.25 L-2.9 .55 L-.65 -.35Z", "#fffce4", .45);
     c.restore();
   }
   c.restore(); c.restore();
@@ -314,7 +339,7 @@ export function drawExpedition(c: Pens, d: Dye, p: CharacterPose, kind: Expediti
     case "liondancers": lionDancers(c, d, p, u, tick); break;
     case "rhinorider": rhinoRider(c, d, p, u, tick); break;
     case "trojanhorse": trojanHorse(c, d, p, u, tick); break;
-    case "windmill": windmill(c, d, u, tick); break;
+    case "windmill": windmill(c, d, p, u, tick); break;
     case "harpoon": harpoon(c, d, p, u, tick); break;
     case "prism": prism(c, d, p, u, tick); break;
     case "snowman": snowman(c, d, p, u, tick); break;

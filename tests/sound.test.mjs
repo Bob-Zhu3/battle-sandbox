@@ -40,6 +40,20 @@ test("a Meteor whooshes once at purchase and lands on its damage tick in both sn
   assert.deepEqual(battleCues(launch,cancelled.world),[]);
 });
 
+test("a fan whistles only when it turns a shot and a Prism chimes only when it takes the lock", () => {
+  let w=createBattle([{id:1,kind:"windmill",team:"red",x:400,y:220},{id:2,kind:"archer",team:"blue",x:486,y:220},
+    {id:3,kind:"prism",team:"red",x:400,y:65},{id:4,kind:"belltower",team:"blue",x:505,y:65}]);
+  const frames=[w];
+  for(let i=0;i<42;i++){w=stepBattle(w);frames.push(w);}
+  for(const stride of [1,3]){
+    const heard=[];
+    for(let i=stride;i<frames.length;i+=stride)
+      for(const cue of battleCues(frames[i-stride],frames[i]))if(cue.kind==="fan" || cue.kind==="prism")heard.push(cue.kind);
+    assert.deepEqual(heard.sort(),["fan","prism"]);
+  }
+  assert.deepEqual(battleCues(undefined,w),[]);
+});
+
 test("one stroke and simultaneous hits each make a single spatial cue", () => {
   const game = new Playground(), empty = game.world;
   const positions = Array.from({length:20},(_,i)=>({x:240+i*12,y:160}));

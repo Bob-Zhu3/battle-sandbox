@@ -184,9 +184,23 @@ async function paletteAndMeteor(url) {
       assert.equal(await panel.getByRole("button").count(),14);
       assert.equal(await page.getByRole("button",{name:"Roster",exact:true}).count(),0);
       const track=bar.locator("#palette-track");
-      await pick(bar,"Scroll troops right"); assert.ok(await track.evaluate(el=>el.scrollLeft>0));
-      await pick(bar,"Scroll troops left"); assert.equal(await track.evaluate(el=>el.scrollLeft),0);
-      await track.dispatchEvent("wheel",{deltaY:155}); assert.ok(await track.evaluate(el=>el.scrollLeft>0));
+      const position=()=>track.evaluate(el=>el.scrollLeft);
+      await pick(bar,"Scroll troops right"); assert.equal(await position(),0);
+      await page.clock.runFor(32);const first=await position();assert.ok(first>0);
+      await page.clock.runFor(32);assert.ok(await position()>first);
+      await pick(bar,"Scroll troops left");await page.clock.runFor(420);assert.equal(await position(),0);
+      await track.dispatchEvent("wheel",{deltaY:45});await track.dispatchEvent("wheel",{deltaY:65});
+      await page.clock.runFor(32);assert.ok(await position()>0 && await position()<109);
+      await page.clock.runFor(420);assert.ok(Math.abs(await position()-110)<=1);
+      await track.dispatchEvent("wheel",{deltaY:100});await page.clock.runFor(32);const forward=await position();
+      await track.dispatchEvent("wheel",{deltaY:-55});await page.clock.runFor(32);const reversed=await position();
+      assert.ok(reversed<forward);
+      await tab("Machines").click({force:true});await page.clock.runFor(420);await tab("People").click({force:true});
+      assert.ok(Math.abs(await position()-reversed)<=1);
+      await page.emulateMedia({reducedMotion:"reduce"});
+      await pick(bar,"Scroll troops left");assert.equal(await position(),0);
+      await track.dispatchEvent("wheel",{deltaY:87});assert.ok(Math.abs(await position()-87)<=1);
+      await page.emulateMedia({reducedMotion:"no-preference"});
       await page.keyboard.press("2"); assert.equal(await bar.locator("button[aria-pressed=true]").getAttribute("aria-label"),"Archer");
       await tab("Mythical").click({force:true});await pick(panel,"Phoenix");
       await page.reload();await page.locator("#brush-phoenix").waitFor();
@@ -242,7 +256,7 @@ async function paletteAndMeteor(url) {
       assert.equal(await core(),null);
     } finally {await page.context().close();}
   }
-  console.log("Direct category browsing, horizontal scrolling, keyboard selection, restored brushes and top-edge Meteor strikes on desktop and phone.");
+  console.log("Roster glides across frames, reverses on input, remembers each category and honors reduced motion on desktop and phone. Top-edge Meteor passes.");
 }
 
 async function touchAndSound(url) {

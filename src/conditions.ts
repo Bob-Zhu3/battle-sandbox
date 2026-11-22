@@ -52,6 +52,7 @@ export function interrupt(unit: Unit) {
   delete unit.burstLeft;
   delete unit.nextBurstTick;
   delete unit.focusSince;
+  if (unit.kind==="prism") { unit.targetId=null; delete unit.prismSides; }
 }
 
 export function slow(unit: Unit, until: number) {
@@ -66,7 +67,7 @@ export function shove(unit: Unit, x: number, y: number, distance: number) {
 }
 
 export function displace(unit: Unit, dx: number, dy: number) {
-  if (isBuilding(unit.kind) || unit.emberUntil !== undefined) return;
+  if (isBuilding(unit.kind) || unit.emberUntil !== undefined || unit.tunnel) return;
   const factor = unit.kind === "irongolem" ? .22 : 1;
   unit.knockback = {x:dx*factor+(unit.knockback?.x ?? 0), y:dy*factor+(unit.knockback?.y ?? 0), ticks:8};
 }

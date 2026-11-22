@@ -5,10 +5,10 @@ import { isBuilding, type UnitKind } from "./units.ts";
 
 // In a crowd, reserve space for a voice, a material and a spell to be heard together.
 const mix = {
-  wormhole:["spell",.27], portalOpen:["spell",.22], prism:["weapon",.21], stoneGaze:["spell",.24], fireBreath:["weapon",.44],
+  wormhole:["spell",.27], portalOpen:["spell",.22], prism:["weapon",.47], stoneGaze:["spell",.24], fireBreath:["weapon",.44],
   winch:["weapon",.27], hook:["material",.19], breach:["material",.37], snow:["weapon",.16], squelch:["material",.18],
   cymbals:["material",.23], heave:["voice",.6], snort:["voice",.49], hiss:["voice",.42], bark:["voice",.48],
-  splash:["material",.22], flutter:["weapon",.23], canvas:["material",.25], hatch:["material",.32], anvil:["material",.34],
+  splash:["material",.22], flutter:["weapon",.23], fan:["material",.25], hatch:["material",.32], anvil:["material",.34],
   glass:["material",.20], lightning:["spell",.24], freeze:["spell",.22], rage:["spell",.28],
   impact:["spell",.21], fall:["spell",.19], howl:["voice",.90], charge:["voice",.55], roar:["voice",.85],
   screech:["voice",.62], groan:["voice",.62], whisper:["voice",.65], squeal:["voice",.36], squeak:["voice",.32],
@@ -39,7 +39,7 @@ export function createCueMixer() {
 
 const attacks: Partial<Record<UnitKind,CueKind>> = {archer:"bow",post:"bolt",lobber:"sling",musketeer:"shot",scout:"dart",clown:"toss",bomber:"fuse",
   frostqueen:"shard",witch:"hex",warrior:"clash",shieldbearer:"clash",belltower:"toll",phoenix:"screech",zombie:"groan",
-  wrestler:"heave",liondancers:"cymbals",rhinorider:"snort",trojanhorse:"wood",windmill:"canvas",harpoon:"winch",
+  wrestler:"heave",liondancers:"cymbals",rhinorider:"snort",trojanhorse:"wood",harpoon:"winch",
   snowman:"snow",hydra:"hiss",vampire:"flutter",slime:"squelch",horseman:"toss",cerberus:"bark",kraken:"splash",irongolem:"anvil"};
 function hurtVoice(u: Unit): CueKind {
   switch (u.kind) {
@@ -89,7 +89,7 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
     for (const u of world.units) {
       const old=previous.get(u.id);
       if(!old)add("place",u.x,u.id);
-      if(fresh(u.lastBlockTick))add(u.kind==="windmill"?"canvas":"block",u.x,u.id,u.lastBlockTick);
+      if(fresh(u.lastBlockTick))add(u.kind==="windmill"?"fan":"block",u.x,u.id,u.lastBlockTick);
       else if(fresh(u.lastHitTick) && (!world.bases || u.hp || u.killedBy!==undefined))add(hurtVoice(u),u.x,u.id,u.lastHitTick);
       if(fresh(u.lastChargeReadyTick))add(u.kind==="rhinorider"?"snort":"charge",u.x,u.id,u.lastChargeReadyTick);
       if(fresh(u.lastDrawTick))add("bowDraw",u.x,u.id,u.lastDrawTick);
@@ -103,6 +103,7 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
       if(u.soul && fresh(u.soul.tick))add("whisper",u.x,u.id,u.soul.tick);
       if(u.zombified && fresh(u.zombified.tick))add("groan",u.x,u.id,u.zombified.tick);
       if(u.hex && fresh(u.hex.since))add("squeal",u.x,u.id,u.hex.since);
+      if(u.kind==="prism" && u.targetId!==null && fresh(u.focusSince))add("prism",u.x,u.id,u.focusSince);
       if(u.beam && fresh(u.beam.tick))add("lens",u.x,u.id,u.beam.tick);
       if(u.arc && fresh(u.arc.tick)){add("howl",u.x,u.id,u.arc.tick);add("thunder",u.x,u.id,u.arc.tick);}
       if(!fresh(u.lastAttackTick))continue;
@@ -120,7 +121,6 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
   for(const e of world.effects??[]) if(fresh(e.tick)) {
     if(e.kind==="glass")add("glass",e.x,Math.round(e.y),e.tick);
     if(e.kind==="stonefall" || e.kind==="blast")add("smash",e.x,Math.round(e.y),e.tick);
-    if(e.kind==="prism")add("prism",e.fromX??e.x,Math.round(e.y),e.tick);
     if(e.kind==="breath")add("fireBreath",e.fromX??e.x,Math.round(e.y),e.tick);
     if(e.kind==="gaze")add("stoneGaze",e.fromX??e.x,Math.round(e.y),e.tick);
     if(e.kind==="harpoon")add("hook",e.x,Math.round(e.y),e.tick);

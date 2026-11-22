@@ -45,8 +45,8 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
         tone(930,284,.13,.18,"triangle");tone(306,1050,.22,.19,"sine",.10,.033);
         noise(1700,4600,.14,.13,.035,.13);break;
       case "prism":
-        for (const [i,hz] of [670,1005,1510].entries()) tone(hz,hz*1.055,.20-i*.02,.12-i*.024,"sine",i*.024,.01);
-        break;
+        tone(490,704,.22,.073,"sine",0,.048);
+        tone(849,1060,.17,.032,"sine",.058,.044); break;
       case "stoneGaze":
         noise(2900,970,.21,.24,.064);tone(760,307,.19,.10,"triangle",.035,.032);noise(1370,850,.10,.19,.004,.16);break;
       case "fireBreath":
@@ -84,8 +84,9 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
       case "flutter":
         for(let i=0;i<3;i++) noise(1520,620,.058,.15-i*.018,.019,i*.055);
         break;
-      case "canvas":
-        noise(430,1200,.10,.16,.018);noise(965,310,.095,.23,.007,.061);break;
+      case "fan":
+        noise(720,2400,.16,.15,.046); noise(2050,1100,.16,.095,.028,.065);
+        tone(315,495,.13,.035,"sine",.012,.04); break;
       case "hatch":
         tone(250,475,.17,.07,"sawtooth",0,.034);noise(960,471,.08,.25,.008,.155);tone(205,117,.095,.12,"triangle",.15);break;
       case "anvil":

@@ -1,9 +1,10 @@
 import { collectSouls, hasSoul, hunt, resolveConversions, type Conversion, type Harvest, type Hex } from "./transformations.ts";
-import { advanceTunnel, digFromHome, type Tunnel } from "./tunnels.ts";
+import { advanceTunnel, digFromHome, diveWorm, type Tunnel } from "./tunnels.ts";
+import { followWormHead, initialWormBody } from "./sandworm.ts";
 import { recordTrail, type TrailMark } from "./trails.ts";
 import { applyMagic, blownAway, openWormhole, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
 import { reflectAtWards } from "./mirror.ts";
-import { focusLens, pickTowerTarget } from "./siege.ts";
+import { channelPrism, focusLens, pickTowerTarget } from "./siege.ts";
 import { applyRage, strikeField } from "./battle-magic.ts";
 import { finishBuilding, resolveControl, startCyclopsSwing, type Windup } from "./encounters.ts";
 import { afflict, disabledUntil, displace, effectLifetime, moveKnockback, shove, stun, tickAfflictions, type Affliction, type GroundEffect } from "./conditions.ts";
@@ -13,8 +14,9 @@ import { nearestEnemy } from "./targeting.ts";
 import type { Arrow } from "./arrows.ts";
 import { advanceShot, applyClouds, deflectHead, releaseShot } from "./shots.ts";
 import { footprint, isHuman, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
-import { releaseTelegraph, rosterStrike, rosterTarget, startTelegraph, type Impulse } from "./roster-attacks.ts";
+import { eruptWorm, releaseTelegraph, rosterStrike, rosterTarget, startTelegraph, type Impulse } from "./roster-attacks.ts";
 import { settleTroopBodies } from "./roster-life.ts";
+import { blowFan, firstFanContact, type FanContact } from "./windmill.ts";
 import { ARENA, ARMIES, BASE_RADIUS, TEAMS, type Base, type Team } from "./battlefield.ts";
 export { ARENA, type Team } from "./battlefield.ts";
 
@@ -63,6 +65,7 @@ export interface Unit extends Placement {
   lastDrawTick?: number;
   lastChargeReadyTick?: number;
   focusSince?: number;
+  prismSides?: number[];
   fogUntil?: number;
   beam?: {tick: number; x: number; y: number; level: number};
   burn?: Affliction;
@@ -71,6 +74,7 @@ export interface Unit extends Placement {
   hex?: Hex;
   soul?: { x: number; y: number; tick: number };
   tunnel?: Tunnel;
+  wormBody?: {x: number; y: number}[];
   emergedTick?: number;
   trail?: TrailMark[];
   knockback?: { x: number; y: number; ticks: number };
@@ -158,6 +162,7 @@ export function createBattle(placements: readonly Placement[], tick = 0, bases?:
       walkDistance: 0, pace: 0, lastAttackTick: null, attackDirection: null, lastAttentionTick: null,
     };
     if (kind === "miner") digFromHome(unit, tick, TICKS_PER_SECOND, bases?.find(base => base.team === unit.team));
+    if (kind === "sandworm") unit.wormBody = initialWormBody(unit);
     return unit;
   });
   return new Battle(tick, units, [], bases);
@@ -183,10 +188,16 @@ function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   if (distance > stopAt && unit.rootedUntil === undefined) {
     const speedFactor = unit.slowUntil === undefined ? 1 : UNIT_DEFINITIONS.frostqueen.speedFactor;
     const step = Math.min(walkSpeed(unit) * speedFactor / TICKS_PER_SECOND, distance - stopAt);
+    if (unit.kind === "sandworm") {
+      const sway = .48 * Math.sin(unit.walkDistance / 13 + unit.id * 2.4) * Math.min(1, (distance - stopAt) / 35);
+      const heading = Math.atan2(dy, dx) + sway;
+      unit.aimX = Math.cos(heading); unit.aimY = Math.sin(heading);
+    }
     unit.x += unit.aimX * step;
     unit.y += unit.aimY * step;
   }
-  return distance;
+  // A diagonal step can land a fraction of a pixel outside reach with no representable movement left.
+  return Math.abs(distance - stopAt) < 1e-8 ? stopAt : distance;
 }
 
 // At this cell width, overlapping circles can only occupy the same cell or
@@ -316,7 +327,9 @@ export function stepBattle(battle: Battle): Battle {
   const winds = activeMagic.filter(spell => spell.kind === "gust");
   const portals = activeMagic.filter(s=>s.kind==="wormhole").sort((a,b)=>a.id-b.id);
   const fieldChanges = activeMagic.filter(s => s.kind === "briar" || s.kind === "fault" || s.kind === "rain");
-  const starting = fieldChanges.length || strikes.length || rings.length || portals.length || battle.units.some(u => u.hp > 0 && (u.raging || u.groundedUntil===tick)) ? battle.units.map(u => {
+  const readyToDive = (u: Unit) => u.hp > 0 && u.kind === "sandworm" && u.windup?.kind === "breach" && tick-u.windup.since >= UNIT_DEFINITIONS.sandworm.windup;
+  const diving = battle.units.some(readyToDive);
+  const starting = diving || fieldChanges.length || strikes.length || rings.length || portals.length || battle.units.some(u => u.hp > 0 && (u.raging || u.groundedUntil===tick)) ? battle.units.map(u => {
     if (!u.hp) return u;
     const ready = {...u};
     if ((ready.groundedUntil ?? Infinity)<=tick) delete ready.groundedUntil;
@@ -337,6 +350,11 @@ export function stepBattle(battle: Battle): Battle {
   for (const spell of strikes) strikeField(spell,targets,tick,hit);
   for (const u of starting) if (u.hp && (rings.length || u.raging)) applyRage(u,rings,tick);
   const control = resolveControl(starting, targets, tick, hit, effects);
+  if (diving) for (const worm of starting) {
+    if (!readyToDive(worm) || disabledUntil(worm)>tick || control.stuns.has(worm.id)) continue;
+    if ((worm.rootedUntil ?? 0)>tick) delete worm.windup;
+    else diveWorm(worm,tick,TICKS_PER_SECOND);
+  }
   const towers = basesAtStart?.map(base => {
     const until = Math.max(base.stunnedUntil ?? 0, control.stuns.get(base.id) ?? 0);
     if (tick < until) return {...base, stunnedUntil: until, acquiredTick: null, targetId: null};
@@ -348,7 +366,11 @@ export function stepBattle(battle: Battle): Battle {
   const units = starting.map((unit) => {
     const next = { ...unit };
     if (unit.hp <= 0) return next;
-    if (unit.tunnel) { advanceTunnel(next,tick); return next; }
+    if (unit.tunnel) {
+      advanceTunnel(next,tick);
+      if (next.kind === "sandworm" && next.emergedTick === tick) eruptWorm(next,targets,tick,hit,effects,impulses);
+      return next;
+    }
     if (unit.emergedTick === tick) return next;
     if (next.slowUntil !== undefined && tick >= next.slowUntil) delete next.slowUntil;
     if (next.fogUntil !== undefined && tick >= next.fogUntil) delete next.fogUntil;
@@ -397,7 +419,7 @@ export function stepBattle(battle: Battle): Battle {
     }
     if (next.frozenUntil !== undefined || unit.warpedTick===tick) return next;
     if (arc || unit.windup) {
-      releaseTelegraph(next,targets,tick,control.gaze.fired.has(unit.id),hit,effects,burns,impulses);
+      releaseTelegraph(next,targets,tick,control.gaze.fired.has(unit.id),hit,effects,burns);
       return next;
     }
     if (unit.kind==="horseman" && unit.headUntil!==undefined) {
@@ -423,9 +445,11 @@ export function stepBattle(battle: Battle): Battle {
       if (next.targetId !== null) { next.lastAttackTick = tick; next.nextAttackTick = tick+UNIT_DEFINITIONS.belltower.cooldownTicks; }
       return next;
     }
-    const target = unit.kind === "lobber" || unit.kind === "sunlens" ? pickTowerTarget(unit,targets) :
+    const target = unit.kind === "lobber" || unit.kind === "sunlens" || unit.kind==="prism" || unit.kind==="windmill" ? pickTowerTarget(unit,targets) :
       (unit.kind === "reaper" && hunt(unit, targets)) || rosterTarget(unit,targets) || nearestEnemy(unit, targets);
     if (unit.kind === "sunlens") { focusLens(next,target,tick,hit); return next; }
+    if (unit.kind==="prism") { channelPrism(next,target,targets,tick,hit); return next; }
+    if (unit.kind==="windmill") { blowFan(next,target,targets,tick,TICKS_PER_SECOND,hit,impulses); return next; }
     if (unit.kind === "drone" && unit.burstLeft && tick >= (unit.nextBurstTick ?? 0) && unit.attackDirection) {
       const spec = UNIT_DEFINITIONS.drone, speed = spec.arrowSpeed / TICKS_PER_SECOND;
       arrows.push({kind: "dart", casterId: unit.id, team: unit.team, x: unit.x, y: unit.y, vx: unit.attackDirection.x * speed,
@@ -488,7 +512,7 @@ export function stepBattle(battle: Battle): Battle {
       next.nextAttackTick = tick + definition.cooldownTicks;
       next.lastAttackTick = tick;
       next.attackDirection = { x: next.aimX, y: next.aimY };
-      if (rosterStrike(next,target,targets,tick,hit,healing,impulses,effects)) return next;
+      if (rosterStrike(next,target,targets,tick,hit,healing,impulses)) return next;
       if (definition.attack === "melee") {
         let amount: number = definition.damage;
         if (unit.kind === "lancer" && (unit.runUp ?? 0) >= UNIT_DEFINITIONS.lancer.runUp) {
@@ -519,12 +543,8 @@ export function stepBattle(battle: Battle): Battle {
   // A lethal melee hit frees the footprint immediately, as in the original duel.
   // Arrows below use the resulting movement paths and the starting list of living enemies.
   const solid = units.map((unit,i) => !starting[i].tunnel && unit.hp > (damage.get(unit.id) ?? 0));
-  // A breach has no swept body between the ridge's origin and its destination.
-  const origins=units.some((u,i)=>u.warpedTick===tick && starting[i].warpedTick!==tick) ?
-    starting.map((u,i)=>units[i].warpedTick===tick ? {...u,x:units[i].x,y:units[i].y} : u) : starting;
-  const shotOrigins=origins===starting ? targets : basesAtStart ? [...origins,...basesAtStart] : origins;
   for (let pass = 0; pass < 4; pass++) {
-    if (!separateFootprints(origins, units, solid)) break;
+    if (!separateFootprints(starting, units, solid)) break;
   }
   const byId = new Map(units.map(unit => [unit.id, unit]));
   for (const mouseId of control.mice.values()) byId.get(mouseId)!.lastSqueakTick = tick;
@@ -546,20 +566,27 @@ export function stepBattle(battle: Battle): Battle {
   const wards = spells?.filter(s => s.kind === "mirror" && tick-s.startTick >= SPELLS.mirror.delay) ?? [];
   const incoming = winds.length ? battle.arrows.filter(arrow => !blownAway(arrow,winds)).map(a=>deflectHead(a,winds)) : battle.arrows;
   if (winds.length) arrows=arrows.map(a=>deflectHead(a,winds));
-  const reflected = reflectAtWards(incoming,wards,shotOrigins,movedTargets,tick);
-  const mills=incoming.length ? units.filter(u=>u.kind==="windmill" && u.hp>0 && disabledUntil(u)<=tick &&
-    ((u.millFastUntil ?? 0)>tick || (tick+Math.abs(u.id)*7)%30<11)) : [];
+  const mills=incoming.length ? units.filter(u=>u.kind==="windmill" && u.hp>0 && disabledUntil(u)<=tick) : [];
+  let fanContacts: Map<Arrow,FanContact> | undefined;
+  if (mills.length) {
+    fanContacts=new Map();
+    for (const arrow of incoming) {
+      const contact=firstFanContact(arrow,mills);
+      if (contact) fanContacts.set(arrow,contact);
+    }
+  }
+  const reflected = reflectAtWards(incoming,wards,targets,movedTargets,tick,fanContacts);
   for (const arrow of incoming) {
     const returned = reflected.get(arrow);
     if (returned) { arrows.push(returned); continue; }
     if (!arrow.kind || arrow.kind === "dart") noticeFriendlyArrow(arrow, units, tick);
-    const flying = advanceShot(arrow, tick, shotOrigins, movedTargets, byId, hit, effects, conversions, mills);
+    const flying = advanceShot(arrow, tick, targets, movedTargets, byId, hit, effects, conversions, fanContacts?.get(arrow));
     if (flying) arrows.push(flying);
   }
   applyClouds(effects, units, winds, tick);
   for (const [index, unit] of units.entries()) {
     const from = starting[index];
-    const distance = unit.warpedTick===tick ? 0 : Math.hypot(unit.x - from.x, unit.y - from.y);
+    const distance = unit.warpedTick===tick || (unit.kind==="sandworm" && from.tunnel) ? 0 : Math.hypot(unit.x - from.x, unit.y - from.y);
     const speed = walkSpeed(unit) / TICKS_PER_SECOND;
     // A shove can slide the ice. Keep the stride fixed inside the shell.
     if (unit.frozenUntil === undefined) {
@@ -608,7 +635,10 @@ export function stepBattle(battle: Battle): Battle {
   finishTreatments(units, byId, tick, healing);
   resolveConversions(conversions, byId, tick, fallen);
   const births=settleTroopBodies(units,byId,damage,fallen,tick);
-  units.forEach((unit,i) => recordTrail(unit,starting[i],tick));
+  units.forEach((unit,i) => {
+    recordTrail(unit,starting[i],tick);
+    if (unit.kind==="sandworm" && unit.hp>0) followWormHead(unit,starting[i],tick);
+  });
   const recruits: Placement[] = [];
   for (const unit of units) {
     const child = finishBuilding(unit, tick);

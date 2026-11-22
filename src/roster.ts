@@ -33,6 +33,38 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   track.id = "palette-track"; track.className = "palette-track"; track.setAttribute("role","tabpanel");
   const tabButtons: HTMLButtonElement[] = [], cards = new Map<Brush,HTMLButtonElement>();
   const offsets = shelves.map(() => 0);
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let scrollFrame: number | null = null, destination = 0, position = 0, lastFrame = 0;
+
+  function stopGlide() {
+    if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+    scrollFrame = null;
+  }
+  function glide(now: number) {
+    // Keep fractional pixels between frames, including on high-refresh displays.
+    position = destination + (position - destination) * Math.exp(-Math.max(0,now-lastFrame)/52);
+    lastFrame = now;
+    const arrived = Math.abs(destination-position) < .5;
+    track.scrollLeft = arrived ? destination : position;
+    scrollFrame = arrived ? null : requestAnimationFrame(glide);
+    if (arrived) updateEdges();
+  }
+  function scrollTo(left: number, animate = true) {
+    destination = Math.max(0,Math.min(track.scrollWidth-track.clientWidth,left));
+    if (!animate || reducedMotion.matches || Math.abs(destination-track.scrollLeft)<.5) {
+      stopGlide(); track.scrollLeft=destination;
+    } else if (scrollFrame===null) {
+      position=track.scrollLeft; lastFrame=performance.now();
+      scrollFrame=requestAnimationFrame(glide);
+    }
+    updateEdges();
+  }
+  function scrollBy(delta: number) {
+    const current = track.scrollLeft;
+    // Accumulate wheel notches in the same direction. A reversal takes effect immediately.
+    const continuing = scrollFrame!==null && (destination-current)*delta>0;
+    scrollTo((continuing ? destination : current)+delta);
+  }
 
   function icon(key: Brush) {
     const art = document.createElement("canvas");art.width=art.height=144;art.className="brush-icon";art.setAttribute("aria-hidden","true");
@@ -84,7 +116,7 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     const button = document.createElement("button"); button.type = "button"; button.className = "palette-arrow";
     button.setAttribute("aria-label", direction < 0 ? "Scroll troops left" : "Scroll troops right");
     button.setAttribute("aria-controls", track.id); button.dataset.direction = String(direction);
-    button.addEventListener("click",() => track.scrollBy({left: direction * Math.max(70,track.clientWidth * .72), behavior:"instant"}));
+    button.addEventListener("click",() => scrollBy(direction * Math.max(70,track.clientWidth * .72)));
     return button;
   }
   const back = scrollArrow(-1), next = scrollArrow(1);
@@ -92,13 +124,16 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     const end = track.scrollWidth - track.clientWidth;
     // Keep both arrow gutters in place while scrolling so portraits never jump under a finger.
     row.toggleAttribute("data-overflow",end > 1);
-    back.disabled = track.scrollLeft <= 1;
-    next.disabled = track.scrollLeft >= end - 1;
+    if (scrollFrame!==null) { destination=Math.min(destination,end); position=Math.min(position,end); }
+    back.disabled = track.scrollLeft <= 1 && (scrollFrame===null || destination<=1);
+    next.disabled = track.scrollLeft >= end-1 && (scrollFrame===null || destination>=end-1);
   }
-  function reveal(card: HTMLButtonElement) {
+  function reveal(card: HTMLButtonElement, animate = true) {
+    stopGlide();
     const box = card.getBoundingClientRect(), visible = track.getBoundingClientRect();
-    if (box.left < visible.left) track.scrollLeft += box.left - visible.left - 3;
-    if (box.right > visible.right) track.scrollLeft += box.right - visible.right + 3;
+    if (box.left < visible.left) scrollTo(track.scrollLeft + box.left-visible.left-3,animate);
+    else if (box.right > visible.right) scrollTo(track.scrollLeft + box.right-visible.right+3,animate);
+    else updateEdges();
   }
   function renderShelf() {
     track.replaceChildren(); cards.clear();
@@ -121,7 +156,7 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   }
   function browse(index: number) {
     if (index === shelf) return;
-    offsets[shelf] = track.scrollLeft; shelf = index;
+    stopGlide(); offsets[shelf] = track.scrollLeft; shelf = index;
     renderShelf(); remember();
   }
   function arrowIndex(event: KeyboardEvent, current: number, length: number) {
@@ -154,11 +189,15 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     e.preventDefault(); enabled[i].focus({preventScroll:true}); reveal(enabled[i]);
   });
   track.addEventListener("wheel", e => {
-    if (e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY) || track.scrollWidth <= track.clientWidth) return;
+    if (e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY) || track.scrollWidth <= track.clientWidth) {
+      stopGlide(); return;
+    }
     e.preventDefault();
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? track.clientWidth : 1;
-    track.scrollLeft += e.deltaY * unit;
+    scrollBy(e.deltaY * unit);
   },{passive:false});
+  track.addEventListener("pointerdown",stopGlide,{passive:true});
+  reducedMotion.addEventListener("change",() => { if (reducedMotion.matches && scrollFrame!==null) scrollTo(destination,false); });
   track.addEventListener("scroll",updateEdges,{passive:true});
   document.addEventListener("keydown", e => {
     if (strip.hidden || e.defaultPrevented || e.repeat || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey ||
@@ -168,14 +207,14 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   });
   row.append(back,track,next); strip.append(tabs,row);
   renderShelf();
-  const armed = cards.get(selected); if (armed) reveal(armed);
+  const armed = cards.get(selected); if (armed) reveal(armed,false);
   new ResizeObserver(updateEdges).observe(track);
   return {
     selectedKind: (): RecruitKind => isSpell(selected) ? "warrior" : selected,
     selectedSpell: (): SpellKind | undefined => isSpell(selected) && casting ? selected : undefined,
     armBrush(kind: Brush) {
       browse(shelves.findIndex(group => group.items.includes(kind)));
-      choose(kind); reveal(cards.get(kind)!);
+      choose(kind); reveal(cards.get(kind)!,false);
     },
     colorBrush(color: Team) {
       if (team === color) return;

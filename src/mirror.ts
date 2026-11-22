@@ -1,9 +1,10 @@
 import { circleEntry, projectileContacts, type Arrow } from "./arrows.ts";
 import type { Target } from "./simulation.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
+import type { FanContact } from "./windmill.ts";
 
 // Catch arrows where they enter the rim. A defender standing in front of the rim can still take the hit.
-export function reflectAtWards(shots: readonly Arrow[], wards: FieldSpell[], from: readonly Target[], to: readonly Target[], tick: number) {
+export function reflectAtWards(shots: readonly Arrow[], wards: FieldSpell[], from: readonly Target[], to: readonly Target[], tick: number, fans?: ReadonlyMap<Arrow,FanContact>) {
   const turned = new Map<Arrow,Arrow>();
   if (!wards.length) return turned;
   const crossings: {shot: Arrow; ward: FieldSpell; time: number}[] = [];
@@ -17,7 +18,7 @@ export function reflectAtWards(shots: readonly Arrow[], wards: FieldSpell[], fro
       if (x*x+y*y < radius*radius || x*shot.vx+y*shot.vy >= 0) continue;
       const time = circleEntry(x,y,shot.vx,shot.vy,radius);
       if (time === undefined) continue;
-      firstBody ??= projectileContacts(shot,from,to)[0]?.time ?? Infinity;
+      firstBody ??= Math.min(projectileContacts(shot,from,to)[0]?.time ?? Infinity,fans?.get(shot)?.time ?? Infinity);
       if (time <= firstBody) crossings.push({shot,ward,time});
     }
   }

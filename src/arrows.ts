@@ -16,6 +16,20 @@ export interface Arrow {
   damage: number;
   releasedTick: number;
   reflectedTick?: number;
+  windTurn?: {tick: number; fraction: number; vx: number; vy: number};
+}
+
+export function arrowPose(shot: Arrow, snapshotTick: number, tick: number) {
+  const turn=shot.windTurn;
+  if (turn && tick<turn.tick) {
+    // Rewind to the actual contact before following the incoming shaft back along its original line.
+    const x=shot.x-(snapshotTick-turn.tick)*shot.vx, y=shot.y-(snapshotTick-turn.tick)*shot.vy;
+    const before=tick-(turn.tick-1+turn.fraction);
+    if (before<0) return {x:x+turn.vx*before,y:y+turn.vy*before,vx:turn.vx,vy:turn.vy};
+    return {x,y,vx:shot.vx,vy:shot.vy};
+  }
+  const rewind=snapshotTick-tick;
+  return {x:shot.x-shot.vx*rewind,y:shot.y-shot.vy*rewind,vx:shot.vx,vy:shot.vy};
 }
 
 // Intersect the moving tip with a moving circle over one tick. In the circle's

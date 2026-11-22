@@ -1,6 +1,7 @@
 import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { FACE, INK, cut, eye, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import { horseman, ironGolem, medusa, vampire, werewolf } from "./beast-figures.ts";
+import { drawSandwormPortrait } from "./sandworm-art.ts";
 import type { Unit } from "./simulation.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
@@ -48,35 +49,6 @@ function hydra(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: num
   line(c, -6.1,-.9,-4.8,-.15,deep,.85); line(c, -3.8,-1.6,-2.35,-1.05,deep,.78);
 }
 
-function sandworm(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
-  const lunge = eventFade(tick, u?.lastAttackTick, 15);
-  const dive = u?.windup?.kind === "breach" ? Math.max(0, Math.min(1, (tick-u.windup.since)/UNIT_DEFINITIONS.sandworm.windup)) : 0;
-  const rumble = Math.sin((tick + (u?.id ?? 0) * 7) * .12);
-  const sand = "#ca9d62", plate = "#e6bf7f", clay = "#93694f";
-  // Three low ridges travel into the segment that actually breaches the surface.
-  for (let i = 0; i < 3; i++) {
-    const x = -15 - 4.7 * i, size = 4.1 - .8 * i, ripple = Math.sin(tick * .15 - i);
-    oval(c, x - 2 * lunge, 6.6, size + .4 * ripple, .7 + .3 * ripple + .3 * dive, "#c8ad83");
-  }
-  c.save(); c.translate(-5, 4.4); c.rotate(-.12 + .12 * rumble + .13 * lunge);
-  cut(c, "M-13 1.9 Q-11.5 -3.7 -6.35 -4.55 Q-.4 -5.2 2.4 -.45 Q-1.8 3.65 -11 3.6Z", sand, 1.1); c.restore();
-  c.translate(2.8 * lunge, 3.3 - 5.2 * lunge + rumble * .6 + 1.8 * dive);
-  c.scale(1, 1 - .68 * dive);
-  c.rotate(-.25 - .19 * p.ready + .33 * lunge);
-  cut(c, "M-17.4 5.3 C-18.1 1.05 -15.05 -3.4 -10.65 -3.8 Q-7.0 -4.1 -5.05 -2.7 C-1.45 -1.3 -2.85 -7.85 1.35 -11.7 Q5.15 -15.35 10.8 -13.7 L12.05 -3.35 Q6.65 -3.55 4.85 2 C2.95 7.6 -2.25 8.65 -7.8 5.7 Q-12.9 3.0 -14.85 7.05Z", sand, 1.45);
-  cut(c, "M-15.8 -.65 Q-14.7 -3 -12.05 -3.3 Q-10.15 -.95 -10.7 3.85 L-12.65 3.7 Q-12.1 1.2 -15.8 -.65Z", plate, .82);
-  cut(c, "M-8.7 -3.05 Q-6.8 -3.05 -5.25 -2.15 Q-3.85 .85 -5.65 5.95 L-7.5 5.5 Q-5.8 1.15 -8.7 -3.05Z", plate, .8);
-  cut(c, "M-3.4 -6 Q-.8 -8.4 2.2 -9.45 Q5.5 -8.4 7.1 -3.05 L4.65 -.9 Q2.25 -5.35 -3.4 -6Z", d.coat, .9);
-  c.save(); c.translate(10.15 + 2.4 * lunge, -7 - lunge); c.rotate(.12 + p.pitch * .12);
-  c.scale(1 + .24 * lunge, 1 + .16 * lunge);
-  cut(c, "M-6.8 -.5 Q-8.05 -6.55 -3.5 -9 Q.3 -11.1 4.2 -7.55 Q7.65 -5.1 7.25 .1 Q7.1 5.7 2.4 7.75 Q-2.25 9.4 -5.45 5.6Z", plate, 1.35);
-  cut(c, "M-6.4 -4.2 Q-4.8 -7.9 -.35 -8.2 Q3.5 -8.35 5.35 -5.55 Q1.95 -7 -1.3 -6.1 Q-3.4 -5.15 -4.5 -2.15 Q-5.75 1.55 -3.1 5.5 Q-6.8 3.25 -6.4 -4.2Z", d.coat, .62);
-  cut(c, "M-3.65 -4.2 Q-.8 -8.15 2.25 -6 Q5.65 -4.25 5.3 .15 Q4.95 4.25 .95 5.55 Q-3.4 6.15 -4.35 .65Z", "#593e42", .85);
-  oval(c, .35, -.1, 2.05,2.5,"#ad736b"); oval(c,.36,-.12,1.04,1.4,"#513f43");
-  cut(c, "M-4.35 -4.45 L-1.5 -6.55 L-.45 -2.1Z M1.55 -6.9 L4.35 -5.1 L1.55 -2.6Z M4.8 1.8 L3.25 4.65 L1.05 2.45Z M-.35 5.1 L-3.1 4.2 L-1.4 1.85Z", FACE, .52);
-  cut(c, "M-4.8 -1.7 L-4.35 .95 L-2.5 -.1Z M4.9 -3.35 L5.45 -.75 L3.3 -1.25Z", "#f5d399", .42);
-  line(c, -4.95, -1.25, -5.3, 1.4, clay, 1); c.restore();
-}
 
 function slime(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const squash = eventFade(tick, u?.lastAttackTick, 13), small = !!u?.smallSlime;
@@ -219,7 +191,7 @@ export function drawBeast(c: Pens, d: Dye, p: CharacterPose, kind: BeastKind, u:
     case "hydra": hydra(c,d,p,u,tick); break;
     case "medusa": medusa(c,d,p,u,tick); break;
     case "vampire": vampire(c,d,p,u,tick); break;
-    case "sandworm": sandworm(c,d,p,u,tick); break;
+    case "sandworm": drawSandwormPortrait(c,d,p); break;
     case "slime": slime(c,d,p,u,tick); break;
     case "horseman": horseman(c,d,p,u,tick); break;
     case "werewolf": werewolf(c,d,p,u,tick); break;

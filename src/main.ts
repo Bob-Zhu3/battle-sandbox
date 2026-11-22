@@ -2,7 +2,7 @@ import { attachDeploymentBrush, attachSpellBrush } from "./brush-input.ts";
 import { ARMIES, TEAMS, type Team } from "./battlefield.ts";
 import { createField, element } from "./field.ts";
 import { crowdFormation } from "./crowd-formation.ts";
-import { reinforcements } from "./deployment.ts";
+import { reinforcements, windmillField } from "./deployment.ts";
 import { Playground } from "./playground.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
@@ -82,11 +82,12 @@ if (demo === "siege") {
   }
   previous = play.world;
   play.paused = true;
-} else if (demo === "reinforcements") {
-  for (const [side,kind,x,y] of reinforcements) play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
+} else if (demo === "reinforcements" || demo === "windmill") {
+  const cast = demo === "windmill" ? windmillField : reinforcements;
+  for (const [side,kind,x,y] of cast) play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
   previous=play.world;
   play.paused=true;
-  field.armBrush("wormhole");
+  field.armBrush(demo === "windmill" ? "gust" : "wormhole");
 } else if (demo === "expressions") {
   const cast: [Team, RecruitKind, number, number][] = [
     ["red","archer",170,115], ["red","warrior",197,115], ["blue","warrior",286,115],

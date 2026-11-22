@@ -1,4 +1,4 @@
-import { ARENA, BASE_RADIUS } from "./battlefield.ts";
+import { BASE_RADIUS } from "./battlefield.ts";
 import { disabledUntil, type GroundEffect, type Hit } from "./conditions.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { exposed, nearestEnemy } from "./targeting.ts";
@@ -43,6 +43,7 @@ export function rosterTarget(u: Unit, targets: readonly Target[]) {
 export function startTelegraph(u: Unit, target: Target, tick: number) {
   const kind=defs[u.kind].attack;
   if (kind !== "gaze" && kind !== "breath" && kind !== "breach") return false;
+  if (kind==="breach" && (u.rootedUntil ?? 0)>tick) return true;
   const reach=defs[u.kind].reach;
   const x=kind==="breach" ? target.x : u.x+u.aimX*reach;
   const y=kind==="breach" ? target.y : u.y+u.aimY*reach;
@@ -86,7 +87,7 @@ function finishSwing(u: Unit,tick: number) {
 }
 
 export function releaseTelegraph(u: Unit, targets: readonly Target[], tick: number, gazeFired: boolean, hit: Hit,
-  effects: GroundEffect[], burns: {id:number; team:Unit["team"]}[], impulses: Impulse[]) {
+  effects: GroundEffect[], burns: {id:number; team:Unit["team"]}[]) {
   const aim=u.windup;
   if (!aim) return;
   if (aim.kind==="gaze") { if (gazeFired) finishSwing(u,tick); return; }
@@ -98,26 +99,25 @@ export function releaseTelegraph(u: Unit, targets: readonly Target[], tick: numb
       hit(t,defs.firedragon.damage,u.team);
       if (t.kind!=="base") burns.push({id:t.id,team:u.team});
     }
-  } else if (aim.kind==="breach") {
-    if (tick-aim.since<defs.sandworm.windup) return;
-    const r=defs.sandworm.radius;
-    u.x=Math.max(r,Math.min(ARENA.width-r,aim.x)); u.y=Math.max(r,Math.min(ARENA.height-r,aim.y));
-    u.warpedTick=tick;
-    effects.push({kind:"breach",x:u.x,y:u.y,radius:defs.sandworm.blastRadius,tick,team:u.team});
-    for (const t of enemies(u,targets,defs.sandworm.blastRadius)) {
-      hit(t,defs.sandworm.damage,u.team);
-      if (mobile(t)) {
-        const dx=t.x-u.x,dy=t.y-u.y,len=Math.hypot(dx,dy);
-        impulses.push({id:t.id,dx:len?dx/len*14:u.aimX*14,dy:len?dy/len*14:u.aimY*14});
-      }
-    }
   } else return;
+  finishSwing(u,tick);
+}
+
+export function eruptWorm(u: Unit, targets: readonly Target[], tick: number, hit: Hit, effects: GroundEffect[], impulses: Impulse[]) {
+  effects.push({kind:"breach",x:u.x,y:u.y,radius:defs.sandworm.blastRadius,tick,team:u.team});
+  for (const t of enemies(u,targets,defs.sandworm.blastRadius)) {
+    hit(t,defs.sandworm.damage,u.team);
+    if (mobile(t)) {
+      const dx=t.x-u.x,dy=t.y-u.y,len=Math.hypot(dx,dy);
+      impulses.push({id:t.id,dx:len?dx/len*14:u.aimX*14,dy:len?dy/len*14:u.aimY*14});
+    }
+  }
   finishSwing(u,tick);
 }
 
 // Secondary hits use the same opening positions and damage ledger as ordinary melee.
 export function rosterStrike(u: Unit, primary: Target, targets: readonly Target[], tick: number, hit: Hit,
-  healing: Map<number,number>, impulses: Impulse[], effects: GroundEffect[]) {
+  healing: Map<number,number>, impulses: Impulse[]) {
   const spec=defs[u.kind];
   const damage=(t: Target,amount: number)=>hit(t,amount,u.team);
   switch (u.kind) {
@@ -148,18 +148,6 @@ export function rosterStrike(u: Unit, primary: Target, targets: readonly Target[
           if (t.id!==primary.id) damage(t,5);
           impulses.push({id:t.id,dx:u.aimX*defs.rhinorider.shove,dy:u.aimY*defs.rhinorider.shove});
         }
-      }
-      break;
-    }
-    case "windmill":
-      for (const foe of enemies(u,targets,spec.reach)) damage(foe,spec.damage);
-      if ((u.millFastUntil ?? 0)>tick) u.nextAttackTick=tick+25;
-      break;
-    case "prism": {
-      const others=enemies(u,targets,spec.reach).filter(t=>t.id!==primary.id && inCone(u,t,spec.reach,spec.reach)).slice(0,2);
-      for (const t of [primary,...others]) {
-        damage(t,t===primary ? spec.damage : defs.prism.sideDamage);
-        effects.push({kind:"prism",fromX:u.x,fromY:u.y,x:t.x,y:t.y,radius:3,tick,team:u.team});
       }
       break;
     }

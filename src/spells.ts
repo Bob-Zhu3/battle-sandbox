@@ -12,7 +12,7 @@ export const SPELLS = {
     description: "Three showers heal allies, put out fires and enemy Phoenix eggs, and fog enemy Sun Lenses." },
   fault: { name: "Fault Line", command: "cast-fault-line", cost: 18, radius: 60, delay: 16, aftershock: 44, duration: 66,
     structureDamage: 12, troopDamage: 3, baseDamage: 3,
-    description: "Two tremors crack enemy buildings. A tremor crossing a Miner's dirt trail forces it to surface where it is." },
+    description: "Two tremors crack enemy buildings. A tremor under a tunneling Miner or Sandworm forces it to surface on the spot." },
   briar: { name: "Briar Snare", command: "cast-briar-snare", cost: 13, radius: 57, delay: 14, duration: 42, holdTicks: 78,
     description: "Roots catch enemy feet as the thorns rise. Rooted troops can still attack. Fire burns the vines away." },
   mirror: { name: "Mirror Ward", command: "cast-mirror-ward", cost: 14, radius: 46, delay: 6, duration: 180, panes: 3,
@@ -86,7 +86,8 @@ export function prepareFieldMagic(unit: Unit, pulses: readonly FieldSpell[], tic
   const affected = (kind: SpellKind) => pulses.some(s => s.kind === kind && s.team !== unit.team && insideSpell(s,unit));
   if (unit.tunnel && affected("fault")) {
     delete unit.tunnel; unit.emergedTick = tick;
-    unit.nextAttackTick = Math.max(unit.nextAttackTick,tick+UNIT_DEFINITIONS.miner.emergeTicks);
+    const recovery=unit.kind==="sandworm" ? UNIT_DEFINITIONS.sandworm.cooldownTicks : UNIT_DEFINITIONS.miner.emergeTicks;
+    unit.nextAttackTick = Math.max(unit.nextAttackTick,tick+recovery);
   }
   if (!unit.tunnel && !airborne(unit) && !isBuilding(unit.kind) && unit.emberUntil === undefined && !unit.burn && affected("briar")) {
     unit.rootedUntil = Math.max(unit.rootedUntil ?? 0,tick+SPELLS.briar.holdTicks);

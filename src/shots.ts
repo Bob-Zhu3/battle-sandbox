@@ -1,4 +1,5 @@
-import { circleEntry, projectileContacts, type Arrow } from "./arrows.ts";
+import { projectileContacts, type Arrow } from "./arrows.ts";
+import { turnDownwind, type FanContact } from "./windmill.ts";
 import { ARENA, BASE_RADIUS } from "./battlefield.ts";
 import { afflict, displace, slow, type GroundEffect, type Hit } from "./conditions.ts";
 import { canHex, type Conversion } from "./transformations.ts";
@@ -72,7 +73,7 @@ export function deflectHead(shot: Arrow,winds: readonly FieldSpell[]): Arrow {
 }
 
 export function advanceShot(shot: Arrow, tick: number, from: readonly Target[], to: readonly Target[], byId: ReadonlyMap<number, Unit>,
-  hit: Hit, effects: GroundEffect[], conversions: Conversion[], mills: readonly Unit[]=[]): Arrow | undefined {
+  hit: Hit, effects: GroundEffect[], conversions: Conversion[], fan?: FanContact): Arrow | undefined {
   const x = shot.x + shot.vx, y = shot.y + shot.vy;
   if (shot.kind === "bomb" || shot.kind === "balloon" || shot.kind === "stone") {
     if (tick >= shot.landTick!) { splash(shot, x, y, tick, to, hit, effects); return; }
@@ -80,15 +81,7 @@ export function advanceShot(shot: Arrow, tick: number, from: readonly Target[], 
   }
   let pierced = shot.piercedIds;
   const contacts=projectileContacts(shot,from,to);
-  if (mills.length && (!shot.kind || shot.kind==="dart" || shot.kind==="bolt" || shot.kind==="venom")) {
-    let guard: Unit | undefined, first=contacts[0]?.time ?? 1;
-    for (const mill of mills) {
-      if (mill.team===shot.team) continue;
-      const t=circleEntry(shot.x-mill.x,shot.y-mill.y,shot.vx,shot.vy,UNIT_DEFINITIONS.windmill.guardReach);
-      if (t!==undefined && (t<first || (t===first && (!guard || mill.id<guard.id)))) { guard=mill; first=t; }
-    }
-    if (guard) { guard.lastBlockTick=tick; return; }
-  }
+  if (fan && fan.time<=(contacts[0]?.time ?? 1)) return turnDownwind(shot,fan,tick);
   for (const {target, time} of contacts) {
     const body = byId.get(target.id);
     if (shot.kind==="head") dropHead(shot,shot.x+shot.vx*time,shot.y+shot.vy*time,tick,byId);

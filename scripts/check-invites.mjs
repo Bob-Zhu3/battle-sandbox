@@ -58,6 +58,34 @@ async function brush(p,shelf,name) {
   await p.page.getByRole("tab",{name:shelf,exact:true}).click();
   await p.page.getByRole("tabpanel").getByRole("button",{name,exact:true}).click();
 }
+
+async function windmillRematch(red,blue) {
+  const round=red.frames.at(-1).round+1;
+  await red.page.getByRole("button",{name:"New round"}).click();
+  const both=[red,blue];
+  await wait(()=>both.every(p=>p.frames.at(-1)?.round===round),"the rematch opens for both players");
+  async function place(p,cards) {
+    for(const [shelf,name,x,y] of cards){await brush(p,shelf,name);await draw(p,x,y);}
+  }
+  await Promise.all([place(red,[["Towers","Windmill",447,160],["Towers","Prism Tower",460,235],["Mythical","Sandworm",405,71]]),
+    place(blue,[["People","Archer",537,160],["Mythical","Iron Golem",552,240],["Towers","Watchpost",495,75]])]);
+  await wait(()=>both.every(p=>p.frames.at(-1)?.world.units.length===6),"six recruits on both fields");
+  await Promise.all(both.map(ready));
+  const seen=p=>p.frames.filter(f=>f.round===round && f.phase==="running").some(({world})=>{
+    const mill=world.units.find(u=>u.kind==="windmill"),prism=world.units.find(u=>u.kind==="prism"),worm=world.units.find(u=>u.kind==="sandworm");
+    return mill?.lastBlockTick>0 && prism?.focusSince>0 && worm?.tunnel && worm.wormBody?.length===9 &&
+      world.arrows.some(a=>a.team==="blue" && a.kind===undefined && a.vx>0);
+  });
+  await wait(()=>both.every(seen),"both browsers see the turned arrow, sustained beam and traveling ridge");
+  const joins=blue.joins.length,token=blue.joins.at(-1).resumeToken;
+  await blue.page.reload();await side(blue,"blue");
+  await wait(()=>blue.joins.length>joins && blue.frames.at(-1)?.world.units.some(u=>u.kind==="sandworm" && u.emergedTick>0),"Blue rejoins the same Sandworm at its exit");
+  assert.equal(blue.joins.at(-1).resumeToken,token);
+  const exit=p=>p.frames.at(-1).world.units.find(u=>u.kind==="sandworm").emergedTick;
+  const arrived=exit(blue);
+  await wait(()=>red.frames.some(f=>f.round===round && f.world.units.some(u=>u.kind==="sandworm" && u.emergedTick===arrived)),"the other screen agrees on the emergence tick");
+  console.log("Windmill rematch: desktop and phone saw the same live fan deflection, Prism lock and Sandworm dive. Blue rejoined and both saw the worm emerge on tick",arrived+".");
+}
 try{
   const red=await player(1024,640),blue=await player(390,700),other=await player(820,620);
   const link=await create(red,"Duel");
@@ -78,6 +106,7 @@ try{
   const final=p=>p.frames.find(f=>f.phase==="finished");
   assert.equal(final(red).outcome,"red");assert.deepEqual(final(red).world,final(blue).world);
   console.log("Duel: two viewport sizes copied and opened the same invite; an independent room stayed empty. Blue rejoined after damage. Both saw Red win on tick",final(red).world.tick,"via",[...new Set([...red.transports,...blue.transports])].join(" / ")+".");
+  await windmillRematch(red,blue);
   if(!args.includes("--duel-only")){
     const group=[await player(1000,640),await player(430,690),await player(760,600)];
     const ffa=await create(group[0],"Free-for-all");

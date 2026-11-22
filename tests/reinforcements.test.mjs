@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { Room } from "../server/room.ts";
 import { createBattle, stepBattle } from "../src/simulation.ts";
 import { makeBase } from "../src/battlefield.ts";
+import { arrowPose } from "../src/arrows.ts";
 import { airborne, footprint, UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { makeFieldSpell, SPELLS } from "../src/spells.ts";
 import { bountyFor } from "../src/transformations.ts";
-import { reinforcements } from "../src/deployment.ts";
+import { reinforcements, windmillField } from "../src/deployment.ts";
 
 const newcomers=["wrestler","liondancers","rhinorider","trojanhorse","windmill","harpoon","prism","snowman",
   "hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem"];
@@ -71,24 +72,83 @@ test("Trojan Horse unloads just once on contact or destruction and never after l
   w=step(w);assert.equal(w.units.length,2);assert.equal(unit(w,1).hp,0);
 });
 
-test("Windmill sweeps unarmed targets, intercepts a passing arrow, and spins faster in Gust",()=>{
-  let w=step(fight("windmill",[warrior(2,439),warrior(3,360)]));
-  for(const id of [2,3])assert.equal(unit(w,id).hp,defs.warrior.maxHp-defs.windmill.damage);
-  w=fight("windmill",[],[at(4,"warrior","red",415)]);
-  w.arrows=[{x:480,y:180,vx:-85,vy:0,team:"blue",casterId:9,releasedTick:0,damage:8}];
-  w=step(w);assert.equal(unit(w,1).lastBlockTick,1);assert.equal(w.arrows.length,0);
-  assert.equal(unit(w,4).hp,defs.warrior.maxHp);
-  w.spells=[spell(w,"gust","red",400)];w=step(w);assert.ok(unit(w,1).millFastUntil>w.tick);
+test("Windmill pushes continuously through its front cone, swivels and speeds up in a friendly Gust",()=>{
+  const start=fight("windmill",[warrior(2,439),warrior(3,360),warrior(4,456,250),at(5,"post","blue",481,185)],
+    [at(6,"archer","red",473,174)]);
+  unit(start,6).nextAttackTick=9999;
+  const w=step(start,9);
+  assert.equal(unit(w,1).targetId,2);assert.ok(unit(w,2).x>441);
+  for(const id of [2,5]) assert.equal(unit(w,id).hp,defs[unit(w,id).kind].maxHp-defs.windmill.damage);
+  assert.equal(unit(w,5).x,481);
+  for(const id of [3,4,6]) assert.equal(unit(w,id).lastHitTick,null);
+  const boosted=json(start);boosted.spells=[spell(boosted,"gust","red",366)];
+  const fast=step(boosted,9);
+  assert.ok(unit(fast,1).millFastUntil>fast.tick);assert.ok(unit(fast,2).x>unit(w,2).x+1);
+  unit(w,2).hp=0;
+  const turned=step(w,9);assert.equal(unit(turned,1).targetId,3);assert.ok(unit(turned,3).x<359);
+  assert.deepEqual(json(step(json(turned),27)),json(step(turned,27)));
 });
 
-test("Prism fires its own separate rays with stable ID ties",()=>{
+test("a frontal stream turns an incoming arrow downwind, while the sides, rear and heavy shots get through",()=>{
+  const shaft={x:536,y:180,vx:-145,vy:0,team:"blue",casterId:9,releasedTick:0,damage:8};
+  const fire=(shot,troops=[],disabled=false)=>{
+    const w=fight("windmill",[],troops);
+    if(disabled) unit(w,1).stunnedUntil=15;
+    w.arrows=[{...shaft,...shot}];
+    return step(w);
+  };
+  const turned=fire({},[at(4,"warrior","red",437)]);
+  assert.equal(unit(turned,1).lastBlockTick,1);assert.equal(turned.arrows.length,1);
+  assert.equal(turned.arrows[0].vx,145);assert.equal(turned.arrows[0].x,400+defs.windmill.reach);
+  assert.equal(turned.arrows[0].team,"blue");assert.equal(unit(turned,4).lastHitTick,null);
+  const later=step(turned,2).arrows[0];
+  assert.ok(later.x>turned.arrows[0].x);
+  assert.equal(arrowPose(later,3,0).x,shaft.x);assert.equal(arrowPose(later,3,.1).vx,-145);
+  assert.equal(arrowPose(later,3,.5).x,501);assert.equal(arrowPose(later,3,.5).vx,145);
+  assert.equal(arrowPose(later,3,1.5).x,573.5);
+  for(const w of [fire({x:335,vx:85}),fire({x:400,y:110,vx:0,vy:80}),fire({kind:"bullet"}),fire({},[],true)]) {
+    assert.equal(unit(w,1).lastBlockTick,undefined);assert.equal(unit(w,1).lastHitTick,1);
+  }
+  const firstBody=fire({},[at(4,"warrior","red",521)]);
+  assert.equal(unit(firstBody,4).lastHitTick,1);assert.equal(unit(firstBody,1).lastBlockTick,undefined);
+  const friendly=fire({team:"red"});
+  assert.equal(friendly.arrows[0].vx,shaft.vx);assert.equal(unit(friendly,1).lastBlockTick,undefined);
+});
+
+test("Prism opens with a primary lock and up to two side rays with stable ID ties",()=>{
   const foes=[warrior(9,455,164),warrior(4,455,196),warrior(3,477),warrior(8,320)];
   for(const order of [foes,[...foes].reverse()]) {
     const w=step(fight("prism",order));assert.equal(unit(w,1).targetId,4);
     assert.equal(unit(w,4).hp,defs.warrior.maxHp-defs.prism.damage);
     for(const id of [9,3])assert.equal(unit(w,id).hp,defs.warrior.maxHp-defs.prism.sideDamage);
-    assert.equal(unit(w,8).hp,defs.warrior.maxHp);assert.equal(w.effects.filter(e=>e.kind==="prism").length,3);
+    assert.equal(unit(w,8).hp,defs.warrior.maxHp);assert.deepEqual(unit(w,1).prismSides,[9,3]);
+    assert.equal(unit(w,1).focusSince,1);assert.equal(w.effects,undefined);
   }
+});
+
+test("Prism holds its target between pulses, builds damage through five levels and resets after losing its lock",()=>{
+  let w=fight("prism",[warrior(2,454),warrior(3,490,195),warrior(4,497,151)]);
+  unit(w,2).hp=1000;
+  const damages=[];
+  for(let tick=1;tick<=166;tick++){
+    const before=unit(w,2).hp;
+    if(tick===60) unit(w,3).x=438;
+    w=step(w);
+    const tower=unit(w,1);assert.equal(tower.targetId,2);assert.equal(tower.focusSince,1);
+    assert.equal(tower.prismSides?.length ?? 0,tick<73 ? 2 : tick<145 ? 1 : 0);
+    if(tick%15===1) damages.push(before-unit(w,2).hp); else assert.equal(unit(w,2).hp,before);
+  }
+  assert.deepEqual(damages,[2,2,2,3,3,4,4,4,5,5,6,6]);
+  assert.deepEqual(json(step(w,21)),json(step(json(w),21)));
+  for(const reason of ["range","death","turned"]){
+    const lost=json(w),old=unit(lost,2);
+    if(reason==="range")old.x=700; else if(reason==="death")old.hp=0; else old.team="red";
+    const fresh=step(lost);assert.equal(unit(fresh,1).targetId,3);assert.equal(unit(fresh,1).focusSince,167);
+    assert.equal(unit(fresh,3).hp-unit(step(fresh,14),3).hp,2);
+  }
+  w.spells=[spell(w,"freeze","blue",400)];w=step(w);
+  assert.equal(unit(w,1).focusSince,undefined);assert.equal(unit(w,1).targetId,null);assert.equal(unit(w,1).prismSides,undefined);
+  w=step(w,unit(w,1).frozenUntil-w.tick);assert.equal(unit(w,1).focusSince,w.tick);
 });
 
 test("Harpoon travels before reeling in ground troops and flyers; Snowman slows on impact and repacks",()=>{
@@ -130,12 +190,86 @@ test("Dragon breath has an interruptible inhale, burns enemies in its cone and s
   const before=unit(w,2).hp;assert.ok(unit(step(w,24),2).hp<before);
 });
 
-test("Sandworm commits to the marked ground even after its prey escapes",()=>{
-  let w=step(fight("sandworm",[warrior(2,480)]));
-  assert.equal(unit(w,1).windup.x,480);unit(w,2).x=580;
-  w=step(w,defs.sandworm.windup);
-  assert.equal(unit(w,1).x,480);assert.equal(unit(w,1).walkDistance,0);
-  assert.equal(unit(w,2).hp,defs.warrior.maxHp);assert.ok(w.effects.some(e=>e.kind==="breach"));
+test("Sandworm dives out of reach, follows a curved ridge and erupts only at the ground it committed to",()=>{
+  let w=step(fight("sandworm",[warrior(2,480),warrior(3,492,199)]));
+  assert.equal(unit(w,1).windup.x,480);
+  const stopped=json(w);stopped.spells=[spell(stopped,"lightning","blue",400)];
+  assert.equal(unit(step(stopped,defs.sandworm.windup),1).tunnel,undefined);
+  unit(w,2).x=580;
+  w=step(w,defs.sandworm.windup-1);
+  const original=json(w);
+  w.arrows=[{x:390,y:180,vx:24,vy:0,team:"blue",damage:9,releasedTick:w.tick}];
+  const packed=json(w),entry=step(w),path=unit(entry,1).tunnel;
+  assert.deepEqual(json(w),packed);assert.ok(path.end>=entry.tick+defs.sandworm.minTunnelTicks);
+  assert.equal(unit(entry,1).x,400);assert.equal(unit(entry,1).lastHitTick,null);assert.equal(entry.arrows.length,1);
+  const midpoint=step(entry,Math.floor((path.end-path.start)/2));
+  assert.ok(unit(midpoint,1).x>425 && unit(midpoint,1).x<455);assert.ok(Math.abs(unit(midpoint,1).y-180)>5);
+  assert.equal(unit(midpoint,3).targetId,null);
+  const saved=json(midpoint);
+  const justBefore=step(midpoint,path.end-midpoint.tick-1);
+  assert.equal(unit(justBefore,3).lastHitTick,null);
+  w=step(justBefore);
+  assert.equal(unit(w,1).emergedTick,path.end);assert.equal(unit(w,1).x,480);assert.equal(unit(w,1).tunnel,undefined);
+  assert.equal(unit(w,1).walkDistance,0);assert.equal(unit(w,2).hp,defs.warrior.maxHp);
+  assert.equal(unit(w,3).hp,defs.warrior.maxHp-defs.sandworm.damage);assert.ok(unit(w,3).knockback);
+  assert.equal(w.effects.filter(e=>e.kind==="breach").length,1);
+  assert.deepEqual(json(w),json(step(saved,path.end-midpoint.tick)));
+  assert.equal(unit(step(w,10),3).hp,unit(w,3).hp);
+  const faulted=json(midpoint);faulted.spells=[spell(faulted,"fault","blue",unit(midpoint,1).x,unit(midpoint,1).y)];
+  const forced=step(faulted);assert.equal(unit(forced,1).emergedTick,forced.tick);assert.equal(unit(forced,1).tunnel,undefined);
+  assert.equal(unit(forced,1).x,unit(midpoint,1).x);assert.equal(unit(forced,1).nextAttackTick,forced.tick+defs.sandworm.cooldownTicks);
+  assert.ok(!forced.effects?.some(e=>e.kind==="breach"));
+  // A stun landing on the last tick of the coil still catches the worm above ground.
+  original.spells=[spell(original,"lightning","blue",400)];
+  assert.equal(unit(step(original),1).windup,undefined);assert.equal(unit(step(original),1).tunnel,undefined);
+});
+
+test("nine body joints follow surface turns, fit corner spawns and recover old snapshots",()=>{
+  for(const [x,y] of [[0,0],[960,0],[0,360],[960,360]]){
+    const head=createBattle([at(1,"sandworm","red",x,y)]).units[0];
+    assert.equal(head.wormBody.length,9);assert.ok(head.wormBody.every(p=>p.x>=5 && p.x<=955 && p.y>=5 && p.y<=355));
+    assert.ok(Math.hypot(head.x-head.wormBody.at(-1).x,head.y-head.wormBody.at(-1).y)>55);
+  }
+  let w=fight("sandworm",[warrior(2,800)]);delete unit(w,1).wormBody;
+  w=step(w,35);
+  const before=json(w),body=unit(w,1).wormBody,oldHead=unit(w,1);
+  assert.equal(body.length,9);assert.ok(Math.abs(oldHead.y-180)>1);
+  unit(w,2).x=oldHead.x;unit(w,2).y=345;
+  const turned=step(w,14),head=unit(turned,1);
+  assert.ok(head.y-oldHead.y>12);
+  assert.ok(Math.abs(head.wormBody.at(-1).y-body.at(-1).y)<4);
+  assert.deepEqual(unit(w,1),unit(before,1));assert.notDeepEqual(head.wormBody,body);
+  let prev=head;
+  for(const joint of head.wormBody){assert.ok(Math.abs(Math.hypot(prev.x-joint.x,prev.y-joint.y)-9)<.15);prev=joint;}
+});
+
+test("the Windmill playground shows a turned arrow, two Sandworm dives and a fully focused Prism",()=>{
+  let w=createBattle(windmillField.map(([team,kind,x,y],i)=>at(i+1,kind,team,x,y)));
+  let arrowsTurned=0,breaches=0,fullFocus=false;
+  for(let i=0;i<340;i++){
+    w=step(w);
+    if(unit(w,1).lastBlockTick===w.tick)arrowsTurned++;
+    if(unit(w,4).emergedTick===w.tick)breaches++;
+    if(w.tick-(unit(w,6).focusSince ?? Infinity)>=144 && unit(w,6).hp>0)fullFocus=true;
+  }
+  assert.ok(arrowsTurned>=1);assert.ok(breaches>=2);assert.ok(fullFocus);
+});
+
+test("Duel and FFA resume a live fan, a half-charged Prism and a tunneling Sandworm together",()=>{
+  for(const mode of ["duel","ffa"]){
+    const original=new Room(mode),joined=original.join();original.join();if(mode==="ffa")original.join();
+    original.phase="running";
+    original.world=createBattle(windmillField.map(([team,kind,x,y],i)=>at(i+1,kind,team,x,y)),0,
+      (mode==="duel"?["red","blue"]:["red","blue","violet"]).map(t=>makeBase(mode,t)));
+    while(!unit(original.world,4).tunnel && original.world.tick<200) original.advance();
+    assert.ok(unit(original.world,4).tunnel);assert.ok(unit(original.world,6).focusSince);
+    assert.ok(unit(original.world,1).lastBlockTick);
+    original.disconnect("red");
+    const rejoined=Room.restore(json(original.checkpoint(1)));
+    assert.equal(rejoined.join(joined.resumeToken).team,"red");
+    for(let i=0;i<120;i++){original.advance();rejoined.advance();}
+    assert.deepEqual(json(rejoined.world),json(original.world));assert.deepEqual(rejoined.gold,original.gold);
+  }
 });
 
 test("Hydra grows heads at wound thresholds, fire cauterizes the wound, and Cerberus can bite on three sides",()=>{

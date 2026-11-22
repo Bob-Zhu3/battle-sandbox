@@ -131,16 +131,16 @@ const recruits = {
     cost: 36, bounty: 6, attack: "melee", radius: 17, maxHp: troopHealth(51), speed: 64, reach: 46, damage: 8, cooldownTicks: 72,
   },
   windmill: {
-    name: "Windmill", command: "place-windmills", description: "Its sails sweep nearby enemies and bat aside arrows and bolts. A friendly Gust spins the sails faster.",
-    cost: 18, bounty: 9, attack: "sweep", radius: 15, maxHp: troopHealth(43), speed: 0, reach: 54, damage: 7, cooldownTicks: 50, guardReach: 45, spinTicks: 75,
+    name: "Windmill", command: "place-windmills", description: "Turns its fan toward enemies. The airstream pushes troops and blows incoming arrows away. A friendly Gust gives it a stronger push.",
+    cost: 18, bounty: 9, attack: "fan", radius: 15, maxHp: troopHealth(43), speed: 0, reach: 101, damage: 3, cooldownTicks: 36, pushPerSecond: 34, spread: .6, spinTicks: 75,
   },
   harpoon: {
     name: "Harpoon Tower", command: "place-harpoon-towers", description: "Fires a barbed hook at any foe. On impact the winch reels troops closer and drags flyers down to the ground.",
     cost: 23, bounty: 11, attack: "arrow", radius: 15, maxHp: troopHealth(43), speed: 0, reach: 166, damage: 10, cooldownTicks: 77, arrowSpeed: 266, pull: 42, groundTicks: 54,
   },
   prism: {
-    name: "Prism Tower", command: "place-prism-towers", description: "Cuts a bright ray into the nearest enemy. Two side facets independently catch other enemies in front of the tower.",
-    cost: 26, bounty: 13, attack: "rays", radius: 15, maxHp: troopHealth(41), speed: 0, reach: 145, damage: 9, cooldownTicks: 53, sideDamage: 6,
+    name: "Prism Tower", command: "place-prism-towers", description: "Holds a continuous ray on one enemy. Its outer rays converge and the beam grows stronger as long as it holds the same target.",
+    cost: 26, bounty: 13, attack: "rays", radius: 15, maxHp: troopHealth(41), speed: 0, reach: 145, damage: 2, cooldownTicks: 15, sideDamage: 1, focusTicks: 36, maxLevel: 5,
   },
   snowman: {
     name: "Snowman", command: "place-snowmen", description: "Throws snowballs that slow whatever they hit. Its belly shrinks as it fires and grows as it packs fresh snow.",
@@ -159,8 +159,8 @@ const recruits = {
     cost: 19, bounty: 9, attack: "melee", radius: 11, maxHp: troopHealth(35), speed: 99, reach: 35, damage: 9, cooldownTicks: 41, drain: 5,
   },
   sandworm: {
-    name: "Sandworm", command: "place-sandworms", description: "Follows heavy footsteps and erupts under its prey. The moving ridge marks where it will strike, even against a stationary foe.",
-    cost: 27, bounty: 13, attack: "breach", radius: 16, maxHp: troopHealth(56), speed: 77, reach: 92, damage: 13, cooldownTicks: 84, windup: 22, blastRadius: 37,
+    name: "Sandworm", command: "place-sandworms", description: "Slithers toward footfalls, dives under the line and erupts at the marked spot. Follow the ridge to dodge it or force it up with Fault Line.",
+    cost: 27, bounty: 13, attack: "breach", radius: 16, maxHp: troopHealth(56), speed: 77, reach: 92, damage: 13, cooldownTicks: 84, windup: 12, tunnelSpeed: 155, minTunnelTicks: 30, blastRadius: 37,
   },
   slime: {
     name: "Slime", command: "place-slimes", description: "A solid hit splits it into two smaller fighters that share its remaining health. The halves can hop back together once.",

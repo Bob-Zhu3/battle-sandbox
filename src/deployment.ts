@@ -3,6 +3,12 @@ import { ARENA, createBattle, type Placement, type Team } from "./simulation.ts"
 import { placementKind, type PlacementType, type RecruitKind } from "./units.ts";
 
 export const BRUSH_SPACING = 24;
+export const windmillField: readonly (readonly [Team, RecruitKind, number, number])[] = [
+  ["red","windmill",508,245], ["blue","archer",622,218], ["blue","warrior",580,278],
+  ["red","sandworm",171,120], ["blue","post",356,115],
+  ["red","prism",651,99], ["blue","irongolem",760,99], ["blue","snowman",790,73], ["blue","belltower",790,125],
+  ["red","shieldbearer",713,113],
+];
 export const reinforcements: readonly (readonly [Team, RecruitKind, number, number])[] = [
   ["red","trojanhorse",220,111], ["blue","werewolf",321,112], ["blue","archer",347,104],
   ["red","wrestler",202,245], ["blue","warrior",249,241],

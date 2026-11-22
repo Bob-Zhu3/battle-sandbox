@@ -64,6 +64,8 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 
 In the reinforcements playground, press **Play** to watch the Harpoon Tower reel in a Fire Dragon, the Trojan Horse release its passengers, and a wounded Werewolf shed its cloak. Wormhole is already selected. Tap an empty spot to bring the nearest mobile Red ally there. [Play the reinforcements scene](https://bob-zhu3.github.io/battle-sandbox/?demo=reinforcements)
 
+Press **Play** in the Windmill scene to see an Archer shoot into the fan. Cast the selected Gust on the Windmill to speed up its blades. Across the field a Sandworm dives under a Watchpost while a Prism Tower focuses on an Iron Golem. [Play the Windmill scene](https://bob-zhu3.github.io/battle-sandbox/?demo=windmill)
+
 ![Roster portraits of the nineteen recruits and the Wormhole spell](media/reinforcements.png)
 
 ![Eight roster portraits showing the Cyclops, Storm Kirin, Frost Queen, Phoenix, Bomber, Musketeer, Venom Scout and Zombie](media/mythical-roster.png)
@@ -94,9 +96,9 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Stone Lobber | 24 | 12 | Marks the ground, then slings a boulder there. Up to 35 units from impact, ground enemies take 16 damage and bases take 8. Flyers and troops closer than 65 units to the sling evade its aim. |
 | Sun Lens | 27 | 13 | Keeps its beam on one enemy. Successive stages pulse for 3, 6 and 10 damage as the facets light. Breaking range, a stun or an enemy rain shower resets the focus. |
 | Bell Tower | 19 | 9 | Tolls when a ground troop comes within 65 units. Ground troops in the circle take 4 damage and are shoved and briefly stunned. A charging Lancer has to start its run again. |
-| Windmill | 18 | 9 | Sweeps nearby enemies and bats arrows out of the air when a sail passes. Friendly Gust speeds its rotation. |
+| Windmill | 18 | 9 | Swivels toward an enemy and blows a widening stream of air out the front. It pushes troops, turns incoming arrows downwind and spins faster in a friendly Gust. |
 | Harpoon Tower | 23 | 11 | Reels a troop closer when its hook hits. A hooked flyer briefly becomes vulnerable to ground attacks. |
-| Prism Tower | 26 | 13 | Its center facet fires on a lone enemy. Two side facets can each light up a different foe. |
+| Prism Tower | 26 | 13 | Holds a continuous ray. Every 0.6 seconds on the same target its damage rises, from 2 to 6 per quarter-second pulse. Its two side rays fold into the main beam as it focuses. Target loss or interruption resets the charge. |
 | Snowman | 17 | 8 | Throws slowing snowballs made from its own belly. Snow gradually packs back on. Friendly Freeze refills it immediately. |
 | Cyclops | 33 | 16 | Raises its spiked club for 0.45 seconds, then smashes a patch of ground. The impact scatters enemies and stuns them. It can lift and swallow a human at 12 HP or less who stays within reach. |
 | Storm Kirin | 23 | 11 | Lightning travels through up to four enemies, stunning every contact for 0.35 seconds. Metal and shields carry the next jump up to 110 units. Other targets carry it up to 78. |
@@ -108,7 +110,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Hydra | 32 | 16 | Bites with two heads to start. Cross a wound threshold and another grows. Fire cauterizes the wound instead. |
 | Medusa | 25 | 12 | Her snakes rise before she casts. Enemies in her gaze take damage, and those looking at her turn to stone. |
 | Vampire | 19 | 9 | Lunges and bites. Feeding on a living opponent restores up to 5 HP. |
-| Sandworm | 27 | 13 | Follows heavy footfalls, then commits to the marked ground. Its ridge can also erupt under a stationary foe. |
+| Sandworm | 27 | 13 | Its long body follows the head around turns. It coils, tunnels toward the spot it picked and erupts for 13 area damage and knockback. The moving ridge gives enemies time to escape. |
 | Slime | 16 | 8 | A solid hit splits its remaining HP between two smaller bodies. If both survive they can hop back together once. |
 | Headless Horseman | 23 | 11 | Throws its pumpkin head, then gallops to retrieve it. Gust can blow the head away. After two seconds on the ground it rolls toward its rider. |
 | Werewolf | 23 | 11 | Taking damage brings out the wolf for 2.5 seconds. It runs faster and swaps short punches for claws. |
@@ -122,7 +124,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Gust | 10 | Shoves enemies and scatters hostile arrows and bolts in its circle. Bullets and lobbed bombs keep flying. A friendly Phoenix egg hatches immediately. |
 | Meteor | 20 | A white-hot stone sheds flame and cinders from the top edge. It strikes the marked ground after 0.8 seconds, dealing 17 damage to enemies still inside or 6 to a base. |
 | Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies, puts out enemy Phoenix eggs and fogs enemy Sun Lenses. |
-| Fault Line | 18 | Two tremors each deal 12 damage to enemy buildings, 3 to ground troops and 3 to bases. An underground Miner caught by either pulse surfaces right there. |
+| Fault Line | 18 | Two tremors each deal 12 damage to enemy buildings, 3 to ground troops and 3 to bases. An underground Miner or Sandworm caught by either pulse surfaces right there. |
 | Briar Snare | 13 | At the moment the vines spring up, they catch grounded enemies for 1.3 seconds. Rooted troops can still shoot or strike within reach. A Phoenix hit burns the vines away. |
 | Mirror Ward | 14 | Three circling panes intercept enemy arrows and bolts as they enter. Each shot turns back along its path and can hit its shooter. Bullets, boulders and magic pass through. The ward lasts three seconds. |
 | Freeze | 18 | Ice holds enemy troops and buildings for 1.1 seconds, or a base for 0.55 seconds. It interrupts a charge, extinguishes a burn, and leaves shots already in flight alone. A Phoenix strike breaks the ice. |
