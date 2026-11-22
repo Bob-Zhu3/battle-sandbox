@@ -6,6 +6,7 @@ import { makeBase } from "../src/battlefield.ts";
 import { airborne, footprint, UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { makeFieldSpell, SPELLS } from "../src/spells.ts";
 import { bountyFor } from "../src/transformations.ts";
+import { reinforcements } from "../src/deployment.ts";
 
 const newcomers=["wrestler","liondancers","rhinorider","trojanhorse","windmill","harpoon","prism","snowman",
   "hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem"];
@@ -20,6 +21,15 @@ function fight(kind,opponents,extra=[]) {
 }
 const warrior=(id,x,y)=>at(id,"warrior","blue",x,y);
 const spell=(w,kind,team,x,y=180)=>makeFieldSpell(100,kind,team,x,y,w.tick+1-SPELLS[kind].delay,w.units);
+
+test("the playable opening shows the first hook grounding the Dragon and the horse and wolf meeting",()=>{
+  let w=createBattle(reinforcements.map(([team,kind,x,y],i)=>at(i+1,kind,team,x,y)));
+  const troop=kind=>w.units.find(u=>u.kind===kind);
+  w=step(w);assert.equal(troop("harpoon").targetId,troop("firedragon").id);
+  let grounded=false;
+  for(let i=0;i<75;i++){w=step(w);if(troop("firedragon").groundedUntil>w.tick)grounded=true;}
+  assert.equal(grounded,true);assert.ok(troop("trojanhorse").openedTick>0);assert.ok(troop("werewolf").wolfUntil>w.tick);
+});
 
 test("all nineteen recruits independently damage an ordinary Warrior",()=>{
   for(const kind of newcomers) {

@@ -1,8 +1,14 @@
 import { ARENA, createBattle, type Placement, type Team } from "./simulation.ts";
 
-import { placementKind, type PlacementType } from "./units.ts";
+import { placementKind, type PlacementType, type RecruitKind } from "./units.ts";
 
 export const BRUSH_SPACING = 24;
+export const reinforcements: readonly (readonly [Team, RecruitKind, number, number])[] = [
+  ["red","trojanhorse",220,111], ["blue","werewolf",321,112], ["blue","archer",347,104],
+  ["red","wrestler",202,245], ["blue","warrior",249,241],
+  ["red","harpoon",519,132], ["blue","firedragon",655,135],
+  ["red","liondancers",567,245], ["blue","slime",636,243], ["blue","warrior",665,261],
+];
 export type ArenaPoint = Pick<Placement, "x" | "y">;
 
 export interface PlacementCommand {

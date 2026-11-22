@@ -2,6 +2,7 @@ import { attachDeploymentBrush, attachSpellBrush } from "./brush-input.ts";
 import { ARMIES, TEAMS, type Team } from "./battlefield.ts";
 import { createField, element } from "./field.ts";
 import { crowdFormation } from "./crowd-formation.ts";
+import { reinforcements } from "./deployment.ts";
 import { Playground } from "./playground.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
@@ -82,13 +83,7 @@ if (demo === "siege") {
   previous = play.world;
   play.paused = true;
 } else if (demo === "reinforcements") {
-  const cast: [Team, RecruitKind, number, number][] = [
-    ["red","trojanhorse",220,111], ["blue","werewolf",321,112], ["blue","archer",386,108],
-    ["red","wrestler",202,245], ["blue","warrior",249,241],
-    ["red","harpoon",519,132], ["blue","firedragon",655,135],
-    ["red","liondancers",567,245], ["blue","slime",636,243], ["blue","warrior",665,261],
-  ];
-  for (const [side,kind,x,y] of cast) play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
+  for (const [side,kind,x,y] of reinforcements) play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
   previous=play.world;
   play.paused=true;
   field.armBrush("wormhole");
