@@ -406,8 +406,15 @@ async function browseRoster(url) {
         await card.click();
         if(shelf==="Spells") {
           assert.equal(await page.locator("#deploy-hint").textContent(),name==="Wormhole" ?
-            "Tap an exit. Your mobile troop closest to that spot travels there." : "Tap anywhere to cast "+name+".");
+            "Tap the entrance to catch enemy troops and towers." : "Tap anywhere to cast "+name+".");
           await page.mouse.click(...point(840,170));
+          if(name==="Wormhole"){
+            assert.equal(await page.locator("#deploy-hint").textContent(),"Tap the exit to open both portals for 5 seconds.");
+            await page.keyboard.press("Escape");
+            assert.equal(await page.locator("#deploy-hint").textContent(),"Tap the entrance to catch enemy troops and towers.");
+            await page.mouse.click(...point(840,170));await page.mouse.click(...point(735,150));
+            assert.equal(await page.locator("#deploy-hint").textContent(),"Tap the entrance to catch enemy troops and towers.");
+          }
         } else {
           const xy=point(125+(placed%11)*70,112+Math.floor(placed/11)*42);
           assert.equal(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.id,xy),"arena",name+" placement should reach the field");

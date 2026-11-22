@@ -58,7 +58,7 @@ function canDraw() {
 function paint() {
   const world = latest?.world ?? empty;
   const blend = fromFrame ? Math.min(1,(performance.now()-frameStart)/frameDuration) : 1;
-  drawArena(field.ctx, fromFrame ?? world, world, blend, !latest || latest.phase === "deploy", draft, draft.length ? draftKind : field.selectedKind(), { mode, ownTeam: team, showIds });
+  drawArena(field.ctx, fromFrame ?? world, world, blend, !latest || latest.phase === "deploy", draft, draft.length ? draftKind : field.selectedKind(), { mode, ownTeam: team, showIds, portalEntrance: spellBrush.entrance });
   if (blend < 1 && !animation) animation = requestAnimationFrame(() => { animation=0; paint(); });
 }
 function problem(points: readonly ArenaPoint[], kind: RecruitKind) {
@@ -82,7 +82,7 @@ function updateInterface() {
   field.setCasting(!!live && edit, !!deploy && edit);
   const spell = live && edit ? field.selectedSpell() : undefined;
   const miner = edit && field.selectedKind() === "miner" && !spell;
-  const castingHint = spell ? castHint(spell) : miner ? "Choose a tunnel exit anywhere on the field." : "";
+  const castingHint = spell ? castHint(spell, !!spellBrush.entrance) : miner ? "Choose a tunnel exit anywhere on the field." : "";
   field.canvas.setAttribute("aria-label", castingHint || (edit ? name + " army. Draw squads in the " + camp + "." : "Shared battlefield."));
   scenario.textContent = team ? name + " · " + match.name : match.name;
   for (const color of match.teams) {
@@ -127,12 +127,16 @@ function updateInterface() {
   }
 }
 
-game.addEventListener("brushchange", () => { notice = ""; updateInterface(); paint(); });
+game.addEventListener("brushchange", () => {
+  if (field.selectedSpell() !== "wormhole") spellBrush.cancel();
+  notice = ""; updateInterface(); paint();
+});
 
 function send(action: RoomAction) { notice = ""; connection.send(action); }
-attachSpellBrush(field.canvas, field.selectedSpell, (spell, point) => {
-  if (canDraw() && latest?.phase === "running") send({type: SPELLS[spell].command, positions: [point]});
-});
+const spellBrush = attachSpellBrush(field.canvas, () => canDraw() && latest?.phase === "running" ? field.selectedSpell() : undefined,
+  (spell, point, entrance) => send({type: SPELLS[spell].command, positions: entrance ? [entrance, point] : [point]}),
+  () => { notice = ""; updateInterface(); paint(); });
+document.addEventListener("keydown", event => { if (event.key === "Escape") spellBrush.cancel(); });
 const cancelStroke = attachDeploymentBrush(field.canvas, {
   canDraw: () => canDraw() && !field.selectedSpell(), selectedKind: field.selectedKind, useLive: () => latest?.phase === "running",
   livePlace(points, kind) {
@@ -161,8 +165,9 @@ const cancelStroke = attachDeploymentBrush(field.canvas, {
 });
 
 const connection = connectRoom(mode, {
-  state(value) { link = value; if (value !== "online") { heardSnapshot = false; cancelStroke(); } updateInterface(); },
+  state(value) { link = value; if (value !== "online") { heardSnapshot = false; spellBrush.cancel(); cancelStroke(); } updateInterface(); },
   joined(side) {
+    if (side !== team) spellBrush.cancel();
     team = side; game.dataset.team = side; game.style.setProperty("--army", ARMIES[side].coat);
     document.title = ARMIES[side].name + " · " + match.name + " · Battle Sandbox";
     field.colorBrush(side); notice = ""; updateInterface();
@@ -180,7 +185,7 @@ const connection = connectRoom(mode, {
     }
     if (heardSnapshot && previous?.round === event.round) field.hear(previous.world,event.world);
     heardSnapshot = true;
-    if (!canDraw() || (previous && previous.round !== event.round)) cancelStroke();
+    if (!canDraw() || (previous && previous.round !== event.round)) { spellBrush.cancel(); cancelStroke(); }
     if (previous?.round !== event.round || previous.phase !== event.phase) { notice = ""; bounty = undefined; }
     if (team && previous?.phase === "running" && event.world.tick > previous.world.tick) {
       const earned = event.world.units.reduce((sum, u) => sum + (u.killedBy === team && u.lastHitTick !== null && u.lastHitTick > previous.world.tick ? bountyFor(u) : 0), 0);

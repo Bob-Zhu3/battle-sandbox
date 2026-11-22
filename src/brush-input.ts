@@ -11,12 +11,27 @@ interface BrushCallbacks {
   useLive?(): boolean;
 }
 
-export function attachSpellBrush(canvas: HTMLCanvasElement, selected: () => SpellKind | undefined, cast: (spell: SpellKind, point: ArenaPoint) => void) {
+export function attachSpellBrush(canvas: HTMLCanvasElement, selected: () => SpellKind | undefined,
+  cast: (spell: SpellKind, point: ArenaPoint, entrance?: ArenaPoint) => void, preview: () => void) {
+  let entrance: ArenaPoint | undefined;
+  function cancel() {
+    if (!entrance) return false;
+    entrance=undefined; preview();
+    return true;
+  }
   canvas.addEventListener("pointerdown", event => {
     const spell = selected();
     if (!spell || !event.isPrimary || event.button !== 0) return;
-    cast(spell, pointerToArena(event.clientX, event.clientY, canvas.getBoundingClientRect()));
+    const point=pointerToArena(event.clientX,event.clientY,canvas.getBoundingClientRect());
+    if (spell==="wormhole" && !entrance) {
+      entrance=point; preview(); return;
+    }
+    const first=entrance;
+    entrance=undefined;
+    cast(spell,point,spell==="wormhole" ? first : undefined);
+    if (first) preview();
   });
+  return {get entrance(){ return entrance; },cancel};
 }
 
 export function attachDeploymentBrush(canvas: HTMLCanvasElement, callbacks: BrushCallbacks) {

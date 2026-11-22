@@ -179,8 +179,8 @@ const recruits = {
     cost: 25, bounty: 12, attack: "melee", radius: 15, maxHp: troopHealth(51), speed: 88, reach: 46, damage: 11, cooldownTicks: 45, sideDamage: 7,
   },
   kraken: {
-    name: "Kraken", command: "place-krakens", description: "Drags one enemy toward its beak. With two in tentacle reach it smacks them together instead.",
-    cost: 30, bounty: 15, attack: "melee", radius: 18, maxHp: troopHealth(65), speed: 58, reach: 63, damage: 12, cooldownTicks: 69, grip: 30,
+    name: "Kraken", command: "place-krakens", description: "Reaches out with long tentacles. One enemy is pulled toward the beak. Two mobile enemies are pulled together.",
+    cost: 30, bounty: 15, attack: "melee", radius: 18, maxHp: troopHealth(65), speed: 58, reach: 116, damage: 12, cooldownTicks: 69, grip: 30,
   },
   firedragon: {
     name: "Fire Dragon", command: "place-fire-dragons", description: "Fills its cheeks, breathes a cone of fire and pants between breaths. Troops can escape the cone or interrupt the inhale.",

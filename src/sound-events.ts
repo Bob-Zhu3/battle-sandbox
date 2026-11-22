@@ -76,7 +76,6 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
     const kind=s.kind, pulse=s.startTick+SPELLS[kind].delay;
     if(kind==="wormhole") {
       if(s.startTick>=before.tick && !before.spells?.some(old=>old.id===s.id)) add("portalOpen",s.x,s.id,s.startTick);
-      if(s.portalUnitId !== undefined && fresh(pulse)) add("wormhole",s.x,s.id,pulse);
     } else if(kind==="meteor" || kind==="rain" || kind==="gust") {
       if(s.startTick>=before.tick && !before.spells?.some(old=>old.id===s.id)) add(kind==="meteor"?"fall":kind,s.x,s.id,s.startTick);
       if(kind==="meteor" && fresh(pulse)) add("impact",s.x,s.id,pulse);
@@ -89,6 +88,7 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
     for (const u of world.units) {
       const old=previous.get(u.id);
       if(!old)add("place",u.x,u.id);
+      if(fresh(u.warpedTick))add("wormhole",u.x,u.id,u.warpedTick);
       if(fresh(u.lastBlockTick))add(u.kind==="windmill"?"fan":"block",u.x,u.id,u.lastBlockTick);
       else if(fresh(u.lastHitTick) && (!world.bases || u.hp || u.killedBy!==undefined))add(hurtVoice(u),u.x,u.id,u.lastHitTick);
       if(fresh(u.lastChargeReadyTick))add(u.kind==="rhinorider"?"snort":"charge",u.x,u.id,u.lastChargeReadyTick);

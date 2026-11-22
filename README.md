@@ -62,7 +62,9 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 
 ### The roster
 
-In the reinforcements playground, press **Play** to watch the Harpoon Tower reel in a Fire Dragon, the Trojan Horse release its passengers, and a wounded Werewolf shed its cloak. Wormhole is already selected. Tap an empty spot to bring the nearest mobile Red ally there. [Play the reinforcements scene](https://bob-zhu3.github.io/battle-sandbox/?demo=reinforcements)
+In the reinforcements playground, press **Play** to watch the Harpoon Tower reel in a Fire Dragon, the Trojan Horse release its passengers, and a wounded Werewolf shed its cloak. [Play the reinforcements scene](https://bob-zhu3.github.io/battle-sandbox/?demo=reinforcements)
+
+In the Wormhole playground, tap the blue Watchpost to mark the entrance, then tap an open spot for the exit. Press **Play** to send the Watchpost through and watch the red Kraken catch two Warriors with its tentacles. [Play the Wormhole and Kraken scene](https://bob-zhu3.github.io/battle-sandbox/?demo=wormhole)
 
 Press **Play** in the Windmill scene to see the wind bend an Archer's shot. Cast the selected Gust on the mill to speed up its four sails. Across the field a Sandworm dives under a Watchpost while a Prism Tower focuses on an Iron Golem. [Play the Windmill scene](https://bob-zhu3.github.io/battle-sandbox/?demo=windmill)
 
@@ -117,7 +119,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Headless Horseman | 23 | 11 | Throws its pumpkin head, then gallops to retrieve it. Gust can blow the head away. After two seconds on the ground it rolls toward its rider. |
 | Werewolf | 23 | 11 | Taking damage brings out the wolf for 2.5 seconds. It runs faster and swaps short punches for claws. |
 | Cerberus | 25 | 12 | The center head bites its target while the other two snap at separate opponents in reach. |
-| Kraken | 30 | 15 | One enemy gets pulled toward the beak. Two in reach get dragged into each other. |
+| Kraken | 30 | 15 | Reaches 116 arena units. One tentacle pulls a lone enemy toward its beak. Two tentacles grab a pair and pull them together. |
 | Fire Dragon | 34 | 17 | Inflates its cheeks before breathing fire across a cone. Enemies can dodge the breath or interrupt the inhale. |
 | Iron Golem | 31 | 15 | Shoves enemies with heavy fists, fits its own spare armor plate at half health and can salvage fallen machines. |
 
@@ -132,7 +134,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Freeze | 18 | Ice holds enemy troops and buildings for 1.1 seconds, or a base for 0.55 seconds. It interrupts a charge, extinguishes a burn, and leaves shots already in flight alone. A Phoenix strike breaks the ice. |
 | Lightning | 24 | Bolts hit the three enemies with the most remaining HP inside the circle. Each takes 18 damage, or 6 for a base, and a quarter-second stun. |
 | Rage | 14 | For 2.4 seconds, allied mobile troops in the ring move 40% faster and recover attacks 50% faster. Reinforcements can run into the effect. Overlapping rings grant one boost. |
-| Wormhole | 19 | Tap the exit anywhere. A pair of rings transports the nearest eligible allied troop after a quarter-second. It keeps its identity, damage and form. |
+| Wormhole | 19 | Tap the entrance, then the exit anywhere on the field. For five seconds, enemy troops touching the entrance, including towers underneath it, travel to the exit. |
 
 Stars overhead mark a stun. Ice around the feet marks a slow. A full ice shell holds the troop's pose until thaw. Red streamers mark the speed boost from Rage. Violet bubbles mean poison. Green skin and a torn coat show that a human has already become a Zombie. Small orange flames on an enemy mean it is taking burn damage. The Phoenix's cracked ember egg counts down to its own rebirth. A Phoenix in flight sheds sparks and a passing Frost Queen leaves small ice crystals. These trails follow their actual movement and fade when they stop.
 

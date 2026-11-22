@@ -2,6 +2,7 @@ import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { FACE, INK, cut, eye, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import { horseman, ironGolem, medusa, vampire, werewolf } from "./beast-figures.ts";
 import { drawSandwormPortrait } from "./sandworm-art.ts";
+import { KRAKEN_SKIN, tentacleExtension } from "./kraken-art.ts";
 import type { Unit } from "./simulation.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
@@ -108,7 +109,8 @@ function cerberus(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: 
 function kraken(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const grab = eventFade(tick, u?.lastAttackTick, 19);
   const wave = Math.sin((tick + (u?.id ?? 0) * 13) * .077);
-  const plum = "#a36c89", pink = "#ddb395", dark = "#7d5a77";
+  const {mantle: plum, shadow: dark, sucker: pink} = KRAKEN_SKIN;
+  const extended = u?.grab ? tentacleExtension(tick-u.grab.tick) : 0;
   c.translate(-p.hurt * 1.4, -.7 * p.lift - .5 * p.breath);
   c.beginPath(); c.moveTo(-4, -.5); c.bezierCurveTo(-10, 2, -8.8, 9.6, -15, 8.4);
   c.bezierCurveTo(-20.1, 7.6, -20.8, 1 + wave * 2, -17.8, .2 + wave * 2); tube(c, dark, 2.55);
@@ -123,12 +125,19 @@ function kraken(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: nu
   eye(c, 4.45, -8.25, 2.95, 2.46 - .68 * grab - 1.6 * p.blink, p.lookX, p.lookY);
   line(c, 1.4, -11.08, 6.9, -11.3 + .66 * grab, dark, 1.15);
   cut(c, "M-.7 -3.2 Q1.35 -4.5 3.2 -3.9 Q3.6 -1.65 1.15 -1.05Z", "#554751", .64); c.restore();
-  c.beginPath(); c.moveTo(-3.15, -.1); c.bezierCurveTo(-8.65, 3.4, -8.75, 11.7, -2.6, 10.55);
-  c.quadraticCurveTo(1.3, 9.7, -.4, 6 - wave); tube(c, plum, 3.05);
-  const tipX = 15.15 + 10 * grab, tipY = -7.9 - 3.7 * grab - wave * 1.3;
-  c.beginPath(); c.moveTo(4.3, -.25); c.bezierCurveTo(9.8, 9.45 - 4 * grab, 18.5 + 5 * grab, 4.85 - 14 * grab, tipX, tipY);
-  c.quadraticCurveTo(tipX - 2, tipY - 3.55, tipX - 4, tipY - 1); tube(c, plum, 3.05);
-  oval(c, 7.3, 2.9 - grab, 1.1, .83, pink); oval(c, 10.45 + 1.15 * grab, 4.0 - 2.8 * grab, .97, .76, pink);
+  const nearCoil = 1 - extended, farCoil = (u?.grab?.targets.length ?? 0) > 1 ? nearCoil : 1;
+  if (farCoil > .03) {
+    c.save(); c.translate(-3.15,-.1); c.scale(farCoil,farCoil);
+    c.beginPath(); c.moveTo(0,0); c.bezierCurveTo(-5.5,3.5,-5.6,11.8,.55,10.65);
+    c.quadraticCurveTo(4.45,9.8,2.75,6.1-wave); tube(c,plum,3.05); c.restore();
+  }
+  if (nearCoil > .03) {
+    c.save(); c.translate(4.3,-.25); c.scale(nearCoil,nearCoil);
+    const tipX = 10.85 + 2.5*p.ready, tipY = -7.65-1.8*p.ready-1.3*wave;
+    c.beginPath(); c.moveTo(0,0); c.bezierCurveTo(5.5,9.7,14.2,5.1-2*p.ready,tipX,tipY);
+    c.quadraticCurveTo(tipX-2,tipY-3.55,tipX-4,tipY-1); tube(c,plum,3.05);
+    oval(c,3,3.15,1.1,.83,pink); oval(c,6.15,4.25-.45*p.ready,.97,.76,pink); c.restore();
+  }
 }
 
 function dragonWing(c: Pens, d: Dye, flap: number, far: boolean, folded: boolean) {

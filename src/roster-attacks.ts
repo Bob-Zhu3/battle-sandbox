@@ -183,8 +183,10 @@ export function rosterStrike(u: Unit, primary: Target, targets: readonly Target[
     }
     case "kraken": {
       damage(primary,spec.damage);
-      const other=enemies(u,targets,spec.reach).find(t=>t.id!==primary.id && mobile(t));
-      if (other && mobile(primary)) {
+      const other=mobile(primary) ? enemies(u,targets,spec.reach).find(t=>t.id!==primary.id && mobile(t)) : undefined;
+      const gripped=other ? [primary,other] : [primary];
+      u.grab={tick,targets:gripped.map(({id,x,y})=>({id,x,y}))};
+      if (other) {
         damage(other,spec.damage);
         const middle={x:(other.x+primary.x)/2,y:(other.y+primary.y)/2};
         pushToward(impulses,primary,middle,defs.kraken.grip); pushToward(impulses,other,middle,defs.kraken.grip);

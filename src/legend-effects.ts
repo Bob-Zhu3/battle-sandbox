@@ -14,8 +14,8 @@ function gate(c: Pens, size: number, open: number, phase: number, team: Team, en
   c.scale(size * open, size * (.3 + .7 * open) * .48);
   oval(c, 0, 0, 1.05, 1.08, "#383147");
   oval(c, 0, 0, .92, .92, dye.coat);
-  oval(c, 0, 0, .74, .75, "#352d50");
-  oval(c, .06, -.08, .45, .45, "#23243c");
+  oval(c, 0, 0, .66, .66, entrance ? "#352d50" : "#685779");
+  oval(c, .04, -.05, .43, .43, entrance ? "#23243c" : "#cbbad4");
   c.lineCap = "round";
   for (let i = 0; i < 3; i++) {
     const a = phase + i * circle / 3;
@@ -43,27 +43,85 @@ export function wormholeIcon(c: Pens) {
   cut(c, "M1.2 -4.7 L4.6 -5 L3 -2.1Z", "#f5cc88", .65);
 }
 
-export function drawWormhole(c: Pens, spell: FieldSpell, tick: number, sx: number, sy: number) {
-  const {delay, duration} = SPELLS.wormhole;
-  const age = tick - spell.startTick;
-  if (age < 0 || age >= duration) return;
-  const k = Math.min(sx, sy), phase = age * .11 + spell.id;
-  const open = Math.max(.08, Math.min(1, (age + 3) / Math.max(3, delay * .65), (duration - age) / 12));
-  const x = spell.x * sx, y = spell.y * sy;
-  c.save(); c.translate(x, y); gate(c, 19*k, open, phase, spell.team, false); c.restore();
-  if (spell.fromX === undefined || spell.fromY === undefined) return;
-  const ox = spell.fromX * sx, oy = spell.fromY * sy;
-  c.save(); c.translate(ox, oy); gate(c, 19*k, open, -phase, spell.team, true); c.restore();
-  const passage = age - delay;
-  if (passage < 0 || passage > 12 || spell.portalUnitId === undefined) return;
-  // A few motes cross the gap only on transfer. The two mouths remain legible in a crowd.
+function rimMarks(c: Pens, entrance: boolean, kick: number) {
+  // Inward hooks stay over the dark inlet. The outlet flares beyond its rim.
+  const tip=entrance ? 10.3-1.2*kick : 19+1.7*kick;
+  const back=entrance ? 15.7 : 14.6;
+  c.beginPath();
+  for (const sign of [-1,1]) {
+    c.moveTo(sign*back,-3.1); c.lineTo(sign*tip,0); c.lineTo(sign*back,3.1);
+  }
+  c.lineJoin=c.lineCap="round";
+  c.strokeStyle="#403348"; c.lineWidth=3; c.stroke();
+  c.strokeStyle="#fff1d0"; c.lineWidth=1.48; c.stroke();
+}
+
+function mouth(c: Pens, x: number, y: number, size: number, phase: number, team: Team, entrance: boolean, kick: number) {
+  c.save(); c.translate(x,y); c.scale(size/18,size/18);
+  gate(c,18,entrance ? 1-.07*kick : 1+.09*kick,phase,team,entrance);
+  rimMarks(c,entrance,kick);
+  if (!entrance) {
+    const lift=10.1+.65*Math.sin(phase)+3*kick;
+    // A shard lifting out of the bright well gives the exit a different silhouette.
+    line(c,0,-1.8,0,-lift,"#eee2ea",1.75);
+    c.translate(0,-lift);
+    cut(c,"M0 -5.8 L3.5 -.4 L.1 3.3 L-3.5 -.4Z",ARMIES[team].light,.94);
+    line(c,-.45,-2.8,-1.35,-.65,"#fff9df",.93);
+  }
+  c.restore();
+}
+
+function inletRing(c: Pens, x: number, y: number, team: Team, sx: number, sy: number, pending: boolean) {
+  // The field can stretch independently on each axis. The arcs show the actual capture radius.
+  const rx=SPELLS.wormhole.radius*sx, ry=SPELLS.wormhole.radius*sy;
+  c.beginPath();
+  for (let i=0;i<6;i++) {
+    const a=(i+.12)*circle/6;
+    c.moveTo(x+Math.cos(a)*rx,y+Math.sin(a)*ry);
+    c.ellipse(x,y,rx,ry,0,a,a+(pending ? .51 : .73));
+  }
+  c.strokeStyle=ARMIES[team].hem+(pending?"a8":"69");
+  c.lineWidth=Math.max(1,(pending?1.4:1.15)*Math.min(sx,sy)); c.lineCap="round"; c.stroke();
+}
+
+export function drawWormholeEntrance(c: Pens, point: {x:number; y:number}, team: Team, tick: number, sx: number, sy: number) {
+  const x=point.x*sx, y=point.y*sy, size=Math.max(11.5,17.6*Math.min(sx,sy));
   c.save();
-  for (let i = 0; i < 4; i++) {
-    const t = (passage + 1 - i * 1.4) / 7;
-    if (t < 0 || t > 1) continue;
-    const px = ox + (x - ox) * t, py = oy + (y - oy) * t - 9*k*Math.sin(t*Math.PI);
-    c.globalAlpha = .75 * Math.sin(t*Math.PI);
-    oval(c, px, py, (3 - .4*i)*k, (2.1 - .2*i)*k, i % 2 ? ARMIES[spell.team].hem : "#ad84c1");
+  inletRing(c,x,y,team,sx,sy,true);
+  mouth(c,x,y,size,-tick*.052,team,true,0);
+  c.restore();
+}
+
+export function drawWormhole(c: Pens, spell: FieldSpell, tick: number, sx: number, sy: number) {
+  const age=tick-spell.startTick, duration=SPELLS.wormhole.duration;
+  if (!spell.entrance || age<0 || age>=duration) return;
+  const k=Math.min(sx,sy), size=Math.max(11.5,17.6*k);
+  const phase=age*.064+spell.id, passage=tick-(spell.lastPassageTick ?? -Infinity);
+  const kick=passage>=0 ? Math.max(0,1-passage/13) : 0;
+  const x=spell.x*sx, y=spell.y*sy;
+  c.save();
+  c.globalAlpha*=.64+.36*Math.min(1,(duration-age)/12);
+  const opacity=c.globalAlpha;
+  const ripple=size*(1.34+.05*Math.sin(phase*.57)+(kick ? .45*(1-kick) : 0));
+  c.beginPath(); c.ellipse(x,y+size*.07,ripple,ripple*.49,0,.23,2.83);
+  c.strokeStyle=ARMIES[spell.team].hem+(kick?"ba":"79"); c.lineWidth=Math.max(1,(1+.6*kick)*k); c.stroke();
+  mouth(c,x,y,size,phase,spell.team,false,kick);
+  const ox=spell.entrance.x*sx, oy=spell.entrance.y*sy;
+  inletRing(c,ox,oy,spell.team,sx,sy,false);
+  mouth(c,ox,oy,size,-phase,spell.team,true,kick);
+  if (kick>0) {
+    // The air between the mouths lights only when the simulation transported an enemy.
+    const distance=Math.max(1,Math.hypot(x-ox,y-oy)); c.lineCap="round";
+    for (let i=0;i<3;i++) {
+      const t=(passage+.7-i*1.45)/8;
+      if (t<=0 || t>=1) continue;
+      const px=ox+(x-ox)*t, py=oy+(y-oy)*t-size*.42*Math.sin(t*Math.PI);
+      const tail=Math.max(0,t-Math.min(.085,size*(.43-i*.06)/distance));
+      const tx=ox+(x-ox)*tail, ty=oy+(y-oy)*tail-size*.42*Math.sin(tail*Math.PI);
+      c.globalAlpha=opacity*.83*Math.sin(t*Math.PI);
+      line(c,tx,ty,px,py,ARMIES[spell.team].coat,Math.max(.95,size*(.113-.012*i)));
+      oval(c,px,py,size*(.145-.019*i),size*(.103-.014*i),i===1?ARMIES[spell.team].hem:"#9877aa");
+    }
   }
   c.restore();
 }

@@ -28,6 +28,12 @@ const tickMs = 1000 / TICKS_PER_SECOND;
 const query = new URLSearchParams(location.search);
 const demo = query.get("demo");
 let soundHint=demo==="sound";
+const spellBrush=attachSpellBrush(field.canvas,field.selectedSpell,(spell,point,entrance)=>{
+  const before=play.world;
+  play.cast(team,spell,point.x,point.y,entrance);
+  if (!play.paused) { field.hear(before,play.world); previous=play.world; }
+  update(); paint();
+},()=>{updateBrushHint(); update(); paint();});
 
 game.dataset.mode = "playground";
 document.title = "Playground · Battle Sandbox";
@@ -39,6 +45,7 @@ clear.title = "Clear the playground";
 clockButton.hidden = false;
 
 function choose(color: Team) {
+  if (team!==color) spellBrush.cancel();
   team = color;
   game.dataset.team = color;
   game.style.setProperty("--army", ARMIES[color].coat);
@@ -57,12 +64,15 @@ choose(team);
 
 function updateBrushHint() {
   const spell = field.selectedSpell(), hint = element("deploy-hint");
-  hint.textContent = spell ? castHint(spell) : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." :
+  hint.textContent = spell ? castHint(spell,!!spellBrush.entrance) : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." :
     soundHint && team==="blue" && field.selectedKind()==="cyclops" ? "Place the blue Cyclops just to the right of the red trio." : "";
   hint.hidden = !hint.textContent;
   field.canvas.setAttribute("aria-label", hint.textContent || "Playground. Choose a color and draw troops anywhere.");
 }
-game.addEventListener("brushchange",updateBrushHint);
+game.addEventListener("brushchange",()=>{
+  if (field.selectedSpell()!=="wormhole") spellBrush.cancel();
+  updateBrushHint();
+});
 if (demo === "siege") {
   const lineup = ["lobber", "sunlens", "belltower"] as const;
   lineup.forEach((kind,index) => {
@@ -82,6 +92,13 @@ if (demo === "siege") {
   }
   previous = play.world;
   play.paused = true;
+} else if (demo === "wormhole") {
+  play.place("red",{type:"place-krakens",positions:[{x:424,y:168}]});
+  play.place("blue",{type:"place-warriors",positions:[{x:520,y:142},{x:520,y:198}]});
+  play.place("blue",{type:UNIT_DEFINITIONS.post.command,positions:[{x:690,y:173}]});
+  previous = play.world;
+  play.paused = true;
+  field.armBrush("wormhole");
 } else if (demo === "monk") {
   play.place("red",{type:"place-monks",positions:[{x:424,y:180}]});
   play.place("blue",{type:"place-archers",positions:[{x:451,y:180},{x:471,y:183}]});
@@ -110,7 +127,7 @@ updateBrushHint();
 
 function paint(blend = play.paused ? lastBlend : 1) {
   lastBlend = blend;
-  drawArena(field.ctx, previous, play.world, blend);
+  drawArena(field.ctx, previous, play.world, blend,false,[],field.selectedKind(),{ownTeam:team,portalEntrance:spellBrush.entrance});
 }
 function syncClockButton() {
   field.pauseSound(play.paused);
@@ -141,17 +158,11 @@ document.addEventListener("keydown", event => {
 });
 function update() {
   if(soundHint && play.world.units.length<3){soundHint=false;updateBrushHint();}
-  guide.hidden = !!(play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length);
-  undo.disabled = !play.canUndo;
-  clear.disabled = !play.canUndo && !play.world.units.length && !play.world.arrows.length;
+  guide.hidden = !!(spellBrush.entrance || play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length);
+  undo.disabled = !play.canUndo && !spellBrush.entrance;
+  clear.disabled = !play.canUndo && !spellBrush.entrance && !play.world.units.length && !play.world.arrows.length;
   field.updateScore(play.world);
 }
-attachSpellBrush(field.canvas, field.selectedSpell, (spell, point) => {
-  const before = play.world;
-  play.cast(team, spell, point.x, point.y);
-  if (!play.paused) { field.hear(before,play.world); previous = play.world; }
-  update(); paint();
-});
 const cancel = attachDeploymentBrush(field.canvas, {
   canDraw: () => !field.selectedSpell(),
   selectedKind() { strokeTeam = team; return field.selectedKind(); },
@@ -164,10 +175,10 @@ const cancel = attachDeploymentBrush(field.canvas, {
     update(); paint();
   },
 });
-undo.addEventListener("click", () => { cancel(); play.undo(); if (!play.paused) previous = play.world; update(); paint(); });
-clear.addEventListener("click", () => { cancel(); play.clear(); previous = play.world; update(); paint(); });
+undo.addEventListener("click", () => { cancel(); if (spellBrush.cancel()) return; play.undo(); if (!play.paused) previous = play.world; update(); paint(); });
+clear.addEventListener("click", () => { cancel(); spellBrush.cancel(); play.clear(); previous = play.world; update(); paint(); });
 document.addEventListener("pointerdown", e => { if (picker.open && e.target instanceof Node && !picker.contains(e.target)) picker.open = false; });
-document.addEventListener("keydown", e => { if (e.key === "Escape") picker.open = false; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { picker.open=false; spellBrush.cancel(); } });
 window.addEventListener("blur", cancel);
 document.addEventListener("visibilitychange", () => { lastTime = performance.now(); if (!play.paused) remainder = 0; if (document.hidden) cancel(); });
 

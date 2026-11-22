@@ -2,7 +2,8 @@ import { collectSouls, hasSoul, hunt, resolveConversions, type Conversion, type 
 import { advanceTunnel, digFromHome, diveWorm, type Tunnel } from "./tunnels.ts";
 import { followWormHead, initialWormBody } from "./sandworm.ts";
 import { recordTrail, type TrailMark } from "./trails.ts";
-import { applyMagic, blownAway, openWormhole, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
+import { applyMagic, blownAway, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
+import { transportEnemies } from "./wormhole.ts";
 import { reflectAtWards } from "./mirror.ts";
 import { channelPrism, focusLens, pickTowerTarget } from "./siege.ts";
 import { applyRage, strikeField } from "./battle-magic.ts";
@@ -80,6 +81,7 @@ export interface Unit extends Placement {
   trail?: TrailMark[];
   knockback?: { x: number; y: number; ticks: number };
   arc?: {tick: number; path: {x: number; y: number}[]};
+  grab?: {tick: number; targets: {id: number; x: number; y: number}[]};
   runUp?: number;
   lastChargeTick?: number;
   stunnedUntil?: number;
@@ -320,24 +322,23 @@ export function stepBattle(battle: Battle): Battle {
   const braces = new Set<number>();
   const healing = new Map<number, number>();
   const impulses: Impulse[] = [];
-  const spells = battle.spells?.filter(s => tick-s.startTick < SPELLS[s.kind].duration)
-    .map(s => s.kind === "mirror" || ((s.kind === "lightning" || s.kind === "wormhole") && pulses(s,tick)) ? {...s} : s);
-  const activeMagic = spells?.filter(spell => pulses(spell, tick)) ?? [];
+  // A portal tests the last movement interval before both mouths expire.
+  const spells = battle.spells?.filter(s => s.kind==="wormhole" ? s.entrance && tick-s.startTick<=SPELLS.wormhole.duration : tick-s.startTick<SPELLS[s.kind].duration)
+    .map(s => s.kind==="wormhole" || s.kind==="mirror" || (s.kind==="lightning" && pulses(s,tick)) ? {...s} : s);
+  const activeMagic = spells?.filter(spell => spell.kind!=="wormhole" && pulses(spell, tick)) ?? [];
   const strikes = activeMagic.filter(s => s.kind === "freeze" || s.kind === "lightning");
   const rings = spells?.filter(s => s.kind === "rage" && tick-s.startTick >= SPELLS.rage.delay) ?? [];
   const winds = activeMagic.filter(spell => spell.kind === "gust");
-  const portals = activeMagic.filter(s=>s.kind==="wormhole").sort((a,b)=>a.id-b.id);
   const fieldChanges = activeMagic.filter(s => s.kind === "briar" || s.kind === "fault" || s.kind === "rain");
   const readyToDive = (u: Unit) => u.hp > 0 && u.kind === "sandworm" && u.windup?.kind === "breach" && tick-u.windup.since >= UNIT_DEFINITIONS.sandworm.windup;
   const diving = battle.units.some(readyToDive);
-  const starting = diving || fieldChanges.length || strikes.length || rings.length || portals.length || battle.units.some(u => u.hp > 0 && (u.raging || u.groundedUntil===tick)) ? battle.units.map(u => {
+  const starting = diving || fieldChanges.length || strikes.length || rings.length || battle.units.some(u => u.hp > 0 && (u.raging || u.groundedUntil===tick)) ? battle.units.map(u => {
     if (!u.hp) return u;
     const ready = {...u};
     if ((ready.groundedUntil ?? Infinity)<=tick) delete ready.groundedUntil;
     if (fieldChanges.length) prepareFieldMagic(ready,fieldChanges,tick);
     return ready;
   }) : battle.units;
-  for (const portal of portals) openWormhole(portal,starting,tick);
   const basesAtStart = strikes.length ? battle.bases?.map(b => ({...b})) : battle.bases;
   const targets: readonly Target[] = basesAtStart ? [...starting, ...basesAtStart] : starting;
   function hit(target: Target, amount: number, team: Team) {
@@ -418,7 +419,7 @@ export function stepBattle(battle: Battle): Battle {
       stun(next, interruptedUntil);
       return next;
     }
-    if (next.frozenUntil !== undefined || unit.warpedTick===tick) return next;
+    if (next.frozenUntil !== undefined) return next;
     if (unit.kind==="monk" && continueFlurry(next,targets,tick,hit)) return next;
     if (arc || unit.windup) {
       releaseTelegraph(next,targets,tick,control.gaze.fired.has(unit.id),hit,effects,burns);
@@ -496,7 +497,8 @@ export function stepBattle(battle: Battle): Battle {
     const definition = UNIT_DEFINITIONS[unit.kind];
     const reach = definition.reach + (target.kind === "base" ? BASE_RADIUS : 0);
     const targetRadius = target.kind === "base" ? BASE_RADIUS : footprint(target);
-    const stopAt = definition.attack === "melee" || unit.kind === "cyclops" ? Math.min(reach,footprint(unit) + targetRadius) : reach;
+    const closesToContact = (definition.attack === "melee" && unit.kind !== "kraken") || unit.kind === "cyclops";
+    const stopAt = closesToContact ? Math.min(reach,footprint(unit) + targetRadius) : reach;
     const distance = moveToward(next, target.x, target.y, stopAt);
     if (unit.kind === "archer") {
       const readyIn = next.nextAttackTick-tick;
@@ -588,7 +590,7 @@ export function stepBattle(battle: Battle): Battle {
   applyClouds(effects, units, winds, tick);
   for (const [index, unit] of units.entries()) {
     const from = starting[index];
-    const distance = unit.warpedTick===tick || (unit.kind==="sandworm" && from.tunnel) ? 0 : Math.hypot(unit.x - from.x, unit.y - from.y);
+    const distance = unit.kind==="sandworm" && from.tunnel ? 0 : Math.hypot(unit.x - from.x, unit.y - from.y);
     const speed = walkSpeed(unit) / TICKS_PER_SECOND;
     // A shove can slide the ice. Keep the stride fixed inside the shell.
     if (unit.frozenUntil === undefined) {
@@ -637,10 +639,6 @@ export function stepBattle(battle: Battle): Battle {
   finishTreatments(units, byId, tick, healing);
   resolveConversions(conversions, byId, tick, fallen);
   const births=settleTroopBodies(units,byId,damage,fallen,tick);
-  units.forEach((unit,i) => {
-    recordTrail(unit,starting[i],tick);
-    if (unit.kind==="sandworm" && unit.hp>0) followWormHead(unit,starting[i],tick);
-  });
   const recruits: Placement[] = [];
   for (const unit of units) {
     const child = finishBuilding(unit, tick);
@@ -652,8 +650,16 @@ export function stepBattle(battle: Battle): Battle {
     births.forEach((birth,i)=>{ if (birth.slime) Object.assign(newborns[i],birth.slime,{smallSlime:true}); });
     units.push(...newborns);
   }
+  const remaining = fallen.size ? spells?.filter(s => !fallen.has(s.team)) : spells;
+  const portals = remaining?.filter(s => s.kind==="wormhole");
+  if (portals?.length) transportEnemies(portals,starting,units,tick);
+  starting.forEach((from,i) => {
+    const unit=units[i];
+    if (unit.warpedTick!==tick) recordTrail(unit,from,tick);
+    if (unit.kind==="sandworm" && unit.hp>0) followWormHead(unit,from,tick);
+  });
   return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases,
-    fallen.size ? spells?.filter(s => !fallen.has(s.team)) : spells, effects);
+    portals?.length ? remaining?.filter(s => s.kind!=="wormhole" || tick<s.startTick+SPELLS.wormhole.duration) : remaining, effects);
 }
 
 export function battleOutcome(battle: Battle): Outcome | null {

@@ -1,7 +1,7 @@
 import { Battle, createBattle, stepBattle, type Team } from "./simulation.ts";
 import { makeFieldSpell, type SpellKind } from "./spells.ts";
 import { placementKind } from "./units.ts";
-import type { PlacementCommand } from "./deployment.ts";
+import type { ArenaPoint, PlacementCommand } from "./deployment.ts";
 
 export class Playground {
   world = createBattle([]);
@@ -24,9 +24,10 @@ export class Playground {
     this.resting = false;
   }
 
-  cast(team: Team, kind: SpellKind, x: number, y: number) {
-    const id = this.nextId++;
-    const spell = makeFieldSpell(id,kind,team,x,y,this.world.tick,this.world.units);
+  cast(team: Team, kind: SpellKind, x: number, y: number, entrance?: ArenaPoint) {
+    const id = this.nextId;
+    const spell = makeFieldSpell(id,kind,team,x,y,this.world.tick,entrance);
+    this.nextId++;
     this.strokes.push([id]);
     this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, undefined, [...(this.world.spells ?? []), spell], this.world.effects);
     this.resting = false;

@@ -22,7 +22,7 @@ function fight(kind,opponents,extra=[]) {
   return w;
 }
 const warrior=(id,x,y)=>at(id,"warrior","blue",x,y);
-const spell=(w,kind,team,x,y=180)=>makeFieldSpell(100,kind,team,x,y,w.tick+1-SPELLS[kind].delay,w.units);
+const spell=(w,kind,team,x,y=180)=>makeFieldSpell(100,kind,team,x,y,w.tick+1-SPELLS[kind].delay);
 
 test("the playable opening shows the first hook grounding the Dragon and the horse and wolf meeting",()=>{
   let w=createBattle(reinforcements.map(([team,kind,x,y],i)=>at(i+1,kind,team,x,y)));
@@ -367,11 +367,20 @@ test("Slime halves share health at split, keep their IDs through a snapshot and 
   assert.equal(w.units.filter(u=>u.kind==="slime").length,2);
 });
 
-test("Kraken pulls one enemy to its beak or two together",()=>{
-  let w=step(fight("kraken",[warrior(2,452)]));
+test("Kraken reaches at full extension and wraps exactly the targets it actually pulls",()=>{
+  const edge=400+defs.kraken.reach;
+  let w=step(fight("kraken",[warrior(2,edge)]));
+  assert.equal(unit(w,1).x,400);
+  assert.deepEqual(unit(w,1).grab,{tick:1,targets:[{id:2,x:edge,y:180}]});
   assert.ok(unit(w,2).knockback.x<0);
-  w=step(fight("kraken",[warrior(2,447,157),warrior(3,447,203)]));
+  w=step(fight("kraken",[warrior(2,500,152),warrior(3,500,208),warrior(4,edge+17)]));
+  assert.deepEqual(unit(w,1).grab.targets.map(t=>t.id),[2,3]);
   assert.ok(unit(w,2).knockback.y>0 && unit(w,3).knockback.y<0);
+  assert.equal(unit(w,4).lastHitTick,null);
+  const saved=json(w);assert.deepEqual(json(step(w,8)),json(step(saved,8)));
+  w=step(fight("kraken",[warrior(2,edge+12)]));
+  assert.equal(unit(w,1).grab,undefined);
+  assert.ok(unit(w,1).x>400);
 });
 
 test("Horseman retrieves a head at a tower and one blown behind enemy ranks",()=>{
@@ -390,35 +399,94 @@ test("Horseman retrieves a head at a tower and one blown behind enemy ranks",()=
   }
 });
 
-test("Wormhole locks the nearest mobile ally by ID and jumps on its pulse without crossing an intervening shot",()=>{
-  let w=createBattle([at(8,"warrior","red",200,150),at(4,"slime","red",200,210),at(7,"prism","red",548,230),warrior(3,765)]);
-  for(const u of w.units){u.rootedUntil=1000;u.nextAttackTick=9999;}
-  unit(w,4).hp=9;w.spells=[makeFieldSpell(90,"wormhole","red",550,180,0,w.units)];
-  assert.equal(w.spells[0].portalUnitId,4);w=step(w,14);assert.equal(unit(w,4).x,200);
-  w.arrows=[{team:"blue",x:390,y:195,vx:0,vy:1,damage:7,releasedTick:14}];
-  const before=json(w),old=w;w=step(w);assert.deepEqual(before,json(old));
-  assert.equal(unit(w,4).warpedTick,15);assert.equal(unit(w,4).x,550);
-  assert.equal(unit(w,4).hp,9);assert.equal(w.arrows.length,1);assert.deepEqual(json(step(before)),json(w));
-  const dead=json(before);unit(dead,4).hp=0;
-  const fizzle=step(dead);assert.equal(fizzle.spells[0].portalUnitId,undefined);assert.equal(unit(fizzle,8).warpedTick,undefined);
+const portal=(id,x,y,destX,destY,start=0)=>makeFieldSpell(id,"wormhole","red",destX,destY,start,{x,y});
+
+test("the entrance moves every living enemy on it, including towers, with no hits along the jump",()=>{
+  const blueBase=makeBase("duel","blue");
+  const x=blueBase.x,y=blueBase.y;
+  const old=createBattle([at(4,"slime","blue",x-22,y),at(6,"prism","violet",x,y+24),
+    at(8,"warrior","red",x,y-22),at(9,"warrior","blue",550,y),at(10,"archer","blue",x+22,y)],0,[blueBase]);
+  for(const u of old.units){u.rootedUntil=1000;u.nextAttackTick=9999;}
+  unit(old,4).hp=9;unit(old,10).hp=0;
+  old.spells=[portal(90,x,y,550,y)];
+  old.arrows=[{team:"red",x:(x+550)/2,y,vx:0,vy:1,damage:7,releasedTick:0}];
+  const before=json(old),w=step(old);
+  assert.deepEqual(json(old),before);assert.deepEqual(json(w),json(step(before)));
+  for(const id of [4,6]){
+    assert.deepEqual([unit(w,id).x,unit(w,id).y,unit(w,id).warpedTick],[550,y,1]);
+    assert.equal(unit(w,id).team,unit(old,id).team);assert.equal(unit(w,id).hp,unit(old,id).hp);
+  }
+  for(const id of [8,9,10])assert.equal(unit(w,id).warpedTick,undefined);
+  assert.deepEqual([w.bases[0].x,w.bases[0].y],[x,y]);
+  assert.equal(w.arrows.length,1);assert.equal(w.spells[0].lastPassageTick,1);
 });
 
-test("Duel and FFA restore the same Wormhole passenger and purchase after reconnect",()=>{
+test("a Wormhole catches late walkers and expires after 300 ticks",()=>{
+  let w=createBattle([warrior(1,180),at(2,"post","red",540)]);
+  unit(w,2).nextAttackTick=9999;
+  w.spells=[portal(90,250,180,700,180)];w=step(w);
+  assert.equal(unit(w,1).warpedTick,undefined);
+  while(!unit(w,1).warpedTick && w.tick<120)w=step(w);
+  assert.ok(w.tick>1 && w.tick<120);assert.equal(unit(w,1).x,700);
+  w=step(w,299-w.tick);assert.equal(w.spells[0].id,90);
+  w=step(w);assert.equal(w.tick,300);assert.equal(w.spells?.length??0,0);
+  unit(w,1).x=250;const crossed=unit(w,1).warpedTick;w=step(w);
+  assert.equal(unit(w,1).warpedTick,crossed);assert.ok(unit(w,1).x<260);
+});
+
+test("a fast crossing chooses the first entrance and an overlapping exit waits for a genuine re-entry",()=>{
+  let w=createBattle([warrior(1,260)]);
+  w.spells=[portal(93,390,180,610,180),portal(92,350,180,630,180),portal(91,350,180,550,180),portal(94,550,180,760,180)];
+  unit(w,1).knockback={x:220,y:0,ticks:1};
+  w=step(w);assert.deepEqual([unit(w,1).x,unit(w,1).warpedTick],[550,1]);
+  assert.deepEqual(w.spells.find(s=>s.id===94).arrivalIds,[1]);
+  const replay=json(w);w=step(w,12);assert.deepEqual(json(w),json(step(replay,12)));
+  assert.deepEqual([unit(w,1).x,unit(w,1).warpedTick],[550,1]);
+  unit(w,1).knockback={x:80,y:0,ticks:1};w=step(w);
+  assert.equal(w.spells.find(s=>s.id===94).arrivalIds,undefined);
+  unit(w,1).knockback={x:-80,y:0,ticks:1};w=step(w);assert.equal(unit(w,1).x,760);
+  assert.equal(unit(w,1).warpedTick,w.tick);
+});
+
+test("the last movement interval admits a crossing before expiry, including at the edge of the field",()=>{
+  for(const [distance,arrives] of [[11,true],[10,false]]){
+    const old=createBattle([warrior(1,240)],299),traveler=unit(old,1),r=footprint(traveler);
+    const entranceX=traveler.x+SPELLS.wormhole.radius+r+10;
+    traveler.knockback={x:distance,y:0,ticks:1};
+    old.spells=[portal(90,entranceX,180,0,0)];
+    const w=step(old),after=unit(w,1);
+    assert.equal(w.spells?.length??0,0);
+    if(arrives)assert.deepEqual([after.x,after.y,after.warpedTick],[r,r,300]);
+    else assert.equal(after.warpedTick,undefined);
+  }
+});
+
+test("Duel and FFA charge once for two valid endpoints and restore a live enemy trap",()=>{
   for(const mode of ["duel","ffa"]) {
     let room=new Room(mode);const joined=room.join();room.join();if(mode==="ffa")room.join();
     const sides=mode==="duel"?["red","blue"]:["red","blue","violet"];
-    const home=makeBase(mode,"red");
     room.phase="running";room.world=createBattle([],0,sides.map(side=>makeBase(mode,side)));
-    const cmd={type:"cast-wormhole",positions:[{x:715,y:105}]};
-    assert.match(room.place("red",1,2,cmd),/mobile ally/);assert.equal(room.gold.red,120);
-    const placed=room.place("red",1,1,{type:defs.rhinorider.command,positions:[home]});
-    const passenger=placed.ack.unitIds[0],receipt=room.place("red",1,2,cmd),gold=120-defs.rhinorider.cost-SPELLS.wormhole.cost;
-    assert.equal(room.world.spells[0].portalUnitId,passenger);assert.equal(room.gold.red,gold);
-    for(let i=0;i<7;i++)room.advance();room.disconnect("red");room=Room.restore(json(room.checkpoint(2)));
+    const entrance={x:715,y:105},exit={x:500,y:185},gold=120-SPELLS.wormhole.cost;
+    const cmd={type:"cast-wormhole",positions:[entrance,exit]};
+    const bad={x:-5,y:185};
+    for(const positions of [[entrance],[bad,exit],[entrance,bad]]){
+      assert.match(room.place("red",1,1,{...cmd,positions}),/entrance|inside the arena/);
+      assert.equal(room.gold.red,120);assert.equal(room.world.spells?.length??0,0);
+    }
+    const receipt=room.place("red",1,1,cmd);
+    assert.equal(receipt.ack.spellId,1);assert.equal(room.gold.red,gold);
+    assert.deepEqual(room.world.spells[0].entrance,entrance);
+    assert.match(room.place("red",1,1,{...cmd,positions:[exit,entrance]}),/different stroke/);
+    for(let i=0;i<7;i++)room.advance();
+    const placed=room.place("blue",1,1,{type:defs.prism.command,positions:[entrance]});
+    const passenger=placed.ack.unitIds[0];room.advance();
+    room.disconnect("red");room=Room.restore(json(room.checkpoint(2)));
     assert.equal(room.join(joined.resumeToken).team,"red");
-    assert.deepEqual(room.place("red",1,2,cmd),{ack:receipt.ack,fresh:false});
-    for(let i=0;i<8;i++)room.advance();
+    assert.deepEqual(room.place("red",1,1,cmd),{ack:receipt.ack,fresh:false});
+    room.advance();
     assert.equal(room.world.spells.length,1);assert.equal(room.gold.red,gold);
-    assert.equal(unit(room.world,passenger).warpedTick,15);assert.equal(unit(room.world,passenger).x,715);
+    assert.equal(room.world.spells[0].lastPassageTick,8);
+    const tower=unit(room.world,passenger);
+    assert.deepEqual([tower.kind,tower.team,tower.x,tower.y,tower.warpedTick],["prism","blue",exit.x,exit.y,8]);
   }
 });

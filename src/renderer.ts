@@ -8,6 +8,7 @@ import { drawMeteor } from "./meteor-art.ts";
 import { stoneMarker } from "./siege-magic-art.ts";
 import { sunbeam, TOWER_ART_SCALE, unitArtScale } from "./tower-art.ts";
 import { drawPrismLocks } from "./prism-art.ts";
+import { drawKrakenGrabs, drawKrakenTips } from "./kraken-art.ts";
 import { drawFanWind } from "./fan-wind.ts";
 import { arrowPose } from "./arrows.ts";
 import { drawFieldSandworm, wormTunnelAt } from "./sandworm-art.ts";
@@ -18,7 +19,8 @@ import { ARMIES, campFor, type MatchMode } from "./battlefield.ts";
 import { characterPose, HIT_FLASH_TICKS, restingPose } from "./character-pose.ts";
 import { drawFallen, drawUnitToken, INK, palette } from "./characters.ts";
 import { drawCrowdUnit, prepareCrowd } from "./crowd-sprites.ts";
-import { drawAttackTrace, drawLegendShot, droppedHead, groundingLine, isAttackTrace } from "./legend-effects.ts";
+import { drawAttackTrace, drawLegendShot, drawWormholeEntrance, droppedHead, groundingLine, isAttackTrace } from "./legend-effects.ts";
+import { SPELLS } from "./spells.ts";
 
 function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team, length: number) {
   ctx.save();
@@ -60,7 +62,7 @@ function drawDivider(ctx: CanvasRenderingContext2D, w: number, h: number, empty:
   ctx.restore();
 }
 
-export function drawArena(ctx: CanvasRenderingContext2D, previous: World, current: World, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior", view: { ownTeam?: Team; showIds?: boolean; mode?: MatchMode } = {}) {
+export function drawArena(ctx: CanvasRenderingContext2D, previous: World, current: World, blend: number, deploying = false, preview: readonly ArenaPoint[] = [], brush: UnitKind = "warrior", view: { ownTeam?: Team; showIds?: boolean; mode?: MatchMode; portalEntrance?: ArenaPoint } = {}) {
   const w = ctx.canvas.clientWidth, h = ctx.canvas.clientHeight;
   if (!w || !h) return;
   ctx.setTransform(ctx.canvas.width / w, 0, 0, ctx.canvas.height / h, 0, 0);
@@ -93,6 +95,11 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
   for (const effect of current.effects ?? []) if (!isAttackTrace(effect)) drawGroundEffect(ctx, effect, tick, sx, sy);
   for (const spell of current.spells ?? []) drawFieldSpell(ctx, spell, tick, sx, sy);
+  if (tick < current.tick) for (const spell of previous.spells ?? []) {
+    const end = spell.startTick + SPELLS.wormhole.duration;
+    if (spell.kind === "wormhole" && tick < end && end <= current.tick) drawFieldSpell(ctx, spell, tick, sx, sy);
+  }
+  if (view.portalEntrance && view.ownTeam) drawWormholeEntrance(ctx,view.portalEntrance,view.ownTeam,tick,sx,sy);
   for (const unit of current.units) if (unit.headSpot) droppedHead(ctx,unit,tick,sx,sy);
   for (const shot of current.arrows) if (shot.kind==="stone" && shot.landTick!==undefined) {
     const left=shot.landTick-current.tick;
@@ -122,6 +129,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const radius = footprint(unit) * unitArtScale(unit.kind) * scale;
     return { unit, from, position, radius, x: (from.x + (unit.x - from.x) * position) * sx, y: (from.y + (unit.y - from.y) * position) * sy };
   }).sort((a, b) => a.y - b.y || a.unit.id - b.unit.id);
+  const krakenGrips = drawKrakenGrabs(ctx,bodies,current.bases,tick,sx,sy);
   for (const {unit,x,y} of bodies) {
     if (!unit.hp || unit.wrappingSince === undefined || unit.targetId === null) continue;
     const patient = byId.get(unit.targetId);
@@ -149,6 +157,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
         const fallAge = combatKill ? (age - HIT_FLASH_TICKS) * 48 / (48 - HIT_FLASH_TICKS) : age;
         drawFallen(ctx, x, y, radius, unit.team, unit.kind, side, fallAge);
       }
+      if (krakenGrips) drawKrakenTips(ctx,krakenGrips.get(unit.id));
     }
   }
   for (const { unit, from, position, radius: r, x, y } of bodies) {
@@ -179,6 +188,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick); ctx.restore();
     } else if (crowd) drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick);
     else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, bodyTick);
+    if (krakenGrips) drawKrakenTips(ctx,krakenGrips.get(unit.id));
     if (stone) {
       ctx.save();ctx.translate(x,y);ctx.scale(r/11,r/11);
       ctx.strokeStyle="#71696b";ctx.lineWidth=1.15;ctx.beginPath();

@@ -143,22 +143,25 @@ export class Room {
     }
     if (spell) {
       if (!live) return "Spells unlock when battle begins.";
-      if (points.length !== 1) return "Choose one spot for the spell.";
-      const point = points[0];
-      if (!record(point) || typeof point.x !== "number" || typeof point.y !== "number" ||
-          !Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.y < 0 ||
-          point.x > ARENA.width || point.y > ARENA.height) return "Choose a spot inside the arena.";
+      const paired = spell==="wormhole";
+      if (points.length !== (paired ? 2 : 1)) return paired ? "Choose an entrance, then an exit." : "Choose one spot for the spell.";
+      const spots: ArenaPoint[] = [];
+      for (const point of points) {
+        if (!record(point) || typeof point.x !== "number" || typeof point.y !== "number" ||
+            !Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.y < 0 ||
+            point.x > ARENA.width || point.y > ARENA.height) return "Choose a spot inside the arena.";
+        spots.push({x:point.x, y:point.y});
+      }
       const price = SPELLS[spell].cost;
       if (price > this.gold[team]!) return "This spell costs " + price + " gold. You have " + this.gold[team] + ".";
-      const { x, y } = point;
+      const { x, y } = spots[spots.length-1];
       const id = this.nextId;
-      const cast = makeFieldSpell(id,spell,team,x,y,this.world.tick,this.world.units);
-      if (spell === "wormhole" && cast.portalUnitId === undefined) return "Wormhole needs a living mobile ally.";
+      const cast = makeFieldSpell(id,spell,team,x,y,this.world.tick,paired ? spots[0] : undefined);
       this.nextId++;
       const ack: PlacementAck = { type: "placement-ack", round, commandId, unitIds: [], spellId: id };
       this.gold[team]! -= price;
       this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, this.world.bases, [...(this.world.spells ?? []), cast], this.world.effects);
-      player.receipts.set(commandId, { ack, type: SPELLS[spell].command, points: [{x, y}] });
+      player.receipts.set(commandId, { ack, type: SPELLS[spell].command, points: spots });
       return { ack, fresh: true };
     }
     if (!kind) return "Unknown placement command.";
