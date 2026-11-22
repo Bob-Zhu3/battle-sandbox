@@ -4,6 +4,7 @@ import type { GroundEffect } from "./conditions.ts";
 import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
 import type { Target, Unit } from "./simulation.ts";
+import { TOWER_ART_SCALE } from "./tower-art.ts";
 
 const circle = 2 * Math.PI;
 
@@ -113,7 +114,7 @@ export function drawAttackTrace(c: Pens, e: GroundEffect, tick: number, sx: numb
   const life = e.kind === "breath" ? 22 : e.kind === "gaze" ? 17 : e.kind === "harpoon" ? 10 : 12;
   if (age < 0 || age >= life || e.fromX === undefined || e.fromY === undefined) return;
   const k = Math.min(sx, sy);
-  const headHeight = e.kind === "prism" ? 19 : e.kind === "harpoon" ? 13 : e.kind === "breath" ? 21 : 16;
+  const headHeight = e.kind === "prism" ? 19*TOWER_ART_SCALE : e.kind === "harpoon" ? 13*TOWER_ART_SCALE : e.kind === "breath" ? 21 : 16;
   const wx = e.x - e.fromX, wy = e.y - e.fromY, worldLength = Math.hypot(wx,wy);
   // The dragon turns its head left or right even when its target is directly above it.
   const side = Math.abs(wx) > .08 * worldLength ? Math.sign(wx) : ARMIES[e.team].facing;
@@ -218,9 +219,11 @@ export function droppedHead(c: Pens, unit: Unit, tick: number, sx: number, sy: n
 export function drawLegendShot(c: Pens, shot: Arrow, x: number, y: number, angle: number, k: number, tick: number,
   caster: Target | undefined, sx: number, sy: number) {
   const age = Math.max(0,tick-shot.releasedTick);
-  const lift = shot.kind === "head" ? 12 + 3*Math.sin(age*.18) : shot.kind === "harpoon" ? 9 : 8 + 4*Math.sin(Math.min(1, age/30)*Math.PI);
+  const launch = Math.max(0,1-age/12);
+  const lift = shot.kind === "head" ? 12 + 3*Math.sin(age*.18) : shot.kind === "harpoon" ? 9 + (13*TOWER_ART_SCALE-9)*launch :
+    8 + 8*(TOWER_ART_SCALE-1)*launch + 4*Math.sin(Math.min(1, age/30)*Math.PI);
   if (shot.kind === "harpoon" && caster?.hp) {
-    const startX = caster.x*sx, startY = caster.y*sy-13*k, dx = x-startX, dy = y-lift*k-startY;
+    const startX = caster.x*sx, startY = caster.y*sy-13*k*TOWER_ART_SCALE, dx = x-startX, dy = y-lift*k-startY;
     const length = Math.hypot(dx,dy)/k;
     c.save();c.translate(startX,startY);c.rotate(Math.atan2(dy,dx));c.scale(k,k);
     rope(c,length,Math.min(6,length*.09)*Math.cos(Math.atan2(dy,dx)));c.restore();

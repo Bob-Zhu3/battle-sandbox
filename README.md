@@ -64,7 +64,7 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 
 In the reinforcements playground, press **Play** to watch the Harpoon Tower reel in a Fire Dragon, the Trojan Horse release its passengers, and a wounded Werewolf shed its cloak. Wormhole is already selected. Tap an empty spot to bring the nearest mobile Red ally there. [Play the reinforcements scene](https://bob-zhu3.github.io/battle-sandbox/?demo=reinforcements)
 
-Press **Play** in the Windmill scene to see an Archer shoot into the fan. Cast the selected Gust on the Windmill to speed up its blades. Across the field a Sandworm dives under a Watchpost while a Prism Tower focuses on an Iron Golem. [Play the Windmill scene](https://bob-zhu3.github.io/battle-sandbox/?demo=windmill)
+Press **Play** in the Windmill scene to see the wind bend an Archer's shot. Cast the selected Gust on the mill to speed up its four sails. Across the field a Sandworm dives under a Watchpost while a Prism Tower focuses on an Iron Golem. [Play the Windmill scene](https://bob-zhu3.github.io/battle-sandbox/?demo=windmill)
 
 ![Roster portraits of the nineteen recruits and the Wormhole spell](media/reinforcements.png)
 

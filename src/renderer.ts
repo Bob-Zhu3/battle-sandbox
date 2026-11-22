@@ -6,7 +6,7 @@ import { drawFieldSpell } from "./magic-art.ts";
 import { iceShell, rageRibbons } from "./weather-art.ts";
 import { drawMeteor } from "./meteor-art.ts";
 import { stoneMarker } from "./siege-magic-art.ts";
-import { sunbeam } from "./tower-art.ts";
+import { sunbeam, TOWER_ART_SCALE, unitArtScale } from "./tower-art.ts";
 import { drawPrismLocks } from "./prism-art.ts";
 import { drawFanWind } from "./fan-wind.ts";
 import { arrowPose } from "./arrows.ts";
@@ -100,10 +100,11 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
   const targets = [...current.units, ...(current.bases ?? [])];
   const byId = new Map(targets.map(target => [target.id, target]));
+  const keepScale = scale * TOWER_ART_SCALE;
   for (const base of current.bases ?? []) {
-    drawKeep(ctx, base, base.x*sx, base.y*sy, scale, tick);
-    if (base.hp && (base.frozenUntil ?? 0)>tick) iceShell(ctx,base.x*sx,base.y*sy,25*scale,base.frozenUntil!-tick);
-    if (base.hp && (base.stunnedUntil ?? 0)>tick) drawStun(ctx,base.x*sx,base.y*sy-24*scale,scale,tick,base.id);
+    drawKeep(ctx, base, base.x*sx, base.y*sy, keepScale, tick);
+    if (base.hp && (base.frozenUntil ?? 0)>tick) iceShell(ctx,base.x*sx,base.y*sy,25*keepScale,base.frozenUntil!-tick);
+    if (base.hp && (base.stunnedUntil ?? 0)>tick) drawStun(ctx,base.x*sx,base.y*sy-24*keepScale,scale,tick,base.id);
   }
   const prior = new Map(previous.units.map(unit => [unit.id, unit]));
   const scoops = new Map<number, (typeof current.units)[number]>();
@@ -118,7 +119,8 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const from = prior.get(unit.id) ?? unit;
     const jump = unit.warpedTick;
     const position = jump !== undefined && jump > previous.tick && jump <= current.tick ? Number(tick >= jump) : blend;
-    return { unit, from, position, x: (from.x + (unit.x - from.x) * position) * sx, y: (from.y + (unit.y - from.y) * position) * sy };
+    const radius = footprint(unit) * unitArtScale(unit.kind) * scale;
+    return { unit, from, position, radius, x: (from.x + (unit.x - from.x) * position) * sx, y: (from.y + (unit.y - from.y) * position) * sy };
   }).sort((a, b) => a.y - b.y || a.unit.id - b.unit.id);
   for (const {unit,x,y} of bodies) {
     if (!unit.hp || unit.wrappingSince === undefined || unit.targetId === null) continue;
@@ -130,12 +132,11 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     ctx.lineWidth=2.8*scale;ctx.setLineDash([4*scale,2*scale]);ctx.beginPath();
     ctx.moveTo(x,y-2*scale);ctx.quadraticCurveTo((x+ex)/2,(y+ey)/2+5*scale,ex,ey-2*scale);ctx.stroke();ctx.restore();
   }
-  for (const { unit, from, position, x, y } of bodies) {
+  for (const { unit, from, position, radius, x, y } of bodies) {
     if (unit.hp || unit.lastHitTick === null || unit.swallowedTick !== undefined) continue;
     const age = Math.max(0, tick - unit.lastHitTick);
     if (age < 48) {
       const side = unit.aimX < 0 ? -1 : 1;
-      const radius = footprint(unit) * scale;
       // A base retreat also timestamps the fallen pose, but only combat kills
       // earn a killer in a match. Keep the struck body visible for its flash.
       const combatKill = !current.bases || unit.killedBy !== undefined;
@@ -150,7 +151,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       }
     }
   }
-  for (const { unit, from, position, x, y } of bodies) {
+  for (const { unit, from, position, radius: r, x, y } of bodies) {
     if (!unit.hp) continue;
     if (unit.kind !== "sandworm" && unit.tunnel) {drawTunnel(ctx,unit,x,y,tick,sx,sy); continue;}
     const travel = from.walkDistance + (unit.walkDistance - from.walkDistance) * blend;
@@ -160,7 +161,6 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const bodyTick = stone ? stoneAt : frozen ? unit.frozenAt! : tick;
     const pose = deploying ? restingPose(ARMIES[unit.team].facing)
       : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), bodyTick, travel, from.lastHitTick,tick);
-    const r = footprint(unit) * scale;
     if (unit.kind === "sandworm" && wormTunnelAt(unit,from,tick)) {
       drawFieldSandworm(ctx,unit,from,x,y,sx,sy,position,tick,pose,false,crowd);
       continue;
@@ -213,7 +213,9 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     } else if (arrow.kind === "stone" || arrow.kind === "bomb" || arrow.kind === "ice" || arrow.kind === "bullet" || arrow.kind === "venom" || arrow.kind === "balloon" || arrow.kind === "hex") {
       drawSpecialShot(ctx,arrow,x,y,angle,scale,tick);
     } else if (length > 0) {
-      const height=arrow.kind==="bolt" ? 7+15*Math.max(0,1-(tick-arrow.releasedTick)/22) : 7;
+      const launchHeight=arrow.kind==="bolt" && arrow.reflectedTick===undefined ? 22*TOWER_ART_SCALE :
+        arrow.kind==="dart" && arrow.casterId!==undefined && byId.get(arrow.casterId)?.kind==="post" ? UNIT_DEFINITIONS.post.radius*TOWER_ART_SCALE : 7;
+      const height=7+(launchHeight-7)*Math.max(0,1-(tick-arrow.releasedTick)/22);
       drawArrow(ctx,x,y-height*scale,angle,scale*(arrow.kind==="dart"?.73:1),arrow.team,length);
     }
   }
@@ -226,11 +228,10 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#f8f3df";
     ctx.fillStyle = INK;
-    for (const unit of current.units) {
+    for (const {unit,radius,x: centerX,y} of bodies) {
       const left = !deploying && ARMIES[unit.team].facing > 0;
-      const offset = footprint(unit) * scale + 5;
-      const x = unit.x * sx + (left ? -offset : offset);
-      const y = unit.y * sy;
+      const offset = radius + 5;
+      const x = centerX + (left ? -offset : offset);
       const label = "#" + unit.id + (deploying ? "" : " · " + unit.hp + " HP");
       ctx.textAlign = left ? "right" : "left";
       ctx.strokeText(label, x, y);
@@ -243,7 +244,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   const radius = UNIT_DEFINITIONS[brush].radius;
   for (const point of preview) {
     const x = boundCenter(point.x, ARENA.width, radius), y = boundCenter(point.y, ARENA.height, radius);
-    drawUnitToken(ctx, x * sx, y * sy, radius * scale, view.ownTeam ?? "red", brush);
+    drawUnitToken(ctx, x * sx, y * sy, radius * unitArtScale(brush) * scale, view.ownTeam ?? "red", brush);
   }
   ctx.restore();
 }

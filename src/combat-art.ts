@@ -5,6 +5,7 @@ import type { GroundEffect } from "./conditions.ts";
 import type { Arrow } from "./arrows.ts";
 import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { drawBomb } from "./roster-art.ts";
+import { TOWER_ART_SCALE } from "./tower-art.ts";
 import { drawBreach } from "./legend-effects.ts";
 
 export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
@@ -124,7 +125,7 @@ export function drawSpecialShot(c: Pens, shot: Arrow, x: number, y: number, angl
   c.save(); c.translate(x,y); c.scale(k,k);
   if(shot.kind==="stone") {
     const t=Math.max(0,Math.min(1,(tick-shot.releasedTick)/(shot.landTick!-shot.releasedTick)));
-    oval(c,0,1.5,4.7,1.9,"#59634b50");c.translate(0,-7*(1-t)-42*Math.sin(Math.PI*t));c.rotate(t*5.9);
+    oval(c,0,1.5,4.7,1.9,"#59634b50");c.translate(0,-7*TOWER_ART_SCALE*(1-t)-42*Math.sin(Math.PI*t));c.rotate(t*5.9);
     cut(c,"M-5 -.8 Q-5.2 -4.9 -.7 -5.4 L3.5 -4 Q5.7 -3.1 5 1.9 L2 5 L-2.7 4.1Z","#93988a",1.2);
     line(c,-3.1,-2.1,-.8,-3.6,"#e1dfbe",1.25);
   } else if(shot.kind==="bomb" || shot.kind==="balloon") {

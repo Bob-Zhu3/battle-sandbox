@@ -1,11 +1,13 @@
 import { ARMIES } from "./battlefield.ts";
 import type { Pens } from "./ink.ts";
 import type { Unit } from "./simulation.ts";
+import { TOWER_ART_SCALE } from "./tower-art.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 
-// Shared with the original drawing. Heights are in its radius-11 art space.
-export const FAN_HUB_HEIGHT = 10.7;
-const mouthOffset = 4.3;
+// Fit the four-sail drawing to a tower-sized token. The axle is measured in that drawing.
+export const MILL_MODEL_SCALE = .76;
+export const FAN_HUB_HEIGHT = 13.2;
+export const FAN_HUB_OFFSET = 4.3;
 
 export function fanGustProgress(unit: Unit | undefined, tick: number) {
   if (unit?.millFastUntil === undefined) return 0;
@@ -38,18 +40,19 @@ export function drawFanWind(c: Pens, unit: Unit, tick: number, sx: number, sy: n
   const dx = length ? unit.aimX / length : ARMIES[unit.team].facing;
   const dy = length ? unit.aimY / length : 0;
   const definition = UNIT_DEFINITIONS.windmill;
-  const figureScale = Math.min(sx, sy) * definition.radius / 11;
+  const artUnits = definition.radius * TOWER_ART_SCALE * MILL_MODEL_SCALE / 11;
+  const figureScale = Math.min(sx, sy) * artUnits;
   const gust = fanGustProgress(unit, tick);
   const boosted = unit.millFastUntil !== undefined &&
     tick >= unit.millFastUntil - definition.spinTicks && tick < unit.millFastUntil;
   const age = tick - (unit.lastBlockTick ?? -Infinity);
   const deflection = age >= 0 && age < 12 ? 1 - age / 12 : 0;
-  const range = definition.reach - mouthOffset * definition.radius / 11;
+  const range = definition.reach - FAN_HUB_OFFSET * artUnits;
   const lanes = boosted ? 4 : 3;
 
   c.save();
-  c.translate(unit.x * sx + dx * mouthOffset * figureScale,
-    unit.y * sy - FAN_HUB_HEIGHT * figureScale + dy * mouthOffset * figureScale);
+  c.translate(unit.x * sx + dx * FAN_HUB_OFFSET * figureScale,
+    unit.y * sy - FAN_HUB_HEIGHT * figureScale + dy * FAN_HUB_OFFSET * figureScale);
   c.transform(dx * sx, dy * sy, -dy * sx, dx * sy, 0, 0);
   const breath = Math.sin(tick * .14 + unit.id);
   c.strokeStyle = "#75a6ac"; c.lineWidth = boosted ? 1.35 : 1.05; c.lineCap = "round";

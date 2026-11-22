@@ -1,9 +1,14 @@
 import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { INK, WOOD, cut, limb, line, oval, type Dye, type Pens } from "./ink.ts";
-import type { Unit } from "./simulation.ts";
-import { UNIT_DEFINITIONS } from "./units.ts";
+import type { Target, Unit } from "./simulation.ts";
+import { isBuilding, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 
 const brass = "#e5af59", bronze = "#95653e", stone = "#b0b3a0", shade = "#7c887c";
+
+export const TOWER_ART_SCALE = 1.2;
+export function unitArtScale(kind: UnitKind | "base") {
+  return kind === "base" || isBuilding(kind) ? TOWER_ART_SCALE : 1;
+}
 
 function plinth(c: Pens, d: Dye) {
   cut(c,"M-10 3 Q-8.8 1.4 -6 1.5 L7 1.5 Q9.6 2.1 10.3 4 L10.7 7.1 Q10.1 8.8 7.4 8.8 L-8.3 8.8 Q-10.7 8.4 -10.7 6.8Z",stone);
@@ -65,11 +70,12 @@ export function bellTower(c: Pens, d: Dye, u: Unit|undefined, tick: number) {
   oval(c,-.35,-18.6,1.55,1.3,brass);
 }
 
-export function sunbeam(c: Pens, u: Unit, target: TargetPoint|undefined, tick: number, sx: number, sy: number) {
+export function sunbeam(c: Pens, u: Unit, target: Target|undefined, tick: number, sx: number, sy: number) {
   if (!u.hp || u.focusSince === undefined || tick<u.focusSince || !target || (u.fogUntil??0)>tick) return;
   const k=Math.min(sx,sy), pulse=u.beam && u.beam.tick>=u.focusSince && tick>=u.beam.tick && tick-u.beam.tick<9 ? u.beam : undefined;
-  const fromX=u.x*sx+(u.aimX<0?-1:1)*k, fromY=u.y*sy-15*k;
-  const end=pulse ?? target, x=end.x*sx, y=end.y*sy-7*k;
+  const lensScale=k*TOWER_ART_SCALE*UNIT_DEFINITIONS.sunlens.radius/11;
+  const fromX=u.x*sx+(u.aimX<0?-1:1)*.9*lensScale, fromY=u.y*sy-11.6*lensScale;
+  const end=pulse ?? target, x=end.x*sx, y=end.y*sy-7*k*unitArtScale(target.kind);
   c.save();c.lineCap="round";
   if(pulse) {
     const strength=1-(tick-pulse.tick)/9; c.globalAlpha=strength;
@@ -82,4 +88,3 @@ export function sunbeam(c: Pens, u: Unit, target: TargetPoint|undefined, tick: n
   }
   c.restore();
 }
-type TargetPoint = {x:number; y:number};

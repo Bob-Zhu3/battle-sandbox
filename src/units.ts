@@ -131,7 +131,7 @@ const recruits = {
     cost: 36, bounty: 6, attack: "melee", radius: 17, maxHp: troopHealth(51), speed: 64, reach: 46, damage: 8, cooldownTicks: 72,
   },
   windmill: {
-    name: "Windmill", command: "place-windmills", description: "Turns its fan toward enemies. The airstream pushes troops and blows incoming arrows away. A friendly Gust gives it a stronger push.",
+    name: "Windmill", command: "place-windmills", description: "Turns its sails toward enemies. The wind pushes troops and blows incoming arrows away. A friendly Gust spins the sails faster.",
     cost: 18, bounty: 9, attack: "fan", radius: 15, maxHp: troopHealth(43), speed: 0, reach: 101, damage: 3, cooldownTicks: 36, pushPerSecond: 34, spread: .6, spinTicks: 75,
   },
   harpoon: {

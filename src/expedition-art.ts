@@ -3,7 +3,7 @@ import { cut, eye, FACE, INK, IRON, limb, line, oval, type Dye, type Pens } from
 import { crystalFocus, crystalLift } from "./prism-art.ts";
 import type { Unit } from "./simulation.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
-import { FAN_HUB_HEIGHT, fanGustProgress } from "./fan-wind.ts";
+import { FAN_HUB_HEIGHT, FAN_HUB_OFFSET, fanGustProgress, MILL_MODEL_SCALE } from "./fan-wind.ts";
 
 export type ExpeditionKind = "wrestler" | "liondancers" | "rhinorider" | "trojanhorse" |
   "windmill" | "harpoon" | "prism" | "snowman";
@@ -190,42 +190,49 @@ function masonry(c: Pens, d: Dye) {
 }
 
 function windmill(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
+  c.scale(MILL_MODEL_SCALE, MILL_MODEL_SCALE);
+  // The character layer faces its target. Undo that mirror for the masonry
+  // so the doorway stays put when the cap swings from one side to the other.
+  c.save(); c.scale(p.side, 1);
   masonry(c, d);
-  cut(c, "M-7.15 3.95 L-5.6 -4.2 Q-1.1 -5.75 4.85 -4.5 L7.55 3.65 Q.85 5.2 -7.15 3.95Z", "#d8c7aa", 1.15);
-  cut(c, "M-6.5 -3.4 L-5.75 -5.1 Q-.2 -6.45 5.4 -5.15 L6.5 -3.8 Q1.5 -2.65 -6.5 -3.4Z", d.coat, .9);
-  cut(c, "M-3.25 3.9 L-3.05 1.1 Q-2.75 -.5 -1.45 -.4 Q.1 -.35 .15 1.1 L.35 4.1Z", grain, .65);
-  limb(c, -1.1, -4.9, -.4, -9.1, "#969f94", 3.3);
-  const block = eventFade(tick, u?.lastBlockTick, 10);
-  c.save(); c.translate(0, -FAN_HUB_HEIGHT); c.rotate(p.pitch);
-  c.translate(-.55 * block, 0);
-  // The short motor behind the fan and its brass swivel keep the front
-  // unambiguous as the head tracks a unit crossing the tower.
-  cut(c, "M-9.65 -3.6 Q-8.4 -5.85 -5.75 -6.05 L2.55 -5.5 L3.1 5.05 L-5.55 5.05 Q-9.65 4.95 -9.75 1.05Z", d.hem, 1.25);
-  cut(c, "M-8.95 -2.7 Q-8.55 -5.35 -5.5 -5.25 L2.3 -4.75 L1.65 -1.15 L-8.95 -.75Z", d.coat, .65);
-  line(c, -7.75, .6, -5.8, .5, "#e8d9bf", .7);
-  line(c, -7.4, 2, -5.8, 1.9, "#e8d9bf", .65);
-  oval(c, -.5, 3.9, 2.1, 2.1, INK); oval(c, -.5, 3.9, 1.35, 1.35, brass);
-  c.save(); c.translate(3.9, 0); c.scale(.79, 1);
-  oval(c, -.75, .2, 10.85, 10.85, INK);
-  oval(c, -.55, .15, 10.05, 10.05, "#8d9990");
-  oval(c, .35, -.2, 9.45, 9.5, INK);
-  oval(c, .35, -.2, 8.35, 8.4, "#f0efdb");
-  const turn = -.22 + (u ? tick * .105 + u.id * .46 : 0) + fanGustProgress(u, tick) * Math.PI * 4;
-  c.save(); c.rotate(turn);
-  for (let blade = 0; blade < 3; blade++) {
-    cut(c, "M-.5 -1.1 C-1.4 -4.05 -.7 -7.85 2.5 -8.05 Q5.55 -8.2 6.45 -5.6 Q6.85 -4.4 5.15 -3.9 Q2.75 -3.35 .65 -.45Z", d.coat, .9);
-    cut(c, "M.45 -5.9 Q1.2 -7.95 3.55 -7.35 L4.9 -6.75 Q2.2 -7.05 .45 -5.9Z", d.light, 0);
-    c.rotate(2 * Math.PI / 3);
+  cut(c, "M-8.95 4.0 Q-7.25 -2.35 -5.45 -11.5 Q-.8 -13.3 4.95 -11.6 Q6.5 -4.3 8.65 3.85 Q.65 6.3 -8.95 4Z", "#e7d7b2", 1.35);
+  cut(c, "M2.7 -11.35 L4.9 -11.65 Q6.5 -4.35 8.65 3.8 Q6 4.85 3.4 4.95 Q3.8 -.45 2.7 -11.35Z", "#c3ac86", 0);
+  cut(c, "M-5.85 4.35 L-5.6 -.15 Q-5.55 -3 -3.55 -3.55 Q-.95 -3.85 -.7 -.9 L-.45 4.8Z", INK, .7);
+  cut(c, "M-4.55 4.3 L-4.3 -.2 Q-4.1 -1.7 -3.3 -1.95 Q-2.05 -2 -2 -.35 L-1.85 4.5Z", grain, 0);
+  cut(c, "M2.65 -6.75 L4.8 -6.6 L5.05 -4.15 L2.7 -4.35Z", d.hem, .65);
+  line(c, -7.65, 1.75, -6.45, 1.85, "#baa581", .72);
+  c.restore();
+
+  const forward = Math.cos(p.pitch), slope = Math.sin(p.pitch);
+  const axleX = FAN_HUB_OFFSET * forward, axleY = -FAN_HUB_HEIGHT + FAN_HUB_OFFSET * slope;
+  // A pitched cap rides on the wooden curb. Its shaded gable and exposed
+  // windshaft turn toward the stream while the tower remains plumb.
+  c.save(); c.translate(.24 * forward, .48 * slope);
+  cut(c, "M-8.3 -10.35 L-7.6 -12.15 L-2.65 -18.25 Q-1.2 -20.4 .1 -21.05 L1.35 -20.65 Q4.75 -17.8 8.25 -11.8 L9 -10.15 Q2.15 -8.95 -8.3 -10.35Z", d.coat, 1.25);
+  cut(c, "M.55 -20.45 Q4.75 -17.35 8.35 -11.35 L3.2 -10.6 Q2.9 -15.55 .55 -20.45Z", d.hem, 0);
+  line(c, -6.4, -11.2, -.8, -18.5, d.light, .85);
+  cut(c, "M-8.3 -10.55 Q-.1 -9.65 8.75 -10.8 L9 -9.75 Q3.15 -8.05 -8.2 -9.4Z", grain, .8);
+  c.restore();
+  limb(c, .15, -FAN_HUB_HEIGHT, axleX, axleY, oak, 2.35);
+
+  const turn = -.69 + (u ? tick * .048 + u.id * .41 : 0) + fanGustProgress(u, tick) * Math.PI * 4;
+  c.save(); c.translate(axleX, axleY);
+  c.transform(1 - .14 * forward, .10 * slope * forward, 0, 1, 0, 0);
+  c.rotate(turn);
+  for (let sail = 0; sail < 4; sail++) {
+    limb(c, 0, -.1, 0, -16.8, oak, 1.15);
+    // The near portion is open ladderwork; the sailcloth is lashed to the
+    // outer bars. White gaps through the wood stay visible at roster size.
+    line(c, 0, -5.05, 3.9, -5.7, grain, .86);
+    line(c, 3.9, -5.7, 4.9, -16.5, grain, 1.05);
+    line(c, 0, -7.9, 4.15, -8.55, grain, .82);
+    cut(c, "M.15 -10.55 Q1.95 -10.4 4.35 -11.15 L4.95 -16.7 Q2.2 -16.05 .15 -16.55Z", ivory, .95);
+    cut(c, "M.3 -14.85 Q2.5 -14.5 4.72 -15.15 L4.95 -16.65 Q2.25 -16.05 .2 -16.45Z", d.coat, .45);
+    c.rotate(Math.PI / 2);
   }
   c.restore();
-  oval(c, .45, -.1, 2.45, 2.4, INK); oval(c, .5, -.25, 1.55, 1.55, brass);
-  c.restore();
-  if (!u) {
-    c.beginPath(); c.moveTo(13.2, -3.05); c.quadraticCurveTo(16.3, -4.3, 19.45, -3.15);
-    c.moveTo(13.7, .75); c.quadraticCurveTo(16.25, .25, 18.25, 1.3);
-    c.strokeStyle = "#84afb3"; c.lineWidth = 1; c.stroke();
-  }
-  c.restore();
+  oval(c, axleX, axleY, 2.15, 2.15, INK);
+  oval(c, axleX - .13, axleY - .2, 1.4, 1.4, brass);
 }
 
 function harpoon(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
