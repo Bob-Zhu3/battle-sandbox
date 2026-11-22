@@ -422,16 +422,25 @@ async function browseRoster(url) {
       await page.getByRole("button",{name:ARMIES[team].name+" army",exact:true}).click();
       for(const shelf of Object.keys(catalog)) {
         await panel.getByRole("tab",{name:shelf,exact:true}).click();
-        const clipped=await panel.locator(".palette-card canvas").evaluateAll(canvases=>canvases.flatMap(canvas=>{
+        const frames=await panel.locator(".palette-card canvas").evaluateAll(canvases=>canvases.map(canvas=>{
           const {width,height}=canvas;
           const ink=canvas.getContext("2d").getImageData(0,0,width,height).data;
+          let left=width,top=height,right=-1,bottom=-1,clipped=false;
           for(let y=0;y<height;y++) for(let x=0;x<width;x++) {
-            if(x>=2 && x<width-2 && y>=2 && y<height-2) continue;
-            if(ink[(y*width+x)*4+3]>32) return [canvas.parentElement.getAttribute("aria-label")];
+            const alpha=ink[(y*width+x)*4+3];
+            if(alpha>32 && (x<2 || x>=width-2 || y<2 || y>=height-2)) clipped=true;
+            if(alpha<128) continue; // Measure the solid figure above its translucent shadow.
+            left=Math.min(left,x); right=Math.max(right,x);
+            top=Math.min(top,y); bottom=Math.max(bottom,y);
           }
-          return [];
+          return {name:canvas.parentElement.getAttribute("aria-label"),clipped,span:Math.max(right-left,bottom-top)+1};
         }));
-        assert.deepEqual(clipped,[],team+" portraits need space around each silhouette");
+        assert.deepEqual(frames.filter(f=>f.clipped).map(f=>f.name),[],team+" portraits need space around each silhouette");
+        if(shelf==="Towers") {
+          // Compare the longest edge so a horizontal harpoon and a tall spire fit the same space.
+          const spans=frames.map(f=>f.span);
+          assert.ok(Math.max(...spans)<=1.15*Math.min(...spans),team+" tower portrait sizes: "+spans.join(", "));
+        }
       }
     }
     await chooseCard(page,"Towers","Mouse Workshop");

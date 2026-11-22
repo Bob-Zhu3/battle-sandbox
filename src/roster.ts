@@ -1,9 +1,8 @@
 import { ARMIES, type Team } from "./battlefield.ts";
 import { drawUnitToken } from "./characters.ts";
 import { drawSpellIcon } from "./magic-art.ts";
-import { unitArtScale } from "./tower-art.ts";
 import { SPELLS, type SpellKind } from "./spells.ts";
-import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
+import { isBuilding, UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 
 type Brush = RecruitKind | SpellKind;
 const shelves: {name: string; items: Brush[]}[] = [
@@ -15,6 +14,16 @@ const shelves: {name: string; items: Brush[]}[] = [
 ];
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
 function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key); }
+
+// Frame the taller and wider silhouettes in the same 72-unit portrait as the other towers.
+const towerPortraits: Partial<Record<RecruitKind, { radius: number; y: number }>> = {
+  post:      { radius: 19,    y: 41 },
+  workshop:  { radius: 18.25, y: 46 },
+  lobber:    { radius: 17.5,  y: 45 },
+  sunlens:   { radius: 16.25, y: 46 },
+  belltower: { radius: 17.5,  y: 45 },
+};
+const standardTowerPortrait = { radius: 16.32, y: 47 };
 
 export function createRoster(strip: HTMLElement, priced: boolean) {
   const storageKey = "battle.palette." + (location.pathname.replace(/\/$/, "") || "/");
@@ -72,21 +81,24 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     const c=art.getContext("2d")!;
     c.scale(2,2);
     if(isSpell(key)){c.translate(36,36);c.scale(1.95,1.95);drawSpellIcon(c,key);}
-    else if (key === "phoenix") {
+    else if (isBuilding(key)) {
+      const { radius, y } = towerPortraits[key] ?? standardTowerPortrait;
+      const x = key === "harpoon" ? 36 - 3 * ARMIES[team].facing : 36;
+      drawUnitToken(c, x, y, radius, team, key);
+    } else if (key === "phoenix") {
       drawUnitToken(c, 36 + ARMIES[team].facing * 9.5, 49, 13.5, team, key);
     } else if (["hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem",
-      "wrestler","liondancers","rhinorider","trojanhorse","windmill","harpoon","prism","snowman"].includes(key)) {
-      const shift=key==="harpoon" ? -3 : key==="firedragon" ? 2.5 : 0;
+      "wrestler","liondancers","rhinorider","trojanhorse"].includes(key)) {
+      const shift=key==="firedragon" ? 2.5 : 0;
       const size=key==="slime" ? 18.5 : key==="vampire" || key==="irongolem" ? 16.5 : key==="firedragon" ? 13 : 13.6;
       const y=key==="slime" ? 43 : 47;
-      drawUnitToken(c,36+shift*ARMIES[team].facing,y,size*unitArtScale(key),team,key);
+      drawUnitToken(c,36+shift*ARMIES[team].facing,y,size,team,key);
     } else {
       const myth = key === "cyclops" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
       const longWeapon = key === "musketeer" || key === "lancer" || key === "miner";
       const size = myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
       const shift = key === "reaper" || key === "miner" ? -7 : longWeapon || key === "cyclops" ? -4 : 0;
-      const y=key==="sunlens" ? 46 : myth ? 49 : 44;
-      drawUnitToken(c,36 + ARMIES[team].facing * shift,y,size*unitArtScale(key),team,key);
+      drawUnitToken(c,36 + ARMIES[team].facing * shift,myth ? 49 : 44,size,team,key);
     }
     return art;
   }
