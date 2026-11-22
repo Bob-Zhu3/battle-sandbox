@@ -39,6 +39,57 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
       envelope(src,filter,at,duration,peak,attack); src.start(at,variation*(1-duration)); src.stop(at+duration);
     }
     switch (cue.kind) {
+      case "portalOpen":
+        noise(480,2300,.27,.18,.085);tone(280,550,.22,.14,"sine",0,.065);tone(414,818,.19,.075,"sine",.035,.06);break;
+      case "wormhole":
+        tone(930,284,.13,.18,"triangle");tone(306,1050,.22,.19,"sine",.10,.033);
+        noise(1700,4600,.14,.13,.035,.13);break;
+      case "prism":
+        for (const [i,hz] of [670,1005,1510].entries()) tone(hz,hz*1.055,.20-i*.02,.12-i*.024,"sine",i*.024,.01);
+        break;
+      case "stoneGaze":
+        noise(2900,970,.21,.24,.064);tone(760,307,.19,.10,"triangle",.035,.032);noise(1370,850,.10,.19,.004,.16);break;
+      case "fireBreath":
+        noise(410,1200,.38,.43,.058);noise(2800,760,.31,.35,.042,.08);tone(109,62,.34,.12,"triangle",.02,.065);break;
+      case "winch":
+        noise(1200,3110,.12,.23,.024);tone(485,710,.11,.11,"triangle");
+        for(let i=0;i<3;i++) noise(2300,1500,.023,.16,.003,.10+i*.031);break;
+      case "hook":
+        tone(990,652,.135,.14,"triangle");tone(1810,1460,.09,.08);noise(3400,1620,.038,.21);break;
+      case "breach":
+        noise(350,160,.32,.38,.038);noise(1370,485,.22,.26,.021,.045);
+        for(let i=0;i<3;i++) noise(1100+i*260,460,.052,.13,.005,.13+i*.055);break;
+      case "snow":
+        noise(2140,900,.10,.26,.016);noise(4100,2450,.06,.14,.011,.022);break;
+      case "squelch":
+        tone(170,459,.079,.17,"sine",0,.016);tone(427,95,.12,.19,"triangle",.052);noise(920,340,.085,.12,.009,.057);break;
+      case "cymbals":
+        noise(6100,3350,.27,.31);tone(1920,1850,.18,.07,"triangle");tone(2961,2870,.13,.065);break;
+      case "heave":
+        noise(880,350,.21,.34,.034);tone(154,93,.18,.17,"sawtooth",.014,.02);break;
+      case "snort":
+        noise(490,1060,.13,.28,.026);noise(960,330,.22,.34,.018,.09);tone(125,73,.20,.11,"sawtooth",.10,.023);break;
+      case "hiss":
+        noise(4100,6400,.16,.27,.058);noise(5900,2600,.18,.22,.018,.11);break;
+      case "bark":
+        for(const [i,hz] of [248,205,323].entries()) {
+          const offset=i*.051;
+          tone(hz,hz*.48,.115,.086,"sawtooth",offset,.009);
+          noise(1350-i*150,460,.115,.14,.008,offset);
+        }
+        break;
+      case "splash":
+        noise(1740,740,.18,.25,.021);tone(360,635,.125,.135,"sine",.040);
+        tone(610,940,.10,.075,"sine",.13);break;
+      case "flutter":
+        for(let i=0;i<3;i++) noise(1520,620,.058,.15-i*.018,.019,i*.055);
+        break;
+      case "canvas":
+        noise(430,1200,.10,.16,.018);noise(965,310,.095,.23,.007,.061);break;
+      case "hatch":
+        tone(250,475,.17,.07,"sawtooth",0,.034);noise(960,471,.08,.25,.008,.155);tone(205,117,.095,.12,"triangle",.15);break;
+      case "anvil":
+        tone(415,397,.29,.16,"triangle");tone(1178,1130,.21,.095);tone(1749,1696,.13,.06);noise(2750,870,.061,.22);break;
       case "place": tone(410,210,.059,.10,"sine"); noise(1250,690,.045,.075); break;
       case "bowDraw": noise(690,2220,.26,.25,.115);noise(1250,850,.12,.13,.042,.09);break;
       case "bow": tone(238,183,.20,.20,"triangle");tone(728,525,.095,.10);noise(5400,2600,.042,.16);break;

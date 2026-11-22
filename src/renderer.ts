@@ -1,7 +1,7 @@
 import { ARENA, boundCenter, type Team } from "./simulation.ts";
 import type { World } from "./room-protocol.ts";
 import { type ArenaPoint } from "./deployment.ts";
-import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { footprint, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { drawFieldSpell } from "./magic-art.ts";
 import { iceShell, rageRibbons } from "./weather-art.ts";
 import { drawMeteor } from "./meteor-art.ts";
@@ -14,6 +14,7 @@ import { ARMIES, campFor, type MatchMode } from "./battlefield.ts";
 import { characterPose, HIT_FLASH_TICKS, restingPose } from "./character-pose.ts";
 import { drawFallen, drawUnitToken, INK, palette } from "./characters.ts";
 import { drawCrowdUnit, prepareCrowd } from "./crowd-sprites.ts";
+import { drawAttackTrace, drawLegendShot, droppedHead, groundingLine, isAttackTrace } from "./legend-effects.ts";
 
 function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team, length: number) {
   ctx.save();
@@ -76,11 +77,16 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
 
   const tick = previous.tick + (current.tick - previous.tick) * blend;
-  const visible = current.units.reduce((n, u) => n + Number(u.hp > 0 || (u.lastHitTick !== null && tick - u.lastHitTick < 48)), 0);
-  const crowd = prepareCrowd(visible, tick, ctx.canvas.width / w);
+  let visible = 0, hasStatues = false;
+  for (const u of current.units) {
+    if (u.hp || (u.lastHitTick !== null && tick - u.lastHitTick < 48)) visible++;
+    if (u.hp && (u.petrifiedUntil ?? 0) > tick) hasStatues = true;
+  }
+  const crowd = prepareCrowd(visible, tick, ctx.canvas.width / w, hasStatues);
   for (const unit of current.units) drawTrail(ctx,unit,tick,sx,sy);
-  for (const effect of current.effects ?? []) drawGroundEffect(ctx, effect, tick, sx, sy);
+  for (const effect of current.effects ?? []) if (!isAttackTrace(effect)) drawGroundEffect(ctx, effect, tick, sx, sy);
   for (const spell of current.spells ?? []) drawFieldSpell(ctx, spell, tick, sx, sy);
+  for (const unit of current.units) if (unit.headSpot) droppedHead(ctx,unit,tick,sx,sy);
   for (const shot of current.arrows) if (shot.kind==="stone" && shot.landTick!==undefined) {
     const left=shot.landTick-current.tick;
     stoneMarker(ctx,shot.x+shot.vx*left,shot.y+shot.vy*left,tick,shot.landTick,sx,sy,shot.team);
@@ -103,7 +109,9 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
   const bodies = current.units.map(unit => {
     const from = prior.get(unit.id) ?? unit;
-    return { unit, from, x: (from.x + (unit.x - from.x) * blend) * sx, y: (from.y + (unit.y - from.y) * blend) * sy };
+    const jump = unit.warpedTick;
+    const position = jump !== undefined && jump > previous.tick && jump <= current.tick ? Number(tick >= jump) : blend;
+    return { unit, from, x: (from.x + (unit.x - from.x) * position) * sx, y: (from.y + (unit.y - from.y) * position) * sy };
   }).sort((a, b) => a.y - b.y || a.unit.id - b.unit.id);
   for (const {unit,x,y} of bodies) {
     if (!unit.hp || unit.wrappingSince === undefined || unit.targetId === null) continue;
@@ -120,7 +128,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const age = Math.max(0, tick - unit.lastHitTick);
     if (age < 48) {
       const side = unit.aimX < 0 ? -1 : 1;
-      const radius = UNIT_DEFINITIONS[unit.kind].radius * scale;
+      const radius = footprint(unit) * scale;
       // A base retreat also timestamps the fallen pose, but only combat kills
       // earn a killer in a match. Keep the struck body visible for its flash.
       const combatKill = !current.bases || unit.killedBy !== undefined;
@@ -139,19 +147,29 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     if (unit.tunnel) {drawTunnel(ctx,unit,x,y,tick,sx,sy); continue;}
     const travel = from.walkDistance + (unit.walkDistance - from.walkDistance) * blend;
     const frozen = unit.frozenAt !== undefined && tick>=unit.frozenAt && tick<(unit.frozenUntil ?? 0);
-    const bodyTick = frozen ? unit.frozenAt! : tick;
+    const stoneAt = (unit.petrifiedUntil ?? -Infinity) - UNIT_DEFINITIONS.medusa.stoneTicks;
+    const stone = tick >= stoneAt && tick < (unit.petrifiedUntil ?? 0);
+    const bodyTick = stone ? stoneAt : frozen ? unit.frozenAt! : tick;
     const pose = deploying ? restingPose(ARMIES[unit.team].facing)
       : characterPose(unit, unit.targetId === null ? undefined : byId.get(unit.targetId), bodyTick, travel, from.lastHitTick,tick);
-    const r = UNIT_DEFINITIONS[unit.kind].radius * scale;
+    const r = footprint(unit) * scale;
     if (unit.raging) rageRibbons(ctx,x,y,r,tick,unit.id,unit.aimX<0?-1:1);
     const hand = scoops.get(unit.id);
     if (hand) {
       const lift = Math.max(0, Math.min(1, (tick-hand.windup!.since-3)/(UNIT_DEFINITIONS.cyclops.swallowTicks-3)));
       const mouthX = hand.x*sx + (hand.aimX<0?-1:1)*9*scale, mouthY = hand.y*sy-12*scale;
       drawUnitToken(ctx,x+(mouthX-x)*lift,y+(mouthY-y)*lift-12*scale*Math.sin(Math.PI*lift),r*(1-.82*lift),unit.team,unit.kind,pose,unit,tick);
+    } else if (stone) {
+      // Grayscale the completed body in one blit, preserving its silhouette and impact flash.
+      ctx.save(); ctx.filter = "grayscale(1) sepia(.14)";
+      drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick); ctx.restore();
+      ctx.save();ctx.translate(x,y);ctx.scale(r/11,r/11);
+      ctx.strokeStyle="#71696b";ctx.lineWidth=1.15;ctx.beginPath();
+      ctx.moveTo(-3.5,-5.5);ctx.lineTo(-1.8,-2);ctx.lineTo(-3.5,-.6);ctx.lineTo(-1.6,2);ctx.stroke();ctx.restore();
     } else if (crowd) drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick);
     else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, bodyTick);
     if (frozen) iceShell(ctx,x,y,r,unit.frozenUntil!-tick);
+    if (unit.groundedUntil !== undefined) groundingLine(ctx,unit,x,y,r,tick);
     if (unit.hex || unit.zombified) drawChange(ctx,unit,x,y,scale,tick);
     if (unit.soul) drawSoul(ctx,unit,x,y,tick,sx,sy);
     if (unit.burn || unit.poison || (unit.rootedUntil ?? 0)>tick || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) drawConditions(ctx,unit,x,y,r,scale,tick);
@@ -162,12 +180,17 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
   for (const u of current.units) if (u.arc) drawChain(ctx,u.arc,tick,sx,sy);
   for (const u of current.units) if (u.kind==="sunlens" && u.targetId!==null) sunbeam(ctx,u,byId.get(u.targetId),tick,sx,sy);
+  for (const effect of current.effects ?? []) if (isAttackTrace(effect)) drawAttackTrace(ctx,effect,tick,sx,sy);
   for (const arrow of current.arrows) {
-    const rewind = arrow.releasedTick === current.tick ? 0 : 1 - blend;
+    if (tick < arrow.releasedTick) continue;
+    const rewind = current.tick - tick;
     const x = (arrow.x - arrow.vx * rewind) * sx;
     const y = (arrow.y - arrow.vy * rewind) * sy;
     const length = Math.min(1, Math.max(0, tick - arrow.releasedTick) / 3);
-    if (arrow.kind === "stone" || arrow.kind === "bomb" || arrow.kind === "ice" || arrow.kind === "bullet" || arrow.kind === "venom" || arrow.kind === "balloon" || arrow.kind === "hex") {
+    if (arrow.kind === "snowball" || arrow.kind === "harpoon" || arrow.kind === "head") {
+      drawLegendShot(ctx,arrow,x,y,Math.atan2(arrow.vy*sy,arrow.vx*sx),scale,tick,
+        arrow.casterId === undefined ? undefined : byId.get(arrow.casterId),sx,sy);
+    } else if (arrow.kind === "stone" || arrow.kind === "bomb" || arrow.kind === "ice" || arrow.kind === "bullet" || arrow.kind === "venom" || arrow.kind === "balloon" || arrow.kind === "hex") {
       drawSpecialShot(ctx,arrow,x,y,Math.atan2(arrow.vy*sy,arrow.vx*sx),scale,tick);
     } else if (length > 0) {
       const height=arrow.kind==="bolt" ? 7+15*Math.max(0,1-(tick-arrow.releasedTick)/22) : 7;
@@ -185,7 +208,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     ctx.fillStyle = INK;
     for (const unit of current.units) {
       const left = !deploying && ARMIES[unit.team].facing > 0;
-      const offset = UNIT_DEFINITIONS[unit.kind].radius * scale + 5;
+      const offset = footprint(unit) * scale + 5;
       const x = unit.x * sx + (left ? -offset : offset);
       const y = unit.y * sy;
       const label = "#" + unit.id + (deploying ? "" : " · " + unit.hp + " HP");

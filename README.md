@@ -1,6 +1,6 @@
 # Battle Sandbox
 
-Draw a squad onto the white field and watch it fight. The illustrated row along the bottom holds twenty-five troops and buildings and nine spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
+Draw a squad onto the white field and watch it fight. The illustrated row along the bottom holds 44 troops and buildings and 10 spells. The home screen is a live playground. Open **Play modes** for a two-player duel or a three- or four-player free-for-all.
 
 **Play online.** Open the game, choose **Play modes**, then **Duel** or **Free-for-all**. Click **Copy invite** and send the link to the other players. Each match has its own field. Everyone can join from a phone or computer, draw a starting army, and press **Ready**. [Open Battle Sandbox](https://bob-zhu3.github.io/battle-sandbox/)
 
@@ -62,6 +62,10 @@ A free-for-all pays one bounty per defeated troop. If more than one army deals d
 
 ### The roster
 
+In the reinforcements playground, press **Play** to watch the Harpoon Tower reel in a Fire Dragon, the Trojan Horse release its passengers, and a wounded Werewolf shed its cloak. Wormhole is already selected. Tap an empty spot to bring the nearest mobile Red ally there. [Play the reinforcements scene](https://bob-zhu3.github.io/battle-sandbox/?demo=reinforcements)
+
+![Roster portraits of the nineteen recruits and the Wormhole spell](media/reinforcements.png)
+
 ![Eight roster portraits showing the Cyclops, Storm Kirin, Frost Queen, Phoenix, Bomber, Musketeer, Venom Scout and Zombie](media/mythical-roster.png)
 
 The Kirin folds its front legs as lightning fires. The Cyclops lifts its club above its eye before a smash. [Watch eight troops idle and meet an enemy before and after the redraw](media/roster-redraw.mp4)
@@ -79,13 +83,21 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Miner | 19 | 9 | Plant an exit flag anywhere. A traveling dirt ridge starts at home. Fault Line can force it to surface early. Once above ground the Miner can be hit and swings its pick after a short emergence. |
 | Clown | 18 | 9 | Tosses a corked glass bottle. It shatters where it lands and leaves a poison cloud for 1.35 seconds. Late arrivals can inhale the poison. Enemy Gust clears the cloud, and a Medic can treat the poison. |
 | Engineer | 21 | 10 | Hammers together one Watchpost near the fight, then repairs damaged machines. |
+| Wrestler | 18 | 9 | Throws a light opponent over one shoulder. Against a heavy one, it deals damage and stumbles back. |
+| Lion Dancers | 20 | 10 | The front dancer bites while the rear dancer kicks an enemy crowding the tail. |
+| Rhino Rider | 28 | 14 | A straight run lowers the horn for a shove through the front rank. It can jab from a standing start. |
 | Clockmouse | 8 | 4 | A squeak at a Cyclops's boots can interrupt a raised club, even on its own team. |
 | Bolt Drone | 15 | 7 | Commits to one line for a three-bolt burst. A sidestepping enemy can escape the later shots. |
+| Trojan Horse | 36 | 6 | Rams an enemy and drops a hatch for two Warriors. Destroying the horse en route releases them early. |
 | Mouse Workshop | 23 | 11 | Winds the drum and releases up to three Clockmice, one at a time. |
 | Watchpost | 15 | 7 | Stays where it was built and fires at enemies in range. An Engineer can mend it. |
 | Stone Lobber | 24 | 12 | Marks the ground, then slings a boulder there. Up to 35 units from impact, ground enemies take 16 damage and bases take 8. Flyers and troops closer than 65 units to the sling evade its aim. |
 | Sun Lens | 27 | 13 | Keeps its beam on one enemy. Successive stages pulse for 3, 6 and 10 damage as the facets light. Breaking range, a stun or an enemy rain shower resets the focus. |
 | Bell Tower | 19 | 9 | Tolls when a ground troop comes within 65 units. Ground troops in the circle take 4 damage and are shoved and briefly stunned. A charging Lancer has to start its run again. |
+| Windmill | 18 | 9 | Sweeps nearby enemies and bats arrows out of the air when a sail passes. Friendly Gust speeds its rotation. |
+| Harpoon Tower | 23 | 11 | Reels a troop closer when its hook hits. A hooked flyer briefly becomes vulnerable to ground attacks. |
+| Prism Tower | 26 | 13 | Its center facet fires on a lone enemy. Two side facets can each light up a different foe. |
+| Snowman | 17 | 8 | Throws slowing snowballs made from its own belly. Snow gradually packs back on. Friendly Freeze refills it immediately. |
 | Cyclops | 33 | 16 | Raises its spiked club for 0.45 seconds, then smashes a patch of ground. The impact scatters enemies and stuns them. It can lift and swallow a human at 12 HP or less who stays within reach. |
 | Storm Kirin | 23 | 11 | Lightning travels through up to four enemies, stunning every contact for 0.35 seconds. Metal and shields carry the next jump up to 110 units. Other targets carry it up to 78. |
 | Frost Queen | 24 | 12 | Her crystal bursts on impact. Enemies inside the frost walk at 48% speed for 100 ticks. |
@@ -93,6 +105,17 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Zombie | 10 | 5 | One bite immediately turns a surviving human green and changes its team. Look for the former troop's headgear. The new Zombie keeps its ID and up to 33 remaining HP, then can spread the bite. |
 | Reaper | 25 | 12 | Its scythe seeks a living enemy at or below one-third health within 118 units, even if a healthy foe is nearer. Cutting down a living enemy draws one soul into its lantern and restores up to 8 HP. |
 | Witch | 29 | 14 | On impact, the pink spiral permanently turns an enemy person or creature into a Hex Pig. It keeps its ID and remaining health and fights for the Witch's side until it dies. Bases and machines take a direct magic hit. |
+| Hydra | 32 | 16 | Bites with two heads to start. Cross a wound threshold and another grows. Fire cauterizes the wound instead. |
+| Medusa | 25 | 12 | Her snakes rise before she casts. Enemies in her gaze take damage, and those looking at her turn to stone. |
+| Vampire | 19 | 9 | Lunges and bites. Feeding on a living opponent restores up to 5 HP. |
+| Sandworm | 27 | 13 | Follows heavy footfalls, then commits to the marked ground. Its ridge can also erupt under a stationary foe. |
+| Slime | 16 | 8 | A solid hit splits its remaining HP between two smaller bodies. If both survive they can hop back together once. |
+| Headless Horseman | 23 | 11 | Throws its pumpkin head, then gallops to retrieve it. Gust can blow the head away. After two seconds on the ground it rolls toward its rider. |
+| Werewolf | 23 | 11 | Taking damage brings out the wolf for 2.5 seconds. It runs faster and swaps short punches for claws. |
+| Cerberus | 25 | 12 | The center head bites its target while the other two snap at separate opponents in reach. |
+| Kraken | 30 | 15 | One enemy gets pulled toward the beak. Two in reach get dragged into each other. |
+| Fire Dragon | 34 | 17 | Inflates its cheeks before breathing fire across a cone. Enemies can dodge the breath or interrupt the inhale. |
+| Iron Golem | 31 | 15 | Shoves enemies with heavy fists, fits its own spare armor plate at half health and can salvage fallen machines. |
 
 | Spell | Gold | What happens |
 | --- | ---: | --- |
@@ -105,6 +128,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Freeze | 18 | Ice holds enemy troops and buildings for 1.1 seconds, or a base for 0.55 seconds. It interrupts a charge, extinguishes a burn, and leaves shots already in flight alone. A Phoenix strike breaks the ice. |
 | Lightning | 24 | Bolts hit the three enemies with the most remaining HP inside the circle. Each takes 18 damage, or 6 for a base, and a quarter-second stun. |
 | Rage | 14 | For 2.4 seconds, allied mobile troops in the ring move 40% faster and recover attacks 50% faster. Reinforcements can run into the effect. Overlapping rings grant one boost. |
+| Wormhole | 19 | Tap the exit anywhere. A pair of rings transports the nearest eligible allied troop after a quarter-second. It keeps its identity, damage and form. |
 
 Stars overhead mark a stun. Ice around the feet marks a slow. A full ice shell holds the troop's pose until thaw. Red streamers mark the speed boost from Rage. Violet bubbles mean poison. Green skin and a torn coat show that a human has already become a Zombie. Small orange flames on an enemy mean it is taking burn damage. The Phoenix's cracked ember egg counts down to its own rebirth. A Phoenix in flight sheds sparks and a passing Frost Queen leaves small ice crystals. These trails follow their actual movement and fade when they stop.
 
@@ -133,7 +157,7 @@ As a control, we temporarily disabled the receipt lookup in a separate checkout.
 | `npm run demo:encounters` | A charged Lancer meets chain lightning, a Cyclops smashes and swallows, and a Phoenix hatches from its ember egg. |
 | `npm run demo:siege` | Four short tower and spell encounters, followed by a live field for trying a cast. |
 | `npm run demo:oddities` | See the new troops in six short fights, then try turning an Archer in the live playground. [Watch the gameplay clip](media/tunnels-and-turncoats.mp4) |
-| `npm run check:modes` | All 34 portraits, touch scrolling, recorded battle voices, live spell purchases, desktop and phone reconnects after a spell or reflected bolt, and complete three- and four-player matches with rematches |
+| `npm run check:modes` | All 54 portraits, touch scrolling, recorded battle voices, live spell purchases, desktop and phone reconnects after a spell or reflected bolt, and complete three- and four-player matches with rematches |
 | `npm run demo:room -- --headed` | Two browser windows drawing at the same time, then recruiting during a base battle |
 | `npm run demo:retry` | Drop confirmation of a five-Warrior stroke, disconnect and return with the original five IDs and one charge |
 | `npm run demo:reconnect` | Disconnect Blue after the first hit, catch up to the live fight and verify both browsers agree through the fall of a base |

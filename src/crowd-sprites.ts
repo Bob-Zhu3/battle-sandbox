@@ -21,18 +21,19 @@ let frame = 0;
 let previousTick = -1;
 let pixelsPerCssPixel = 1;
 
-export function prepareCrowd(count: number, tick: number, ratio: number) {
+export function prepareCrowd(count: number, tick: number, ratio: number, hasStatues = false) {
   // Dense fights reserve the screen's native pixels for movement, trails,
   // projectiles and labels. The body tile still draws at its exact CSS size.
   const rasterRatio = count >= 128 ? Math.min(1, ratio) : ratio;
-  if (count < 48 || tick < previousTick || rasterRatio !== pixelsPerCssPixel) stamps.clear();
+  const crowd = count >= 48;
+  if ((!crowd && !hasStatues) || tick < previousTick || rasterRatio !== pixelsPerCssPixel) stamps.clear();
   previousTick = tick;
   pixelsPerCssPixel = rasterRatio;
-  if (count < 48) return false;
+  if (!crowd && !hasStatues) return false;
   frameTicks = count >= 128 ? 8 : 4;
   for (const [id, stamp] of stamps) if (stamp.lastSeen < frame) stamps.delete(id);
   frame++;
-  return true;
+  return crowd;
 }
 
 const rimColor = [1, 3, 5].map(offset => Number.parseInt(INK.slice(offset, offset + 2), 16));
@@ -58,6 +59,9 @@ function tintDamage(pen: CanvasRenderingContext2D, intensity: number) {
 
 function actionChanged(a: Unit, b: Unit) {
   return a.kind !== b.kind || a.team !== b.team || !!a.hp !== !!b.hp ||
+    a.heads !== b.heads || a.smallSlime !== b.smallSlime || a.wolfUntil !== b.wolfUntil || a.headUntil !== b.headUntil ||
+    a.snowStock !== b.snowStock || a.openedTick !== b.openedTick || a.lastKickTick !== b.lastKickTick ||
+    a.petrifiedUntil !== b.petrifiedUntil || a.groundedUntil !== b.groundedUntil || a.warpedTick !== b.warpedTick ||
     a.targetId !== b.targetId || a.lastAttackTick !== b.lastAttackTick ||
     a.lastHitTick !== b.lastHitTick || a.lastAttentionTick !== b.lastAttentionTick ||
     a.lastDrawTick !== b.lastDrawTick || a.lastChargeTick !== b.lastChargeTick ||
@@ -83,7 +87,7 @@ function visiblyMoved(a: CharacterPose, b: CharacterPose) {
 export function drawCrowdUnit(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number,
   pose: CharacterPose, unit: Unit, tick: number) {
   const scale = radius / 11;
-  const large = unit.kind === "phoenix" || unit.kind === "cyclops";
+  const large = unit.kind === "phoenix" || unit.kind === "cyclops" || unit.kind === "firedragon" || unit.kind === "hydra" || unit.kind === "kraken";
   const infantry = unit.kind === "warrior" || unit.kind === "archer";
   const halfWidth = large ? 53 : unit.kind === "archer" ? 31 : 37;
   const top = large ? 54 : infantry ? 30 : 37;

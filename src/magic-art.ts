@@ -3,6 +3,7 @@ import { INK, cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell, type SpellKind } from "./spells.ts";
 import { drawSiegeSpell, siegeSpellIcon } from "./siege-magic-art.ts";
 import { drawWeatherField, weatherIcon } from "./weather-art.ts";
+import { drawWormhole, wormholeIcon } from "./legend-effects.ts";
 
 function meteorIcon(c: Pens) {
   c.lineJoin="round";
@@ -23,12 +24,14 @@ export function drawSpellIcon(c: Pens, kind: SpellKind) {
     oval(c,-3,-3,7,5,INK);oval(c,3,-5,6,5,INK);oval(c,6,-2,6,4,INK);
     oval(c,0,-3,8,3.6,"#addad4");oval(c,4,-5,4.3,3.4,"#d8eee3");
     for (const x of [-6,0,6]) line(c,x,4,x-2,8,"#418b96",1.8);
-  } else if (kind==="freeze" || kind==="lightning" || kind==="rage") weatherIcon(c,kind);
+  } else if (kind==="wormhole") wormholeIcon(c);
+  else if (kind==="freeze" || kind==="lightning" || kind==="rage") weatherIcon(c,kind);
   else siegeSpellIcon(c,kind);
   c.restore();
 }
 
 export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: number, sy: number) {
+  if (spell.kind === "wormhole") { drawWormhole(c,spell,tick,sx,sy); return; }
   const age=tick-spell.startTick, spec=SPELLS[spell.kind], r=spec.radius;
   if (age < 0) return;
   const scale=Math.min(sx,sy);

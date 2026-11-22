@@ -1,9 +1,12 @@
 import { ARENA, TEAMS, type Team } from "./battlefield.ts";
 import type { Target, Unit } from "./simulation.ts";
-import { isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { footprint, isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Affliction { team: Team; until: number; next: number; applied: number }
-export interface GroundEffect { kind: "blast" | "smash" | "frost" | "miasma" | "glass" | "stonefall" | "toll"; team: Team; x: number; y: number; tick: number; radius: number }
+export interface GroundEffect {
+  kind: "blast" | "smash" | "frost" | "miasma" | "glass" | "stonefall" | "toll" | "prism" | "gaze" | "breath" | "harpoon" | "breach";
+  team: Team; x: number; y: number; tick: number; radius: number; fromX?: number; fromY?: number;
+}
 export type Hit = (target: Target, amount: number, team: Team) => void;
 export const effectLifetime = (e: GroundEffect) => e.kind === "miasma" ? UNIT_DEFINITIONS.clown.cloudTicks : e.kind === "glass" ? 19 : 34;
 const ailments = {
@@ -41,7 +44,7 @@ export function disabledUntil(target: Target) {
 }
 
 export function interrupt(unit: Unit) {
-  if (unit.kind === "lancer") unit.runUp = 0;
+  if (unit.kind === "lancer" || unit.kind === "rhinorider") unit.runUp = 0;
   delete unit.drawingBow;
   delete unit.windup;
   delete unit.wrappingSince;
@@ -59,15 +62,19 @@ export function shove(unit: Unit, x: number, y: number, distance: number) {
   if (isBuilding(unit.kind) || unit.emberUntil !== undefined) return;
   const dx = unit.x - x, dy = unit.y - y, length = Math.hypot(dx, dy);
   const angle = unit.id * 2.4;
-  const newX = (length ? dx / length : Math.cos(angle)) * distance;
-  const newY = (length ? dy / length : Math.sin(angle)) * distance;
-  unit.knockback = { x: newX + (unit.knockback?.x ?? 0), y: newY + (unit.knockback?.y ?? 0), ticks: 8 };
+  displace(unit,(length ? dx / length : Math.cos(angle))*distance,(length ? dy / length : Math.sin(angle))*distance);
+}
+
+export function displace(unit: Unit, dx: number, dy: number) {
+  if (isBuilding(unit.kind) || unit.emberUntil !== undefined) return;
+  const factor = unit.kind === "irongolem" ? .22 : 1;
+  unit.knockback = {x:dx*factor+(unit.knockback?.x ?? 0), y:dy*factor+(unit.knockback?.y ?? 0), ticks:8};
 }
 
 export function moveKnockback(unit: Unit) {
   const knock = unit.knockback;
   if (!knock) return;
-  const portion = 2 / (knock.ticks + 1), r = UNIT_DEFINITIONS[unit.kind].radius;
+  const portion = 2 / (knock.ticks + 1), r = footprint(unit);
   unit.x = Math.max(r, Math.min(ARENA.width - r, unit.x + knock.x * portion));
   unit.y = Math.max(r, Math.min(ARENA.height - r, unit.y + knock.y * portion));
   if (knock.ticks === 1) delete unit.knockback;

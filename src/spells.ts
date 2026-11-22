@@ -1,7 +1,7 @@
 import { ARENA, BASE_RADIUS, type Team } from "./battlefield.ts";
 import type { Arrow } from "./arrows.ts";
 import type { Target, Unit } from "./simulation.ts";
-import { airborne, isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { airborne, footprint, isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export const SPELLS = {
   gust: { name: "Gust", command: "cast-gust", cost: 10, radius: 70, delay: 8, duration: 32,
@@ -23,8 +23,13 @@ export const SPELLS = {
     description: "Calls down a bolt on each of the three healthiest enemies in the circle. Each strike deals damage and stuns." },
   rage: { name: "Rage", command: "cast-rage", cost: 14, radius: 66, delay: 8, duration: 152, speedFactor: 1.4,
     description: "Allied troops inside the ring move 40% faster and recover attacks 50% faster. Late arrivals join the rush." },
+  wormhole: { name: "Wormhole", command: "cast-wormhole", cost: 19, radius: 24, delay: 15, duration: 46,
+    description: "Choose an exit anywhere. Two rings carry the nearest living mobile ally to it, keeping its identity, health and form." },
 } as const;
 export type SpellKind = keyof typeof SPELLS;
+export function castHint(kind: SpellKind) {
+  return kind==="wormhole" ? "Tap an exit. Your mobile troop closest to that spot travels there." : "Tap anywhere to cast "+SPELLS[kind].name+".";
+}
 export type SpellType = (typeof SPELLS)[SpellKind]["command"];
 export const SPELL_KINDS = Object.keys(SPELLS) as SpellKind[];
 export function spellKind(type: unknown) { return SPELL_KINDS.find(kind => SPELLS[kind].command === type); }
@@ -32,6 +37,36 @@ export interface FieldSpell {
   id: number; team: Team; kind: SpellKind; x: number; y: number; startTick: number;
   reflection?: {count: number; tick: number; x: number; y: number};
   strikes?: {id: number; x: number; y: number}[];
+  portalUnitId?: number; fromX?: number; fromY?: number;
+}
+
+function canTravel(u: Unit, team: Team) {
+  return u.team === team && u.hp > 0 && !isBuilding(u.kind) && !u.tunnel && u.emberUntil === undefined;
+}
+
+export function makeFieldSpell(id: number, kind: SpellKind, team: Team, x: number, y: number, startTick: number, units: readonly Unit[]): FieldSpell {
+  const spell: FieldSpell = {id,kind,team,x,y,startTick};
+  if (kind !== "wormhole") return spell;
+  let passenger: Unit | undefined, best = Infinity;
+  for (const unit of units) {
+    if (!canTravel(unit,team)) continue;
+    const d = (x-unit.x)**2+(y-unit.y)**2;
+    if (d < best || (d === best && unit.id < passenger!.id)) { passenger=unit; best=d; }
+  }
+  if (passenger) { spell.portalUnitId=passenger.id; spell.fromX=passenger.x; spell.fromY=passenger.y; }
+  return spell;
+}
+
+// Jump on the opening snapshot so an arrow does not sweep the space between the two portals.
+export function openWormhole(spell: FieldSpell, units: readonly Unit[], tick: number) {
+  const passenger = units.find(u => u.id === spell.portalUnitId && canTravel(u,spell.team));
+  if (!passenger || passenger.warpedTick === tick) { delete spell.portalUnitId; return; }
+  const r=footprint(passenger);
+  spell.fromX=passenger.x; spell.fromY=passenger.y;
+  passenger.x=Math.max(r,Math.min(ARENA.width-r,spell.x)); passenger.y=Math.max(r,Math.min(ARENA.height-r,spell.y));
+  passenger.warpedTick=tick; passenger.targetId=null; passenger.pace=0;
+  if (passenger.runUp !== undefined) passenger.runUp=0;
+  delete passenger.windup; delete passenger.knockback; delete passenger.trail;
 }
 
 export function pulses(spell: FieldSpell, tick: number) {
@@ -43,7 +78,7 @@ export function insideSpell(spell: FieldSpell, point: {x: number; y: number}, ex
   return Math.hypot(spell.x - point.x, spell.y - point.y) <= SPELLS[spell.kind].radius + extra;
 }
 export function blownAway(shot: Arrow, winds: readonly FieldSpell[]) {
-  return shot.kind !== "stone" && shot.kind !== "bomb" && shot.kind !== "bullet" && winds.some(wind => wind.team !== shot.team && insideSpell(wind, shot));
+  return shot.kind !== "head" && shot.kind !== "stone" && shot.kind !== "bomb" && shot.kind !== "bullet" && winds.some(wind => wind.team !== shot.team && insideSpell(wind, shot));
 }
 
 // Resolve these on a copy of the opening position, before troops choose targets or spend a charge.
@@ -55,7 +90,7 @@ export function prepareFieldMagic(unit: Unit, pulses: readonly FieldSpell[], tic
   }
   if (!unit.tunnel && !airborne(unit) && !isBuilding(unit.kind) && unit.emberUntil === undefined && !unit.burn && affected("briar")) {
     unit.rootedUntil = Math.max(unit.rootedUntil ?? 0,tick+SPELLS.briar.holdTicks);
-    if (unit.kind === "lancer") unit.runUp = 0;
+    if (unit.kind === "lancer" || unit.kind === "rhinorider") unit.runUp = 0;
   }
   if (unit.kind === "sunlens" && affected("rain")) {
     delete unit.focusSince; unit.targetId = null; unit.fogUntil = tick+UNIT_DEFINITIONS.sunlens.fogTicks;
@@ -82,8 +117,14 @@ export function applyMagic(active: readonly FieldSpell[], units: Unit[], targets
     }
     if (spell.kind !== "rain" && spell.kind !== "gust") continue;
     for (const unit of units) {
-      if (unit.hp <= 0 || unit.tunnel || !insideSpell(spell, unit)) continue;
+      if (unit.hp <= 0 || unit.tunnel) continue;
       const friendly = unit.team === spell.team;
+      if (!friendly && spell.kind === "gust" && unit.kind === "horseman" && unit.headLandedTick !== undefined && unit.headSpot && insideSpell(spell,unit.headSpot)) {
+        const dx=unit.headSpot.x-spell.x,dy=unit.headSpot.y-spell.y,d=Math.hypot(dx,dy);
+        unit.headSpot={x:Math.max(4,Math.min(ARENA.width-4,unit.headSpot.x+(d?dx/d:1)*42)),y:Math.max(4,Math.min(ARENA.height-4,unit.headSpot.y+(d?dy/d:0)*42))};
+      }
+      if (!insideSpell(spell,unit)) continue;
+      if (friendly && spell.kind === "gust" && unit.kind === "windmill") unit.millFastUntil=tick+UNIT_DEFINITIONS.windmill.spinTicks;
       if (spell.kind === "rain") {
         if (friendly) delete unit.burn;
         if (!friendly && unit.emberUntil !== undefined) hit(unit, 1, spell.team);
@@ -96,8 +137,8 @@ export function applyMagic(active: readonly FieldSpell[], units: Unit[], targets
         const dx = unit.x - spell.x, dy = unit.y - spell.y;
         const d = Math.hypot(dx, dy);
         const dirX = d ? dx / d : Math.cos(unit.id * 2.4), dirY = d ? dy / d : Math.sin(unit.id * 2.4);
-        const move = 24 + 16 * (1 - d / SPELLS.gust.radius);
-        const r = UNIT_DEFINITIONS[unit.kind].radius;
+        const move = (24 + 16 * (1 - d / SPELLS.gust.radius))*(unit.kind==="irongolem" ? .22 : 1);
+        const r = footprint(unit);
         unit.x = Math.max(r, Math.min(ARENA.width - r, unit.x + dirX * move));
         unit.y = Math.max(r, Math.min(ARENA.height - r, unit.y + dirY * move));
       }

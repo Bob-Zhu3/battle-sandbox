@@ -114,6 +114,82 @@ const recruits = {
     name: "Phoenix", command: "place-phoenixes", description: "Its talons set enemies on fire. Its first fall leaves an ember egg. Guard it to hatch, fan it with Gust, or douse an enemy egg with Rain.",
     cost: 22, bounty: 11, attack: "melee", radius: 14.5, maxHp: troopHealth(32), speed: 96, reach: 36, damage: 7, cooldownTicks: 39, hatchTicks: 90,
   },
+  wrestler: {
+    name: "Wrestler", command: "place-wrestlers", description: "Grapples and throws lighter enemies over one shoulder. Heavy opponents take the hit and make the Wrestler stumble back.",
+    cost: 18, bounty: 9, attack: "melee", radius: 13, maxHp: troopHealth(47), speed: 78, reach: 37, damage: 11, cooldownTicks: 65, throwDistance: 32,
+  },
+  liondancers: {
+    name: "Lion Dancers", command: "place-lion-dancers", description: "Two dancers share a lion costume. The head bites the foe in front while the back dancer kicks anyone crowding the tail.",
+    cost: 20, bounty: 10, attack: "melee", radius: 14, maxHp: troopHealth(44), speed: 86, reach: 42, damage: 9, cooldownTicks: 42, kickDamage: 7,
+  },
+  rhinorider: {
+    name: "Rhino Rider", command: "place-rhino-riders", description: "Lowers its horn after a straight run and plows through the front rank. At close range it keeps jabbing. Stuns cut the charge short.",
+    cost: 28, bounty: 14, attack: "melee", radius: 17, maxHp: troopHealth(69), speed: 108, reach: 50, damage: 10, cooldownTicks: 57, runUp: 46, bonus: 9, shove: 39,
+  },
+  trojanhorse: {
+    name: "Trojan Horse", command: "place-trojan-horses", description: "Rams an enemy and opens its hatch for two Warriors. Break the horse on the way and its passengers spill out early.",
+    cost: 36, bounty: 6, attack: "melee", radius: 17, maxHp: troopHealth(51), speed: 64, reach: 46, damage: 8, cooldownTicks: 72,
+  },
+  windmill: {
+    name: "Windmill", command: "place-windmills", description: "Its sails sweep nearby enemies and bat aside arrows and bolts. A friendly Gust spins the sails faster.",
+    cost: 18, bounty: 9, attack: "sweep", radius: 15, maxHp: troopHealth(43), speed: 0, reach: 54, damage: 7, cooldownTicks: 50, guardReach: 45, spinTicks: 75,
+  },
+  harpoon: {
+    name: "Harpoon Tower", command: "place-harpoon-towers", description: "Fires a barbed hook at any foe. On impact the winch reels troops closer and drags flyers down to the ground.",
+    cost: 23, bounty: 11, attack: "arrow", radius: 15, maxHp: troopHealth(43), speed: 0, reach: 166, damage: 10, cooldownTicks: 77, arrowSpeed: 266, pull: 42, groundTicks: 54,
+  },
+  prism: {
+    name: "Prism Tower", command: "place-prism-towers", description: "Cuts a bright ray into the nearest enemy. Two side facets independently catch other enemies in front of the tower.",
+    cost: 26, bounty: 13, attack: "rays", radius: 15, maxHp: troopHealth(41), speed: 0, reach: 145, damage: 9, cooldownTicks: 53, sideDamage: 6,
+  },
+  snowman: {
+    name: "Snowman", command: "place-snowmen", description: "Throws snowballs that slow whatever they hit. Its belly shrinks as it fires and grows as it packs fresh snow.",
+    cost: 17, bounty: 8, attack: "arrow", radius: 13, maxHp: troopHealth(34), speed: 0, reach: 132, damage: 6, cooldownTicks: 33, arrowSpeed: 222, repackTicks: 66, slowTicks: 42,
+  },
+  hydra: {
+    name: "Hydra", command: "place-hydras", description: "Each head bites a different foe, or piles onto one. At two wound thresholds a fresh head grows unless the wound is burning.",
+    cost: 32, bounty: 16, attack: "melee", radius: 18, maxHp: troopHealth(74), speed: 68, reach: 49, damage: 7, cooldownTicks: 51,
+  },
+  medusa: {
+    name: "Medusa", command: "place-medusas", description: "Raises her snakes and releases a damaging gaze. Enemies looking at her also turn to stone and lose their charge.",
+    cost: 25, bounty: 12, attack: "gaze", radius: 13, maxHp: troopHealth(35), speed: 71, reach: 112, damage: 8, cooldownTicks: 94, windup: 20, stoneTicks: 34,
+  },
+  vampire: {
+    name: "Vampire", command: "place-vampires", description: "Bites any opponent. Drawing blood from a living enemy restores its own health.",
+    cost: 19, bounty: 9, attack: "melee", radius: 11, maxHp: troopHealth(35), speed: 99, reach: 35, damage: 9, cooldownTicks: 41, drain: 5,
+  },
+  sandworm: {
+    name: "Sandworm", command: "place-sandworms", description: "Follows heavy footsteps and erupts under its prey. The moving ridge marks where it will strike, even against a stationary foe.",
+    cost: 27, bounty: 13, attack: "breach", radius: 16, maxHp: troopHealth(56), speed: 77, reach: 92, damage: 13, cooldownTicks: 84, windup: 22, blastRadius: 37,
+  },
+  slime: {
+    name: "Slime", command: "place-slimes", description: "A solid hit splits it into two smaller fighters that share its remaining health. The halves can hop back together once.",
+    cost: 16, bounty: 8, attack: "melee", radius: 13, maxHp: troopHealth(40), speed: 70, reach: 34, damage: 7, cooldownTicks: 39, splitDamage: 8, mergeDelay: 66,
+  },
+  horseman: {
+    name: "Headless Horseman", command: "place-headless-horsemen", description: "Throws its pumpkin head and gallops to retrieve it. If the way is blocked, the head rolls back toward its rider.",
+    cost: 23, bounty: 11, attack: "arrow", radius: 15, maxHp: troopHealth(42), speed: 121, reach: 115, damage: 13, cooldownTicks: 64, arrowSpeed: 267, returnTicks: 120,
+  },
+  werewolf: {
+    name: "Werewolf", command: "place-werewolves", description: "A wounded traveler sheds its cloak, runs on all fours and claws faster. Its own wounds trigger the change.",
+    cost: 23, bounty: 11, attack: "melee", radius: 13, maxHp: troopHealth(46), speed: 77, reach: 39, damage: 6, cooldownTicks: 47, wolfTicks: 150, restTicks: 90, clawDamage: 11, clawTicks: 31,
+  },
+  cerberus: {
+    name: "Cerberus", command: "place-cerberuses", description: "Three dog heads guard three directions. The middle head bites a lone foe, and each outer head can bite another attacker.",
+    cost: 25, bounty: 12, attack: "melee", radius: 15, maxHp: troopHealth(51), speed: 88, reach: 46, damage: 11, cooldownTicks: 45, sideDamage: 7,
+  },
+  kraken: {
+    name: "Kraken", command: "place-krakens", description: "Drags one enemy toward its beak. With two in tentacle reach it smacks them together instead.",
+    cost: 30, bounty: 15, attack: "melee", radius: 18, maxHp: troopHealth(65), speed: 58, reach: 63, damage: 12, cooldownTicks: 69, grip: 30,
+  },
+  firedragon: {
+    name: "Fire Dragon", command: "place-fire-dragons", description: "Fills its cheeks, breathes a cone of fire and pants between breaths. Troops can escape the cone or interrupt the inhale.",
+    cost: 34, bounty: 17, attack: "breath", radius: 19, maxHp: troopHealth(58), speed: 76, reach: 119, damage: 12, cooldownTicks: 99, windup: 28,
+  },
+  irongolem: {
+    name: "Iron Golem", command: "place-iron-golems", description: "Heavy fists shove enemies while its iron feet resist knockback. Fits a spare plate at half health and can salvage more from nearby wrecks.",
+    cost: 31, bounty: 15, attack: "melee", radius: 19, maxHp: troopHealth(78), speed: 55, reach: 49, damage: 14, cooldownTicks: 66, repairHp: 12,
+  },
 } as const;
 
 // The pig is a combat form. Only recruits have a placement command.
@@ -124,11 +200,13 @@ export type RecruitKind = keyof typeof recruits;
 export type UnitKind = keyof typeof UNIT_DEFINITIONS;
 export const RECRUIT_KINDS = Object.keys(recruits) as RecruitKind[];
 export const UNIT_KINDS = Object.keys(UNIT_DEFINITIONS) as UnitKind[];
-export const isBuilding = (kind: UnitKind) => kind === "workshop" || kind === "post" || kind === "lobber" || kind === "sunlens" || kind === "belltower";
-export const isMachine = (kind: UnitKind) => kind === "mouse" || kind === "drone" || isBuilding(kind);
-export const airborne = (target: {kind: UnitKind | "base"; emberUntil?: number}) => target.kind === "drone" || (target.kind === "phoenix" && target.emberUntil === undefined);
+export const isBuilding = (kind: UnitKind) => UNIT_DEFINITIONS[kind].speed === 0;
+export const isMachine = (kind: UnitKind) => kind === "mouse" || kind === "drone" || kind === "trojanhorse" || kind === "irongolem" || isBuilding(kind);
+export const airborne = (target: {kind: UnitKind | "base"; emberUntil?: number; groundedUntil?: number}) => target.groundedUntil === undefined && (target.kind === "drone" || target.kind === "firedragon" || (target.kind === "phoenix" && target.emberUntil === undefined));
+export const footprint = (unit: {kind: UnitKind; smallSlime?: boolean}) => unit.kind === "slime" && unit.smallSlime ? 8 : UNIT_DEFINITIONS[unit.kind].radius;
 export const isHuman = (kind: UnitKind) => kind === "warrior" || kind === "archer" || kind === "shieldbearer" ||
-  kind === "medic" || kind === "lancer" || kind === "bomber" || kind === "engineer" || kind === "musketeer" || kind === "scout" || kind === "miner" || kind === "clown";
+  kind === "medic" || kind === "lancer" || kind === "bomber" || kind === "engineer" || kind === "musketeer" || kind === "scout" || kind === "miner" || kind === "clown" ||
+  kind === "wrestler" || kind === "liondancers" || kind === "rhinorider";
 export type PlacementType = (typeof recruits)[RecruitKind]["command"];
 
 export function placementKind(type: PlacementType): RecruitKind;

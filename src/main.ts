@@ -5,7 +5,7 @@ import { crowdFormation } from "./crowd-formation.ts";
 import { Playground } from "./playground.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
-import { SPELLS } from "./spells.ts";
+import { castHint } from "./spells.ts";
 import { TICKS_PER_SECOND } from "./simulation.ts";
 
 const field = createField();
@@ -56,7 +56,7 @@ choose(team);
 
 function updateBrushHint() {
   const spell = field.selectedSpell(), hint = element("deploy-hint");
-  hint.textContent = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." :
+  hint.textContent = spell ? castHint(spell) : field.selectedKind() === "miner" ? "Choose a tunnel exit anywhere on the field." :
     soundHint && team==="blue" && field.selectedKind()==="cyclops" ? "Place the blue Cyclops just to the right of the red trio." : "";
   hint.hidden = !hint.textContent;
   field.canvas.setAttribute("aria-label", hint.textContent || "Playground. Choose a color and draw troops anywhere.");
@@ -81,6 +81,17 @@ if (demo === "siege") {
   }
   previous = play.world;
   play.paused = true;
+} else if (demo === "reinforcements") {
+  const cast: [Team, RecruitKind, number, number][] = [
+    ["red","trojanhorse",220,111], ["blue","werewolf",321,112], ["blue","archer",386,108],
+    ["red","wrestler",202,245], ["blue","warrior",249,241],
+    ["red","harpoon",519,132], ["blue","firedragon",655,135],
+    ["red","liondancers",567,245], ["blue","slime",636,243], ["blue","warrior",665,261],
+  ];
+  for (const [side,kind,x,y] of cast) play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
+  previous=play.world;
+  play.paused=true;
+  field.armBrush("wormhole");
 } else if (demo === "expressions") {
   const cast: [Team, RecruitKind, number, number][] = [
     ["red","archer",170,115], ["red","warrior",197,115], ["blue","warrior",286,115],

@@ -1,18 +1,20 @@
 import { collectSouls, hasSoul, hunt, resolveConversions, type Conversion, type Harvest, type Hex } from "./transformations.ts";
 import { advanceTunnel, digFromHome, type Tunnel } from "./tunnels.ts";
 import { recordTrail, type TrailMark } from "./trails.ts";
-import { applyMagic, blownAway, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
+import { applyMagic, blownAway, openWormhole, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
 import { reflectAtWards } from "./mirror.ts";
 import { focusLens, pickTowerTarget } from "./siege.ts";
 import { applyRage, strikeField } from "./battle-magic.ts";
 import { finishBuilding, resolveControl, startCyclopsSwing, type Windup } from "./encounters.ts";
-import { afflict, disabledUntil, effectLifetime, moveKnockback, shove, slow, stun, tickAfflictions, type Affliction, type GroundEffect } from "./conditions.ts";
+import { afflict, disabledUntil, displace, effectLifetime, moveKnockback, shove, stun, tickAfflictions, type Affliction, type GroundEffect } from "./conditions.ts";
 import { aimTower, incomingShot } from "./defense.ts";
 import { finishTreatments, medicDuty } from "./medic.ts";
 import { nearestEnemy } from "./targeting.ts";
 import type { Arrow } from "./arrows.ts";
-import { advanceShot, applyClouds, releaseShot } from "./shots.ts";
-import { isHuman, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { advanceShot, applyClouds, deflectHead, releaseShot } from "./shots.ts";
+import { footprint, isHuman, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { releaseTelegraph, rosterStrike, rosterTarget, startTelegraph, type Impulse } from "./roster-attacks.ts";
+import { settleTroopBodies } from "./roster-life.ts";
 import { ARENA, ARMIES, BASE_RADIUS, TEAMS, type Base, type Team } from "./battlefield.ts";
 export { ARENA, type Team } from "./battlefield.ts";
 
@@ -90,6 +92,25 @@ export interface Unit extends Placement {
   aidReadyTick?: number;
   lastHealTick?: number;
   lastTreatedTick?: number;
+  lastKickTick?: number;
+  openedTick?: number;
+  heads?: number;
+  hydraWounds?: number;
+  smallSlime?: boolean;
+  splitTick?: number;
+  siblingId?: number;
+  wolfUntil?: number;
+  wolfReadyTick?: number;
+  headUntil?: number;
+  headSpot?: { x: number; y: number };
+  headLandedTick?: number;
+  spareUsed?: boolean;
+  snowStock?: number;
+  repackAt?: number;
+  millFastUntil?: number;
+  groundedUntil?: number;
+  petrifiedUntil?: number;
+  warpedTick?: number;
 }
 
 export type Warrior = Unit & { kind: "warrior" };
@@ -151,7 +172,8 @@ export function createDuel(): Battle {
 
 export type Target = Unit | Base;
 function walkSpeed(unit: Unit) {
-  return UNIT_DEFINITIONS[unit.kind].speed * (unit.raging ? SPELLS.rage.speedFactor : 1);
+  const stride=unit.kind==="werewolf" && unit.wolfUntil!==undefined ? 1.45 : unit.smallSlime && unit.kind==="slime" ? 1.18 : 1;
+  return UNIT_DEFINITIONS[unit.kind].speed * stride * (unit.raging ? SPELLS.rage.speedFactor : 1);
 }
 function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   const dx = x - unit.x, dy = y - unit.y;
@@ -206,7 +228,7 @@ function separateFootprints(previous: readonly Unit[], next: Unit[], solid: read
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const squared = dx * dx + dy * dy;
-      const touching = UNIT_DEFINITIONS[a.kind].radius + UNIT_DEFINITIONS[b.kind].radius;
+      const touching = footprint(a) + footprint(b);
       if (squared >= touching * touching) continue;
       overlapping = true;
       const distance = Math.sqrt(squared);
@@ -237,7 +259,7 @@ function separateFootprints(previous: readonly Unit[], next: Unit[], solid: read
     const dx = unit.x - from.x + push[i].x;
     const dy = unit.y - from.y + push[i].y;
     const distance = Math.hypot(dx, dy);
-    const { radius } = UNIT_DEFINITIONS[unit.kind];
+    const radius = footprint(unit);
     const walkStep = unit.rootedUntil === undefined && unit.frozenUntil === undefined ? walkSpeed(unit) / TICKS_PER_SECOND : 0;
     const fraction = distance > walkStep ? walkStep / distance : 1;
     unit.x = boundCenter(from.x + dx * fraction, ARENA.width, radius);
@@ -285,19 +307,23 @@ export function stepBattle(battle: Battle): Battle {
   const cuts: Harvest[] = [];
   const braces = new Set<number>();
   const healing = new Map<number, number>();
+  const impulses: Impulse[] = [];
   const spells = battle.spells?.filter(s => tick-s.startTick < SPELLS[s.kind].duration)
-    .map(s => s.kind === "mirror" || (s.kind === "lightning" && pulses(s,tick)) ? {...s} : s);
+    .map(s => s.kind === "mirror" || ((s.kind === "lightning" || s.kind === "wormhole") && pulses(s,tick)) ? {...s} : s);
   const activeMagic = spells?.filter(spell => pulses(spell, tick)) ?? [];
   const strikes = activeMagic.filter(s => s.kind === "freeze" || s.kind === "lightning");
   const rings = spells?.filter(s => s.kind === "rage" && tick-s.startTick >= SPELLS.rage.delay) ?? [];
   const winds = activeMagic.filter(spell => spell.kind === "gust");
+  const portals = activeMagic.filter(s=>s.kind==="wormhole").sort((a,b)=>a.id-b.id);
   const fieldChanges = activeMagic.filter(s => s.kind === "briar" || s.kind === "fault" || s.kind === "rain");
-  const starting = fieldChanges.length || strikes.length || rings.length || battle.units.some(u => u.hp > 0 && u.raging) ? battle.units.map(u => {
+  const starting = fieldChanges.length || strikes.length || rings.length || portals.length || battle.units.some(u => u.hp > 0 && (u.raging || u.groundedUntil===tick)) ? battle.units.map(u => {
     if (!u.hp) return u;
     const ready = {...u};
+    if ((ready.groundedUntil ?? Infinity)<=tick) delete ready.groundedUntil;
     if (fieldChanges.length) prepareFieldMagic(ready,fieldChanges,tick);
     return ready;
   }) : battle.units;
+  for (const portal of portals) openWormhole(portal,starting,tick);
   const basesAtStart = strikes.length ? battle.bases?.map(b => ({...b})) : battle.bases;
   const targets: readonly Target[] = basesAtStart ? [...starting, ...basesAtStart] : starting;
   function hit(target: Target, amount: number, team: Team) {
@@ -328,6 +354,13 @@ export function stepBattle(battle: Battle): Battle {
     if (next.fogUntil !== undefined && tick >= next.fogUntil) delete next.fogUntil;
     if (next.rootedUntil !== undefined && tick >= next.rootedUntil) delete next.rootedUntil;
     if (next.frozenUntil !== undefined && tick >= next.frozenUntil) { delete next.frozenUntil; delete next.frozenAt; }
+    if ((next.wolfUntil ?? Infinity)<=tick) delete next.wolfUntil;
+    if ((next.petrifiedUntil ?? Infinity)<=tick) delete next.petrifiedUntil;
+    if (unit.kind==="snowman" && (unit.repackAt ?? Infinity)<=tick) {
+      next.snowStock=Math.min(3,(unit.snowStock ?? 3)+1);
+      if (next.snowStock<3) next.repackAt=tick+UNIT_DEFINITIONS.snowman.repackTicks;
+      else delete next.repackAt;
+    }
     if (unit.emberUntil !== undefined) {
       if (tick >= unit.emberUntil) {
         delete next.emberUntil;
@@ -357,19 +390,41 @@ export function stepBattle(battle: Battle): Battle {
       }
     }
     const interruptedUntil = Math.max(control.stuns.get(unit.id) ?? 0, next.stunnedUntil ?? 0);
+    if (control.gaze.stone.has(unit.id)) next.petrifiedUntil=tick+UNIT_DEFINITIONS.medusa.stoneTicks;
     if (tick < interruptedUntil) {
       stun(next, interruptedUntil);
       return next;
     }
-    if (next.frozenUntil !== undefined) return next;
-    if (arc || unit.windup) return next;
+    if (next.frozenUntil !== undefined || unit.warpedTick===tick) return next;
+    if (arc || unit.windup) {
+      releaseTelegraph(next,targets,tick,control.gaze.fired.has(unit.id),hit,effects,burns,impulses);
+      return next;
+    }
+    if (unit.kind==="horseman" && unit.headUntil!==undefined) {
+      if (unit.headSpot && unit.headLandedTick!==undefined) {
+        const head=unit.headSpot;
+        const distance=moveToward(next,head.x,head.y,5);
+        if (distance<=footprint(unit)+3) {
+          delete next.headUntil; delete next.headSpot; delete next.headLandedTick;
+        } else if (tick-unit.headLandedTick>=UNIT_DEFINITIONS.horseman.returnTicks) {
+          const roll=Math.min(2.5,distance);
+          next.headSpot={x:head.x-next.aimX*roll,y:head.y-next.aimY*roll};
+        }
+      }
+      return next;
+    }
+    if (unit.kind==="slime" && unit.smallSlime && unit.siblingId!==undefined && tick-(unit.splitTick ?? tick)>=UNIT_DEFINITIONS.slime.mergeDelay) {
+      const other=starting.find(u=>u.id===unit.siblingId && u.team===unit.team && u.kind==="slime" && u.hp>0);
+      if (other) { moveToward(next,other.x,other.y,14); return next; }
+      delete next.siblingId;
+    }
     if (unit.kind === "belltower") {
       next.targetId = control.bells.get(unit.id) ?? null;
       if (next.targetId !== null) { next.lastAttackTick = tick; next.nextAttackTick = tick+UNIT_DEFINITIONS.belltower.cooldownTicks; }
       return next;
     }
     const target = unit.kind === "lobber" || unit.kind === "sunlens" ? pickTowerTarget(unit,targets) :
-      (unit.kind === "reaper" && hunt(unit, targets)) || nearestEnemy(unit, targets);
+      (unit.kind === "reaper" && hunt(unit, targets)) || rosterTarget(unit,targets) || nearestEnemy(unit, targets);
     if (unit.kind === "sunlens") { focusLens(next,target,tick,hit); return next; }
     if (unit.kind === "drone" && unit.burstLeft && tick >= (unit.nextBurstTick ?? 0) && unit.attackDirection) {
       const spec = UNIT_DEFINITIONS.drone, speed = spec.arrowSpeed / TICKS_PER_SECOND;
@@ -414,8 +469,8 @@ export function stepBattle(battle: Battle): Battle {
 
     const definition = UNIT_DEFINITIONS[unit.kind];
     const reach = definition.reach + (target.kind === "base" ? BASE_RADIUS : 0);
-    const targetRadius = target.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[target.kind].radius;
-    const stopAt = definition.attack === "melee" || unit.kind === "cyclops" ? definition.radius + targetRadius : reach;
+    const targetRadius = target.kind === "base" ? BASE_RADIUS : footprint(target);
+    const stopAt = definition.attack === "melee" || unit.kind === "cyclops" ? Math.min(reach,footprint(unit) + targetRadius) : reach;
     const distance = moveToward(next, target.x, target.y, stopAt);
     if (unit.kind === "archer") {
       const readyIn = next.nextAttackTick-tick;
@@ -428,9 +483,12 @@ export function stepBattle(battle: Battle): Battle {
       return next;
     }
     if (definition.attack !== "lightning" && distance <= reach && tick >= unit.nextAttackTick) {
+      if (startTelegraph(next,target,tick)) return next;
+      if (unit.kind==="snowman" && next.snowStock===0) return next;
       next.nextAttackTick = tick + definition.cooldownTicks;
       next.lastAttackTick = tick;
       next.attackDirection = { x: next.aimX, y: next.aimY };
+      if (rosterStrike(next,target,targets,tick,hit,healing,impulses,effects)) return next;
       if (definition.attack === "melee") {
         let amount: number = definition.damage;
         if (unit.kind === "lancer" && (unit.runUp ?? 0) >= UNIT_DEFINITIONS.lancer.runUp) {
@@ -445,6 +503,11 @@ export function stepBattle(battle: Battle): Battle {
         if (unit.kind === "reaper" && hasSoul(target)) cuts.push({casterId: unit.id, victimId: target.id});
         if (unit.kind === "phoenix" && target.kind !== "base") burns.push({id: target.id, team: unit.team});
       } else if (definition.attack === "arrow") {
+        if (unit.kind==="snowman") {
+          next.snowStock=(next.snowStock ?? 3)-1;
+          next.repackAt ??= tick+UNIT_DEFINITIONS.snowman.repackTicks;
+        }
+        if (unit.kind==="horseman") next.headUntil=tick+Math.max(1,Math.ceil(distance*TICKS_PER_SECOND/UNIT_DEFINITIONS.horseman.arrowSpeed));
         if (unit.kind === "archer" && shootingPastCover(next, starting, distance)) next.lastAttentionTick = tick;
         if (unit.kind === "drone") { next.burstLeft = 2; next.nextBurstTick = tick + UNIT_DEFINITIONS.drone.burstGap; }
         arrows.push(releaseShot(next, target, tick, TICKS_PER_SECOND));
@@ -456,8 +519,12 @@ export function stepBattle(battle: Battle): Battle {
   // A lethal melee hit frees the footprint immediately, as in the original duel.
   // Arrows below use the resulting movement paths and the starting list of living enemies.
   const solid = units.map((unit,i) => !starting[i].tunnel && unit.hp > (damage.get(unit.id) ?? 0));
+  // A breach has no swept body between the ridge's origin and its destination.
+  const origins=units.some((u,i)=>u.warpedTick===tick && starting[i].warpedTick!==tick) ?
+    starting.map((u,i)=>units[i].warpedTick===tick ? {...u,x:units[i].x,y:units[i].y} : u) : starting;
+  const shotOrigins=origins===starting ? targets : basesAtStart ? [...origins,...basesAtStart] : origins;
   for (let pass = 0; pass < 4; pass++) {
-    if (!separateFootprints(starting, units, solid)) break;
+    if (!separateFootprints(origins, units, solid)) break;
   }
   const byId = new Map(units.map(unit => [unit.id, unit]));
   for (const mouseId of control.mice.values()) byId.get(mouseId)!.lastSqueakTick = tick;
@@ -466,6 +533,7 @@ export function stepBattle(battle: Battle): Battle {
     const target = byId.get(id)!;
     for (const point of impacts) shove(target, point.x, point.y, point.distance);
   }
+  for (const impulse of impulses) displace(byId.get(impulse.id)!,impulse.dx,impulse.dy);
   for (const unit of units) moveKnockback(unit);
   for (const {id, team} of burns) afflict(byId.get(id)!, "burn", team, tick);
   applyMagic(activeMagic, units, targets, tick, hit, healing);
@@ -476,29 +544,33 @@ export function stepBattle(battle: Battle): Battle {
   if (winds.length) arrows = arrows.filter(arrow => !blownAway(arrow, winds));
   const movedTargets = towers ? [...units, ...towers] : units;
   const wards = spells?.filter(s => s.kind === "mirror" && tick-s.startTick >= SPELLS.mirror.delay) ?? [];
-  const incoming = winds.length ? battle.arrows.filter(arrow => !blownAway(arrow,winds)) : battle.arrows;
-  const reflected = reflectAtWards(incoming,wards,targets,movedTargets,tick);
+  const incoming = winds.length ? battle.arrows.filter(arrow => !blownAway(arrow,winds)).map(a=>deflectHead(a,winds)) : battle.arrows;
+  if (winds.length) arrows=arrows.map(a=>deflectHead(a,winds));
+  const reflected = reflectAtWards(incoming,wards,shotOrigins,movedTargets,tick);
+  const mills=incoming.length ? units.filter(u=>u.kind==="windmill" && u.hp>0 && disabledUntil(u)<=tick &&
+    ((u.millFastUntil ?? 0)>tick || (tick+Math.abs(u.id)*7)%30<11)) : [];
   for (const arrow of incoming) {
     const returned = reflected.get(arrow);
     if (returned) { arrows.push(returned); continue; }
     if (!arrow.kind || arrow.kind === "dart") noticeFriendlyArrow(arrow, units, tick);
-    const flying = advanceShot(arrow, tick, targets, movedTargets, byId, hit, effects, conversions);
+    const flying = advanceShot(arrow, tick, shotOrigins, movedTargets, byId, hit, effects, conversions, mills);
     if (flying) arrows.push(flying);
   }
   applyClouds(effects, units, winds, tick);
   for (const [index, unit] of units.entries()) {
     const from = starting[index];
-    const distance = Math.hypot(unit.x - from.x, unit.y - from.y);
+    const distance = unit.warpedTick===tick ? 0 : Math.hypot(unit.x - from.x, unit.y - from.y);
     const speed = walkSpeed(unit) / TICKS_PER_SECOND;
     // A shove can slide the ice. Keep the stride fixed inside the shell.
     if (unit.frozenUntil === undefined) {
       unit.walkDistance += distance;
       unit.pace += ((speed ? Math.min(1, distance / speed) : 0) - unit.pace) * .3;
     }
-    if (unit.kind === "lancer" && unit.lastChargeTick !== tick) {
+    if ((unit.kind === "lancer" || unit.kind==="rhinorider") && unit.lastChargeTick !== tick) {
       const straight = unit.aimX * from.aimX + unit.aimY * from.aimY > 0.93;
-      unit.runUp = distance > 0.15 && straight && !from.knockback && !control.shocks.has(unit.id) && tick >= disabledUntil(unit) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
-      if ((from.runUp ?? 0) < UNIT_DEFINITIONS.lancer.runUp && unit.runUp >= UNIT_DEFINITIONS.lancer.runUp) unit.lastChargeReadyTick=tick;
+      unit.runUp = distance > 0.15 && straight && !from.knockback && !unit.knockback && unit.rootedUntil===undefined && !control.shocks.has(unit.id) && tick >= disabledUntil(unit) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
+      const threshold=UNIT_DEFINITIONS[unit.kind].runUp;
+      if ((from.runUp ?? 0) < threshold && unit.runUp >= threshold) unit.lastChargeReadyTick=tick;
     }
     const amount = damage.get(unit.id);
     if (amount === undefined) continue;
@@ -535,6 +607,7 @@ export function stepBattle(battle: Battle): Battle {
   }
   finishTreatments(units, byId, tick, healing);
   resolveConversions(conversions, byId, tick, fallen);
+  const births=settleTroopBodies(units,byId,damage,fallen,tick);
   units.forEach((unit,i) => recordTrail(unit,starting[i],tick));
   const recruits: Placement[] = [];
   for (const unit of units) {
@@ -542,6 +615,11 @@ export function stepBattle(battle: Battle): Battle {
     if (child) recruits.push(child);
   }
   if (recruits.length) units.push(...createBattle(recruits).units);
+  if (births.length) {
+    const newborns=createBattle(births.map(b=>b.placement),tick).units;
+    births.forEach((birth,i)=>{ if (birth.slime) Object.assign(newborns[i],birth.slime,{smallSlime:true}); });
+    units.push(...newborns);
+  }
   return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases,
     fallen.size ? spells?.filter(s => !fallen.has(s.team)) : spells, effects);
 }

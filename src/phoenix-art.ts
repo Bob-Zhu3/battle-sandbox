@@ -126,12 +126,13 @@ export function phoenix(c: Pens, dye: Dye, pose: CharacterPose, unit: Unit | und
   }
   const flight = phoenixFlight(unit, pose, tick);
   const stroke = unit ? flight.wing : .82;
+  const tuck = tick < (unit?.groundedUntil ?? 0) ? 1.25 : flight.talons;
   c.translate(2.8 * flight.talons, -flight.height);
   c.rotate(flight.pitch);
-  wing(c, dye, stroke, flight.wrist, flight.talons, true);
+  wing(c, dye, stroke, flight.wrist, tuck, true);
   tail(c, flight.tail, flight.tailTip, flight.pullUp, flight.talons);
   claw(c, .2, 2.2, flight.talons * .72, true);
   claw(c, 4, 2.2, flight.talons, false);
   body(c, .17 * pose.pitch - .38 * flight.pitch + .14 * pose.ready, pose, Math.max(flight.talons, flight.takeoff * .75));
-  wing(c, dye, stroke, flight.wrist, flight.talons, false);
+  wing(c, dye, stroke, flight.wrist, tuck, false);
 }

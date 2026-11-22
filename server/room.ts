@@ -1,4 +1,4 @@
-import { SPELLS, spellKind } from "../src/spells.ts";
+import { makeFieldSpell, SPELLS, spellKind } from "../src/spells.ts";
 import { BRUSH_SPACING, type ArenaPoint } from "../src/deployment.ts";
 import { Battle, battleOutcome, createBattle, stepBattle, TICKS_PER_SECOND, ARENA, type Outcome, type Placement, type Team } from "../src/simulation.ts";
 import { type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
@@ -150,8 +150,10 @@ export class Room {
       const price = SPELLS[spell].cost;
       if (price > this.gold[team]!) return "This spell costs " + price + " gold. You have " + this.gold[team] + ".";
       const { x, y } = point;
-      const id = this.nextId++;
-      const cast = { id, kind: spell, team, x, y, startTick: this.world.tick };
+      const id = this.nextId;
+      const cast = makeFieldSpell(id,spell,team,x,y,this.world.tick,this.world.units);
+      if (spell === "wormhole" && cast.portalUnitId === undefined) return "Wormhole needs a living mobile ally.";
+      this.nextId++;
       const ack: PlacementAck = { type: "placement-ack", round, commandId, unitIds: [], spellId: id };
       this.gold[team]! -= price;
       this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, this.world.bases, [...(this.world.spells ?? []), cast], this.world.effects);

@@ -3,7 +3,7 @@ import { ARMIES, BASE_HP, GOLD_PER_SECOND, MATCHES, campFor, inCamp, type MatchM
 import type { ArenaPoint } from "./deployment.ts";
 import { createField, element } from "./field.ts";
 import { drawArena } from "./renderer.ts";
-import { SPELLS } from "./spells.ts";
+import { castHint, SPELLS } from "./spells.ts";
 import { connectRoom, type ConnectionState } from "./room-connection.ts";
 import type { RoomAction, Snapshot, World } from "./room-protocol.ts";
 import { bountyFor } from "./transformations.ts";
@@ -82,7 +82,7 @@ function updateInterface() {
   field.setCasting(!!live && edit, !!deploy && edit);
   const spell = live && edit ? field.selectedSpell() : undefined;
   const miner = edit && field.selectedKind() === "miner" && !spell;
-  const castingHint = spell ? "Tap anywhere to cast " + SPELLS[spell].name + "." : miner ? "Choose a tunnel exit anywhere on the field." : "";
+  const castingHint = spell ? castHint(spell) : miner ? "Choose a tunnel exit anywhere on the field." : "";
   field.canvas.setAttribute("aria-label", castingHint || (edit ? name + " army. Draw squads in the " + camp + "." : "Shared battlefield."));
   scenario.textContent = team ? name + " · " + match.name : match.name;
   for (const color of match.teams) {

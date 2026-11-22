@@ -6,11 +6,11 @@ import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 
 type Brush = RecruitKind | SpellKind;
 const shelves: {name: string; items: Brush[]}[] = [
-  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","miner","clown","engineer"]},
-  {name: "Machines", items: ["mouse","drone"]},
-  {name: "Towers", items: ["post","workshop","lobber","sunlens","belltower"]},
-  {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","reaper","witch","zombie"]},
-  {name: "Spells", items: ["gust","meteor","rain","fault","briar","mirror","freeze","lightning","rage"]},
+  {name: "People", items: ["warrior","archer","shieldbearer","medic","lancer","bomber","musketeer","scout","miner","clown","engineer","wrestler","liondancers","rhinorider"]},
+  {name: "Machines", items: ["mouse","drone","trojanhorse"]},
+  {name: "Towers", items: ["post","workshop","lobber","sunlens","belltower","windmill","harpoon","prism","snowman"]},
+  {name: "Mythical", items: ["cyclops","kirin","frostqueen","phoenix","reaper","witch","zombie","hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem"]},
+  {name: "Spells", items: ["gust","meteor","rain","fault","briar","mirror","freeze","lightning","rage","wormhole"]},
 ];
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
 function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key); }
@@ -41,6 +41,11 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     if(isSpell(key)){c.translate(36,36);c.scale(1.95,1.95);drawSpellIcon(c,key);}
     else if (key === "phoenix") {
       drawUnitToken(c, 36 + ARMIES[team].facing * 9.5, 49, 13.5, team, key);
+    } else if (["hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem",
+      "wrestler","liondancers","rhinorider","trojanhorse","windmill","harpoon","prism","snowman"].includes(key)) {
+      const shift=key==="harpoon" ? -3 : key==="firedragon" ? 2.5 : 0;
+      const size=key==="slime" ? 18.5 : key==="vampire" || key==="irongolem" ? 16.5 : key==="firedragon" ? 13 : 13.6;
+      drawUnitToken(c,36+shift*ARMIES[team].facing,key==="slime" ? 43 : 47,size,team,key);
     } else {
       const myth = key === "cyclops" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
       const longWeapon = key === "musketeer" || key === "lancer" || key === "miner";

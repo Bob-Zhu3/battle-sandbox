@@ -1,10 +1,10 @@
 import type { Team, Target } from "./simulation.ts";
 import { BASE_RADIUS } from "./battlefield.ts";
-import { UNIT_DEFINITIONS } from "./units.ts";
+import { footprint } from "./units.ts";
 
 export interface Arrow {
   // "balloon" is the Clown's glass bottle in saved and live snapshots.
-  kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom" | "balloon" | "hex" | "stone";
+  kind?: "bolt" | "dart" | "bullet" | "bomb" | "ice" | "venom" | "balloon" | "hex" | "stone" | "head" | "snowball" | "harpoon";
   casterId?: number;
   piercedIds?: number[];
   landTick?: number;
@@ -39,7 +39,7 @@ export function projectileContacts(shot: Arrow, previous: readonly Target[], nex
   for (const [i, target] of previous.entries()) {
     if (target.id === shot.casterId || target.hp <= 0 || (target.kind !== "base" && target.tunnel) || target.team === shot.team || shot.piercedIds?.includes(target.id) ||
         (shot.kind === "bolt" && target.kind === "base" && shot.reflectedTick === undefined)) continue;
-    const end = next[i], radius = target.kind === "base" ? BASE_RADIUS : UNIT_DEFINITIONS[target.kind].radius;
+    const end = next[i], radius = target.kind === "base" ? BASE_RADIUS : footprint(target);
     const time = circleEntry(shot.x-target.x,shot.y-target.y,shot.vx-(end.x-target.x),shot.vy-(end.y-target.y),radius);
     if (time !== undefined) hits.push({target, time});
   }

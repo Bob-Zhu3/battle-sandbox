@@ -120,11 +120,17 @@ const wingbeat = [
 
 export function phoenixFlight(unit: Unit | undefined, pose: CharacterPose, tick: number) {
   const phase = (tick / 54 + (unit?.id ?? 0) * .381966) % 1;
+  const talons = eventFade(tick, unit?.lastAttackTick, 11);
+  if (tick < (unit?.groundedUntil ?? 0)) {
+    const tug = Math.sin(2 * Math.PI * phase);
+    return { wing: .03 + .095 * tug, wrist: .24 + .13 * tug, height: .35 + .2 * tug,
+      pitch: .07 + .12 * talons, tail: .32*tug, tailTip: .34*Math.sin(2*Math.PI*(phase-.17)),
+      talons, pullUp: 0, takeoff: 0 };
+  }
   let i = 1;
   while (phase > wingbeat[i][0]) i++;
   const a = wingbeat[i - 1], b = wingbeat[i];
   const t = smooth((phase - a[0]) / (b[0] - a[0]));
-  const talons = eventFade(tick, unit?.lastAttackTick, 11);
   const takeoff = eventFade(tick, unit?.lastHatchTick, 23);
   const age = tick - (unit?.lastAttackTick ?? -Infinity);
   const pullUp = age >= 0 && age < 23 ? Math.sin(Math.PI * age / 23) : 0;

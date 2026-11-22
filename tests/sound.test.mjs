@@ -111,3 +111,29 @@ test("a human keeps the same performer's voice when struck again", () => {
   assert.equal(new Set(choices.map(t=>t%2)).size,1);
   assert.equal(new Set(choices).size,2);
 });
+
+test("a Wormhole opens on placement and only sounds again when a living passenger crosses it", () => {
+  for (const survives of [true,false]) {
+    const game = new Playground();
+    game.place("red",{type:"place-warriors",positions:[{x:160,y:180}]});
+    if (!survives) {
+      game.place("blue",{type:"place-warriors",positions:[{x:182,y:180}]});
+      game.world.units[0].hp = 1;
+    }
+    const before = game.world;
+    game.cast("red","wormhole",780,180);
+    const frames = [game.world];
+    assert.deepEqual(battleCues(before,frames[0]).map(c=>c.kind),["portalOpen"]);
+    for (let t=1; t<=SPELLS.wormhole.delay+6; t++) { game.advance(); frames.push(game.world); }
+    for (const stride of [1,3]) {
+      const heard = [];
+      for (let i=stride; i<frames.length; i+=stride) {
+        for (const cue of battleCues(frames[i-stride],frames[i])) {
+          if (cue.kind==="portalOpen" || cue.kind==="wormhole") heard.push([i,cue.kind,cue.x]);
+        }
+      }
+      assert.deepEqual(heard,survives ? [[SPELLS.wormhole.delay,"wormhole",780]] : []);
+    }
+    assert.deepEqual(battleCues(undefined,frames.at(-1)),[]);
+  }
+});

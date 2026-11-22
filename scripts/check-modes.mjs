@@ -181,7 +181,7 @@ async function paletteAndMeteor(url) {
       const pick=(scope,name)=>scope.getByRole("button",{name,exact:true}).click({force:true});
       const tab=name=>bar.getByRole("tab",{name,exact:true});
       assert.deepEqual(await bar.getByRole("tab").allTextContents(),["People","Machines","Towers","Mythical","Spells"]);
-      assert.equal(await panel.getByRole("button").count(),11);
+      assert.equal(await panel.getByRole("button").count(),14);
       assert.equal(await page.getByRole("button",{name:"Roster",exact:true}).count(),0);
       const track=bar.locator("#palette-track");
       await pick(bar,"Scroll troops right"); assert.ok(await track.evaluate(el=>el.scrollLeft>0));
@@ -373,11 +373,11 @@ async function browseRoster(url) {
   const {page,point}=await open(url);
   try {
     const catalog={
-      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Miner","Clown","Engineer"],
-      Machines:["Clockmouse","Bolt Drone"],
-      Towers:["Watchpost","Mouse Workshop","Stone Lobber","Sun Lens","Bell Tower"],
-      Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Reaper","Witch","Zombie"],
-      Spells:["Gust","Meteor","Healing Rain","Fault Line","Briar Snare","Mirror Ward","Freeze","Lightning","Rage"],
+      People:["Warrior","Archer","Shieldbearer","Field Medic","Lancer","Bomber","Musketeer","Venom Scout","Miner","Clown","Engineer","Wrestler","Lion Dancers","Rhino Rider"],
+      Machines:["Clockmouse","Bolt Drone","Trojan Horse"],
+      Towers:["Watchpost","Mouse Workshop","Stone Lobber","Sun Lens","Bell Tower","Windmill","Harpoon Tower","Prism Tower","Snowman"],
+      Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Reaper","Witch","Zombie","Hydra","Medusa","Vampire","Sandworm","Slime","Headless Horseman","Werewolf","Cerberus","Kraken","Fire Dragon","Iron Golem"],
+      Spells:["Gust","Meteor","Healing Rain","Fault Line","Briar Snare","Mirror Ward","Freeze","Lightning","Rage","Wormhole"],
     };
     const portraits=new Set();
     let placed=0;
@@ -391,15 +391,18 @@ async function browseRoster(url) {
         if(i===0 && shelf==="Mythical") await picture(page,"roster-mythical");
         await card.click();
         if(shelf==="Spells") {
-          assert.equal(await page.locator("#deploy-hint").textContent(),"Tap anywhere to cast "+name+".");
+          assert.equal(await page.locator("#deploy-hint").textContent(),name==="Wormhole" ?
+            "Tap an exit. Your mobile troop closest to that spot travels there." : "Tap anywhere to cast "+name+".");
           await page.mouse.click(...point(840,170));
         } else {
-          await page.mouse.click(...point(125+(placed%9)*86,110+Math.floor(placed/9)*52));
+          const xy=point(125+(placed%11)*70,112+Math.floor(placed/11)*42);
+          assert.equal(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.id,xy),"arena",name+" placement should reach the field");
+          await page.mouse.click(...xy);
           await page.waitForFunction(n=>Number(document.querySelector("#red-count").textContent)===n,++placed);
         }
       }
     }
-    assert.equal(portraits.size,34);assert.equal(placed,25);
+    assert.equal(portraits.size,54);assert.equal(placed,44);
     const panel=page.getByRole("region",{name:"Troops and spells"});
     for(const team of TEAMS) {
       await page.getByRole("button",{name:ARMIES[team].name+" army",exact:true}).click();
@@ -428,12 +431,12 @@ async function browseRoster(url) {
       const slots=await page.locator(".palette-card").evaluateAll(cards=>cards.map(card=>{
         const {width,height,bottom}=card.getBoundingClientRect();return {width,height,bottom};
       }));
-      assert.equal(slots.length,5);
+      assert.equal(slots.length,9);
       assert.ok(slots.every(s=>s.width>=44 && s.height>=44 && Math.abs(s.bottom-slots[0].bottom)<=3.5),
         "Portraits form one horizontally scrollable, tappable row at "+width+"px");
     }
     assert.equal(await page.locator("#gold-balance").textContent(),"∞");
-    console.log("Roster: all 34 portraits fit their cards in four colors, all 25 troops and buildings place, and all nine spells cast.");
+    console.log("Roster: all 54 portraits fit their cards in four colors, all 44 troops and buildings place, and all ten spells cast.");
   } finally {await page.context().close();}
 }
 

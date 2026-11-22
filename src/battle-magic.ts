@@ -10,6 +10,9 @@ export function strikeField(spell: FieldSpell, targets: readonly Target[], tick:
   if (spell.kind !== "freeze" && spell.kind !== "lightning") return;
   const seen = targets.filter(t => t.team !== spell.team && exposed(t) && insideSpell(spell,t,t.kind === "base" ? BASE_RADIUS : 0));
   if (spell.kind === "freeze") {
+    for (const unit of targets) if (unit.kind === "snowman" && unit.team === spell.team && unit.hp > 0 && insideSpell(spell,unit)) {
+      unit.snowStock=3; delete unit.repackAt;
+    }
     for (const target of seen) {
       const base = target.kind === "base";
       if (!base && tick >= (target.frozenUntil ?? 0)) target.frozenAt = tick;

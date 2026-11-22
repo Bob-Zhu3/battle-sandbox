@@ -3,8 +3,9 @@ import { disabledUntil, type GroundEffect, type Hit } from "./conditions.ts";
 import type { Unit, Target, Placement } from "./simulation.ts";
 import { nearestEnemy } from "./targeting.ts";
 import { airborne, isBuilding, isHuman, isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { resolveGazes } from "./roster-attacks.ts";
 
-export interface Windup { kind: "smash" | "swallow"; since: number; x: number; y: number; targetId: number }
+export interface Windup { kind: "smash" | "swallow" | "gaze" | "breath" | "breach"; since: number; x: number; y: number; targetId: number }
 const club = UNIT_DEFINITIONS.cyclops;
 const storm = UNIT_DEFINITIONS.kirin;
 
@@ -84,7 +85,8 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
       hit(enemy,bell.damage,tower.team); disable(enemy.id,bell.stunTicks); push(enemy.id,tower,bell.shove);
     }
   }
-  const ready = units.filter(u => u.hp > 0 && u.windup && tick >= disabledUntil(u) &&
+  const gaze=resolveGazes(units,targets,tick,hit,effects,stuns);
+  const ready = units.filter(u => u.kind === "cyclops" && u.hp > 0 && u.windup && tick >= disabledUntil(u) &&
     tick - u.windup.since >= (u.windup.kind === "smash" ? club.windup : club.swallowTicks));
   ready.sort((a, b) => a.windup!.since - b.windup!.since || a.id - b.id);
   for (const caster of ready) {
@@ -111,7 +113,7 @@ export function resolveControl(units: readonly Unit[], targets: readonly Target[
     swallowed.add(meal.id);
     hit(meal, meal.hp, caster.team);
   }
-  return {stuns, arcs, mice, finished, shocks, meals, swallowed, bells};
+  return {stuns, arcs, mice, finished, shocks, meals, swallowed, bells, gaze};
 }
 
 export function finishBuilding(unit: Unit, tick: number): Placement | undefined {
@@ -125,10 +127,14 @@ export function finishBuilding(unit: Unit, tick: number): Placement | undefined 
   delete unit.constructingSince;
   // Player-issued IDs are positive and bases occupy -1 through -4.
   // Each original builder has four reserved slots, independent of packet order.
-  const id = -1024 - unit.id * 4 - index;
+  const id = childId(unit.id,index);
   const spread = workshop ? (index - 2) * 9 : 0;
   // Build to the side so an Engineer can shelter behind their own post.
   const side = unit.y > ARENA.height / 2 ? -1 : 1;
   return { id, team: unit.team, kind: workshop ? "mouse" : "post", x: unit.x + unit.aimX * 17,
     y: unit.y + unit.aimY * 17 + (workshop ? spread : side * 19), makerId: unit.id };
+}
+
+export function childId(parent: number, slot: number) {
+  return -1024 - parent * 4 - slot;
 }

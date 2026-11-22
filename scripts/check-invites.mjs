@@ -54,6 +54,10 @@ async function draw(p,x,y,ey=y) {
   await p.page.mouse.up();
 }
 const ready=p=>p.page.getByRole("button",{name:"Ready",exact:true}).click();
+async function brush(p,shelf,name) {
+  await p.page.getByRole("tab",{name:shelf,exact:true}).click();
+  await p.page.getByRole("tabpanel").getByRole("button",{name,exact:true}).click();
+}
 try{
   const red=await player(1024,640),blue=await player(390,700),other=await player(820,620);
   const link=await create(red,"Duel");
@@ -78,11 +82,23 @@ try{
     const group=[await player(1000,640),await player(430,690),await player(760,600)];
     const ffa=await create(group[0],"Free-for-all");
     for(const [i,team] of ["blue","violet"].entries()){await group[i+1].page.goto(ffa);await side(group[i+1],team);}
-    await Promise.all([draw(group[0],300,109),draw(group[1],640,109),draw(group[2],300,205)]);
+    await Promise.all([brush(group[0],"Mythical","Fire Dragon"),brush(group[1],"Towers","Prism Tower"),brush(group[2],"Mythical","Hydra")]);
+    await Promise.all([draw(group[0],230,92),draw(group[1],695,109),draw(group[2],190,236)]);
     await wait(()=>group.every(p=>p.frames.at(-1)?.world.units.length===3),"all three armies deployed");
+    const roster=group[0].frames.at(-1).world.units;
+    assert.deepEqual(roster.map(u=>u.kind).sort(),["firedragon","hydra","prism"]);
+    const passenger=roster.find(u=>u.kind==="firedragon").id;
     await Promise.all(group.map(ready));
     await wait(()=>group.every(p=>p.frames.some(f=>f.phase==="running" && f.world.bases.length===3)),"free-for-all countdown completed");
-    console.log("Free-for-all: three independent browsers joined one invite, deployed in different camps and started the same three-base battle.");
+    await brush(group[0],"Spells","Wormhole");await draw(group[0],533,155);
+    const arrival=p=>p.frames.find(f=>f.world.units.some(u=>u.id===passenger && u.warpedTick!==undefined));
+    await wait(()=>group.every(arrival),"all three players see the Fire Dragon travel through the Wormhole");
+    const tick=p=>arrival(p).world.units.find(u=>u.id===passenger).warpedTick;
+    assert.ok(group.every(p=>tick(p)===tick(group[0])));
+    await group[2].page.reload();await side(group[2],"violet");
+    await wait(()=>group[2].joins.length===2 && group[2].frames.at(-1)?.world.tick>=tick(group[0]),"Violet rejoins after the jump");
+    assert.equal(group[2].frames.at(-1).world.units.find(u=>u.id===passenger).warpedTick,tick(group[0]));
+    console.log("Free-for-all: three browsers deployed a Fire Dragon, Prism Tower and Hydra. All saw the same Dragon traverse a Wormhole on tick",tick(group[0]),"and Violet rejoined the battle.");
   }
   assert.deepEqual(errors,[]);
 } finally {

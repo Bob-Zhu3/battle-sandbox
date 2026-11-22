@@ -1,5 +1,5 @@
 import { Battle, createBattle, stepBattle, type Team } from "./simulation.ts";
-import { type SpellKind } from "./spells.ts";
+import { makeFieldSpell, type SpellKind } from "./spells.ts";
 import { placementKind } from "./units.ts";
 import type { PlacementCommand } from "./deployment.ts";
 
@@ -26,7 +26,7 @@ export class Playground {
 
   cast(team: Team, kind: SpellKind, x: number, y: number) {
     const id = this.nextId++;
-    const spell = {id, kind, team, x, y, startTick: this.world.tick};
+    const spell = makeFieldSpell(id,kind,team,x,y,this.world.tick,this.world.units);
     this.strokes.push([id]);
     this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, undefined, [...(this.world.spells ?? []), spell], this.world.effects);
     this.resting = false;
@@ -57,11 +57,13 @@ export class Playground {
       return;
     }
     const next = stepBattle(from);
-    const units = next.units.filter(u => u.hp > 0 || next.tick - (u.lastHitTick ?? next.tick) < 48);
+    const units = next.units.filter(u => u.hp > 0 || (u.lastHitTick!==null && next.tick-u.lastHitTick<48));
     this.world = new Battle(next.tick, units, next.arrows, undefined, next.spells, next.effects);
     this.resting = !next.spells?.length && !next.effects?.length && !next.arrows.length && units.every(u =>
       u.hp > 0 && u.targetId === null && u.pace < .001 && u.emberUntil === undefined &&
       !u.windup && !u.burstLeft && !u.burn && !u.poison && !u.tunnel && !u.trail && !u.knockback &&
+      !u.headSpot && !u.repackAt && (u.wolfUntil ?? 0) <= next.tick && (u.groundedUntil ?? 0) <= next.tick &&
+      !(u.smallSlime && u.siblingId !== undefined) &&
       (u.aidReadyTick ?? 0) <= next.tick && (u.rootedUntil ?? 0) <= next.tick &&
       (u.stunnedUntil ?? 0) <= next.tick && (u.fogUntil ?? 0) <= next.tick && (u.frozenUntil ?? 0) <= next.tick && !u.raging);
   }

@@ -5,8 +5,10 @@ import type { GroundEffect } from "./conditions.ts";
 import type { Arrow } from "./arrows.ts";
 import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { drawBomb } from "./roster-art.ts";
+import { drawBreach } from "./legend-effects.ts";
 
 export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
+  if (e.kind === "breach") { drawBreach(c,e,tick,sx,sy); return; }
   if (e.kind==="miasma") { drawMiasma(c,e,tick,sx,sy); return; }
   if (e.kind==="glass") {
     const age=tick-e.tick;

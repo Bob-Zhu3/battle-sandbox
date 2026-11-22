@@ -1,11 +1,11 @@
-import { projectileContacts, type Arrow } from "./arrows.ts";
+import { circleEntry, projectileContacts, type Arrow } from "./arrows.ts";
 import { ARENA, BASE_RADIUS } from "./battlefield.ts";
-import { afflict, slow, type GroundEffect, type Hit } from "./conditions.ts";
+import { afflict, displace, slow, type GroundEffect, type Hit } from "./conditions.ts";
 import { canHex, type Conversion } from "./transformations.ts";
 import { insideSpell, type FieldSpell } from "./spells.ts";
 import { facesShot } from "./defense.ts";
 import type { Target, Unit } from "./simulation.ts";
-import { airborne, UNIT_DEFINITIONS } from "./units.ts";
+import { airborne, footprint, UNIT_DEFINITIONS } from "./units.ts";
 
 export function releaseShot(unit: Unit, target: Target, tick: number, tickRate: number): Arrow {
   const spec = UNIT_DEFINITIONS[unit.kind];
@@ -19,6 +19,9 @@ export function releaseShot(unit: Unit, target: Target, tick: number, tickRate: 
       return {...shot, kind: unit.kind === "lobber" ? "stone" : unit.kind === "clown" ? "balloon" : "bomb", landTick: tick + flight, vx: dx / flight, vy: dy / flight};
     }
     case "musketeer": return {...shot, kind: "bullet"};
+    case "harpoon": return {...shot, kind:"harpoon"};
+    case "snowman": return {...shot, kind:"snowball"};
+    case "horseman": return {...shot,kind:"head",landTick:tick+Math.max(1,Math.ceil(Math.hypot(target.x-unit.x,target.y-unit.y)/speed))};
     case "scout": return {...shot, kind: "venom"};
     case "witch": return {...shot, kind: "hex"};
     case "frostqueen": return {...shot, kind: "ice"};
@@ -53,16 +56,53 @@ export function applyClouds(effects: GroundEffect[], units: Unit[], winds: reado
   }
 }
 
+function dropHead(shot: Arrow, x: number, y: number, tick: number, byId: ReadonlyMap<number,Unit>) {
+  const rider=shot.casterId===undefined ? undefined : byId.get(shot.casterId);
+  if (rider?.kind!=="horseman" || !rider.hp || rider.team!==shot.team) return;
+  rider.headSpot={x:Math.max(4,Math.min(ARENA.width-4,x)),y:Math.max(4,Math.min(ARENA.height-4,y))};
+  rider.headLandedTick=tick;
+}
+
+export function deflectHead(shot: Arrow,winds: readonly FieldSpell[]): Arrow {
+  if (shot.kind!=="head") return shot;
+  const wind=winds.find(s=>s.team!==shot.team && insideSpell(s,shot));
+  if (!wind) return shot;
+  const dx=shot.x-wind.x,dy=shot.y-wind.y,d=Math.hypot(dx,dy),speed=Math.hypot(shot.vx,shot.vy);
+  return {...shot,vx:d?dx/d*speed:-shot.vx,vy:d?dy/d*speed:-shot.vy};
+}
+
 export function advanceShot(shot: Arrow, tick: number, from: readonly Target[], to: readonly Target[], byId: ReadonlyMap<number, Unit>,
-  hit: Hit, effects: GroundEffect[], conversions: Conversion[]): Arrow | undefined {
+  hit: Hit, effects: GroundEffect[], conversions: Conversion[], mills: readonly Unit[]=[]): Arrow | undefined {
   const x = shot.x + shot.vx, y = shot.y + shot.vy;
   if (shot.kind === "bomb" || shot.kind === "balloon" || shot.kind === "stone") {
     if (tick >= shot.landTick!) { splash(shot, x, y, tick, to, hit, effects); return; }
     return {...shot, x, y};
   }
   let pierced = shot.piercedIds;
-  for (const {target, time} of projectileContacts(shot, from, to)) {
+  const contacts=projectileContacts(shot,from,to);
+  if (mills.length && (!shot.kind || shot.kind==="dart" || shot.kind==="bolt" || shot.kind==="venom")) {
+    let guard: Unit | undefined, first=contacts[0]?.time ?? 1;
+    for (const mill of mills) {
+      if (mill.team===shot.team) continue;
+      const t=circleEntry(shot.x-mill.x,shot.y-mill.y,shot.vx,shot.vy,UNIT_DEFINITIONS.windmill.guardReach);
+      if (t!==undefined && (t<first || (t===first && (!guard || mill.id<guard.id)))) { guard=mill; first=t; }
+    }
+    if (guard) { guard.lastBlockTick=tick; return; }
+  }
+  for (const {target, time} of contacts) {
     const body = byId.get(target.id);
+    if (shot.kind==="head") dropHead(shot,shot.x+shot.vx*time,shot.y+shot.vy*time,tick,byId);
+    if (body && shot.kind==="snowball") slow(body,tick+UNIT_DEFINITIONS.snowman.slowTicks);
+    if (body && shot.kind==="harpoon") {
+      const tower=shot.casterId===undefined ? undefined : byId.get(shot.casterId);
+      if (tower?.kind==="harpoon" && tower.hp>0 && tower.team===shot.team) {
+        const dx=tower.x-body.x,dy=tower.y-body.y,d=Math.hypot(dx,dy);
+        const pull=Math.min(UNIT_DEFINITIONS.harpoon.pull,Math.max(0,d-footprint(tower)-footprint(body)));
+        if (d && pull) displace(body,dx/d*pull,dy/d*pull);
+        if (airborne(body) || body.groundedUntil!==undefined) body.groundedUntil=tick+UNIT_DEFINITIONS.harpoon.groundTicks;
+        effects.push({kind:"harpoon",team:shot.team,tick,x:body.x,y:body.y,fromX:tower.x,fromY:tower.y,radius:3});
+      }
+    }
     if (shot.kind === "ice") {
       splash(shot, shot.x + shot.vx * time, shot.y + shot.vy * time, tick, to, hit, effects);
       return;
@@ -83,5 +123,7 @@ export function advanceShot(shot: Arrow, tick: number, from: readonly Target[], 
     if (shot.kind !== "bullet" || target.kind === "base" || pierced?.length) return;
     pierced = [target.id];
   }
-  if (x >= 0 && x <= ARENA.width && y >= 0 && y <= ARENA.height) return pierced ? {...shot, x, y, piercedIds: pierced} : {...shot, x, y};
+  const inside=x>=0 && x<=ARENA.width && y>=0 && y<=ARENA.height;
+  if (shot.kind==="head" && (tick>=(shot.landTick ?? tick) || !inside)) { dropHead(shot,x,y,tick,byId); return; }
+  if (inside) return pierced ? {...shot, x, y, piercedIds: pierced} : {...shot, x, y};
 }

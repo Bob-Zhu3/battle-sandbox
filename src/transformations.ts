@@ -7,8 +7,12 @@ export interface Hex { kind: RecruitKind; team: Team; since: number }
 export interface Conversion { id: number; team: Team; casterId: number; kind: "bite" | "hex" }
 export interface Harvest { casterId: number; victimId: number }
 
-export function maxHealth(unit: Unit) { return UNIT_DEFINITIONS[unit.hex?.kind ?? unit.kind].maxHp; }
+export function maxHealth(unit: Unit) {
+  const hp = UNIT_DEFINITIONS[unit.hex?.kind ?? unit.kind].maxHp;
+  return unit.smallSlime ? Math.ceil(hp / 2) : hp;
+}
 export function bountyFor(unit: Unit) {
+  if (unit.smallSlime && unit.makerId !== undefined) return 0;
   if (unit.hex && unit.killedBy === unit.hex.team) return 0;
   return UNIT_DEFINITIONS[unit.hex?.kind ?? unit.kind].bounty;
 }
@@ -34,6 +38,8 @@ function changeAllegiance(unit: Unit, team: Team, tick: number) {
   unit.nextAttackTick = tick + 5;
   delete unit.windup; delete unit.runUp; delete unit.wrappingSince; delete unit.constructingSince;
   delete unit.burstLeft; delete unit.nextBurstTick; delete unit.trail;
+  delete unit.headUntil; delete unit.headSpot; delete unit.headLandedTick; delete unit.wolfUntil;
+  delete unit.siblingId;
   if (unit.poison?.team === team) delete unit.poison;
   if (unit.burn?.team === team) delete unit.burn;
 }

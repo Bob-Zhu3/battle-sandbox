@@ -6,6 +6,8 @@ import { cyclops, frostQueen, kirin } from "./mythical-art.ts";
 import { phoenix } from "./phoenix-art.ts";
 import { bellTower, stoneLobber, sunLens } from "./tower-art.ts";
 import { UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { drawExpedition } from "./expedition-art.ts";
+import { drawBeast, fallenBeast } from "./beast-art.ts";
 
 const linen = "#fff5d9", leather = "#865836", brass = "#e3ad59";
 function ring(c: Pens, x: number, y: number, r: number, color: string) {
@@ -211,12 +213,14 @@ function drone(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
   const t=tick+(u?.id??0)*13;
   const shot=u?.nextBurstTick===undefined ? u?.lastAttackTick : u.nextBurstTick-UNIT_DEFINITIONS.drone.burstGap;
   const recoil=eventFade(tick,shot,6);
-  c.translate(-2.8*recoil,-4-Math.sin(t*.088)*2.4+1.1*recoil);
-  c.rotate(.18*p.pace-.17*recoil+Math.sin(t*.061)*.045);
+  const grounded = tick < (u?.groundedUntil ?? 0);
+  const height = grounded ? 1.7 : -4-Math.sin(t*.088)*2.4;
+  c.translate(-2.8*recoil,height+1.1*recoil);
+  c.rotate((grounded ? -.13 : .18*p.pace+Math.sin(t*.061)*.045)-.17*recoil);
   for(const s of [-1,1]) {
     limb(c,s*3,-1,s*9,-6,IRON,1.7);
     c.save(); c.translate(s*10,-7); c.rotate(-.12*p.pace+s*.09*recoil);
-    const blade=Math.cos(t*.36+s*.7)*7.9;
+    const blade=Math.cos(t*(grounded ? .10 : .36)+s*.7)*7.9;
     line(c,-blade,-.7,blade,.7,INK,1.85);
     line(c,.25*blade,.35,blade,.7,"#d1d8bd",1); oval(c,0,0,1.65,1.35,"#b89258"); c.restore();
   }
@@ -230,6 +234,12 @@ function drone(c: Pens,d: Dye,p: CharacterPose,u: Unit|undefined,tick: number) {
 export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?: Unit,tick=0) {
   const t=tick+(u?.id??0)*11;
   switch(kind) {
+    case "wrestler": case "liondancers": case "rhinorider": case "trojanhorse":
+    case "windmill": case "harpoon": case "prism": case "snowman":
+      drawExpedition(c,d,p,kind,u,tick); break;
+    case "hydra": case "medusa": case "vampire": case "sandworm": case "slime": case "horseman":
+    case "werewolf": case "cerberus": case "kraken": case "firedragon": case "irongolem":
+      drawBeast(c,d,p,kind,u,tick); break;
     case "miner": minerArt(c,d,p,u,tick); break;
     case "clown": clownArt(c,d,p,u,tick); break;
     case "reaper": reaperArt(c,d,p,u,tick); break;
@@ -257,6 +267,7 @@ export function drawSpecialist(c: Pens,d: Dye,kind: UnitKind,p: CharacterPose,u?
   }
 }
 export function fallenSpecialist(c: Pens,d: Dye,kind: UnitKind) {
+  if (fallenBeast(c,d,kind)) return;
   if(kind==="sunlens" || kind==="belltower" || kind==="lobber"){
     cut(c,"M-7 3 L-5 -2 L-.6 -.9 L1.3 -4 L6.4 -.5 L6.7 3.1Z","#a3aa97",1.1);
     if(kind==="sunlens") {ring(c,-2,-2,3.4,brass);oval(c,-2,-2,1.8,1.7,"#f7c16b");}
