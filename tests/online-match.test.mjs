@@ -25,12 +25,16 @@ function field() {
   sqlite.exec(readFileSync(new URL("../drizzle/0000_online_rooms.sql",import.meta.url),"utf8"));
   const db = sqliteBinding(sqlite);
   let now=10_000;
+  // Saves the database turned away. A race test reads this to prove its requests really collided.
+  const saves={rejected:0};
   return {
-    skip(ms){now+=ms;}, db,
+    skip(ms){now+=ms;}, db, saves,
     async request(mode,id,input) {
       // A new store on every request also exercises reconnect after a process restart.
       for(let i=0;i<42;i++){
-        const reply=await exchange(matchDatabase(db),mode,id,input,()=>now);
+        const store=matchDatabase(db);
+        const counted={read:store.read,async save(...args){const ok=await store.save(...args);if(!ok)saves.rejected++;return ok;}};
+        const reply=await exchange(counted,mode,id,input,()=>now);
         if(!reply.retry)return reply;
       }
       assert.fail("The hosted match failed to catch up.");
@@ -46,10 +50,13 @@ const snapshot=r=>r.events.find(e=>e.type==="snapshot");
 test("online invites isolate concurrent games, seats and receipts and survive a lost join or purchase confirmation",async()=>{
   const f=field(),a=crypto.randomUUID(),b=crypto.randomUUID(),c=crypto.randomUUID(), id="11111111111111111111", other="22222222222222222222";
   const [ra,rb,rc]=await Promise.all([f.request("duel",id,hello(a)),f.request("duel",id,hello(b)),f.request("duel",other,hello(c))]);
+  assert.ok(f.saves.rejected>0,"Both joins found no match yet, so only one of them can create it");
   assert.equal(ra.events[0].team,"red");assert.equal(rb.events[0].team,"blue");assert.equal(rc.events[0].team,"red");
   assert.equal((await f.request("duel",id,hello(a))).events[0].resumeToken,ra.events[0].resumeToken);
   const stroke=put(205);stroke.action.positions=Array.from({length:5},(_,i)=>({x:205+i*24,y:180}));
+  const rejected=f.saves.rejected;
   await Promise.all([f.request("duel",id,sync(a,stroke)),f.request("duel",id,sync(b,put(755)))]);
+  assert.ok(f.saves.rejected>rejected,"Both purchases read the same version, so the version check must turn one save away");
   assert.equal(snapshot(await f.request("duel",other,sync(c))).world.units.length,0);
   assert.equal((await f.request("duel",other,hello(crypto.randomUUID(),ra.events[0].resumeToken))).close,CLOSE.expired);
   await f.request("duel",id,{op:"disconnect",client:a});

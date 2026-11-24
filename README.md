@@ -85,7 +85,7 @@ As a control, we temporarily disabled the receipt lookup in a separate checkout.
 - **Choice.** The hosted service holds no match in memory. Each request loads the match's checkpoint, advances the deterministic simulation by the ticks that have elapsed (at most 180 per request), applies the player's commands and saves with a version check. If two requests read the same version, only one save succeeds. The other reloads and tries again, up to 8 times.
 - **Alternative.** Keep each match in one long-running process, as the local server does. That is simpler, but a crash or host restart loses the match, and every request for a match has to reach that one process.
 - **Commit.** [bf314bd](https://github.com/Bob-Zhu3/battle-sandbox/commit/bf314bd).
-- **Check.** [tests/online-match.test.mjs](tests/online-match.test.mjs) opens a new store for every request, disconnects both players mid-battle for 24 seconds, and expects both returning players to see the same finished battle: Red wins and Blue's base is at 0 HP.
+- **Check.** [tests/online-match.test.mjs](tests/online-match.test.mjs) sends two players' purchases at the same moment and fails unless the version check turns one save away. To see it catch a lost update, change `AND version=?` to `AND version>=?` in [server/match-database.ts](server/match-database.ts): the test fails, while the version of the test before this assertion still passed. The same file also opens a new store for every request, disconnects both players mid-battle for 24 seconds, and expects both returning players to see the same finished battle: Red wins and Blue's base is at 0 HP.
 
 ## Debugging story: crowded fights fell to 7 frames per second
 
