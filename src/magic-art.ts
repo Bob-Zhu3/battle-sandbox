@@ -1,3 +1,4 @@
+import { drawEffect } from "./pixel-art/effect-player.ts";
 import { ARMIES } from "./battlefield.ts";
 import { INK, cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell, type SpellKind } from "./spells.ts";
@@ -65,6 +66,7 @@ export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
     for (const pulse of [SPELLS.rain.delay,48,84]) {
       const elapsed=age-pulse;
       if(elapsed<0 || elapsed>29) continue;
+      drawEffect(c,"heal",0,0,elapsed,27,r*1.35*scale);
       for(let i=0;i<5;i++) {
         const t=(elapsed-i*1.2)/24;
         if(t<0 || t>=1) continue;

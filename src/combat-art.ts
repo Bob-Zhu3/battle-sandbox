@@ -1,7 +1,8 @@
 import { poisonBottle } from "./oddities-art.ts";
 import { drawMiasma } from "./field-effects.ts";
 import type { Unit } from "./simulation.ts";
-import type { GroundEffect } from "./conditions.ts";
+import { effectLifetime, type GroundEffect } from "./conditions.ts";
+import { drawEffect } from "./pixel-art/effect-player.ts";
 import type { Arrow } from "./arrows.ts";
 import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { drawBomb } from "./roster-art.ts";
@@ -9,6 +10,8 @@ import { TOWER_ART_SCALE } from "./tower-art.ts";
 import { drawBreach } from "./legend-effects.ts";
 
 export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
+  const mapped = groundAnimations[e.kind as keyof typeof groundAnimations];
+  if (mapped && drawEffect(c, mapped, e.x*sx, e.y*sy, tick-e.tick, effectLifetime(e), e.radius*2*Math.min(sx,sy))) return;
   if (e.kind === "breach") { drawBreach(c,e,tick,sx,sy); return; }
   if (e.kind==="miasma") { drawMiasma(c,e,tick,sx,sy); return; }
   if (e.kind==="glass") {
@@ -58,6 +61,8 @@ export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: num
   }
   c.restore();
 }
+
+const groundAnimations = { blast: "bomb", smash: "smash", frost: "shards", miasma: "poison", stonefall: "rubble" } as const;
 
 export function drawStun(c: Pens, x: number, y: number, size: number, tick: number, id: number) {
   c.save(); c.translate(x,y); c.scale(size,size);

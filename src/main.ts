@@ -4,6 +4,7 @@ import { createField, element } from "./field.ts";
 import { crowdFormation } from "./crowd-formation.ts";
 import { reinforcements, windmillField } from "./deployment.ts";
 import { Playground } from "./playground.ts";
+import { pixelSkirmish } from "./pixel-art/showcase.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 import { castHint } from "./spells.ts";
@@ -73,7 +74,11 @@ game.addEventListener("brushchange",()=>{
   if (field.selectedSpell()!=="wormhole") spellBrush.cancel();
   updateBrushHint();
 });
-if (demo === "siege") {
+if (demo === "pixels") {
+  pixelSkirmish(play);
+  previous=play.world;
+  field.armBrush("archer");
+} else if (demo === "siege") {
   const lineup = ["lobber", "sunlens", "belltower"] as const;
   lineup.forEach((kind,index) => {
     play.place("blue",{type:UNIT_DEFINITIONS[kind].command,positions:[{x:405+index*75,y:178}]});

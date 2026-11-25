@@ -1,4 +1,5 @@
 import { ARMIES } from "./battlefield.ts";
+import { drawEffect } from "./pixel-art/effect-player.ts";
 import { cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
 
@@ -44,11 +45,13 @@ export function drawWeatherField(c: Pens,s: FieldSpell,tick: number,sx: number,s
           c.lineTo(originX+(ex-originX)*f+split*(4+(j*7%13))*k,originY+(ey-originY)*f);
         }
         c.lineTo(ex,ey);c.strokeStyle="#9471ab";c.lineWidth=4.8*k;c.stroke();c.strokeStyle="#fff2aa";c.lineWidth=2.25*k;c.stroke();
+        if (drawEffect(c,"zap",ex,ey,t,17,45*k)) continue;
         for(let j=0;j<5;j++){const a=j*tau/5+.3+i;line(c,ex+Math.cos(a)*(3+t*.45)*k,ey+Math.sin(a)*(3+t*.45)*k,
           ex+Math.cos(a)*(8+t*.55)*k,ey+Math.sin(a)*(8+t*.55)*k,"#fff3bc",1.7*k);}
       }
     }
   } else if (s.kind==="freeze") {
+    if (t>=0 && drawEffect(c,"snow",0,0,t,rule.duration-rule.delay,rule.radius*2*k)) { c.restore(); return; }
     const spread=t<0?.20+age*.009:Math.min(1,(t+4)/13);
     for(let i=0;i<6;i++) {
       const a=i*tau/6+s.id*.31;

@@ -21,6 +21,7 @@ import { drawFallen, drawUnitToken, INK, palette } from "./characters.ts";
 import { drawCrowdUnit, prepareCrowd } from "./crowd-sprites.ts";
 import { drawAttackTrace, drawLegendShot, drawWormholeEntrance, droppedHead, groundingLine, isAttackTrace } from "./legend-effects.ts";
 import { SPELLS } from "./spells.ts";
+import { drawEffect } from "./pixel-art/effect-player.ts";
 
 function drawArrow(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, scale: number, side: Team, length: number) {
   ctx.save();
@@ -66,10 +67,12 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   const w = ctx.canvas.clientWidth, h = ctx.canvas.clientHeight;
   if (!w || !h) return;
   ctx.setTransform(ctx.canvas.width / w, 0, 0, ctx.canvas.height / h, 0, 0);
+  ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, w, h);
   // Keep pointer input and rendering in the same arena coordinates at every viewport size.
   const sx = w / ARENA.width, sy = h / ARENA.height;
   const scale = Math.min(sx, sy);
+  const bodyScale = Math.max(scale, Math.min(sy,.71));
   if (view.mode) {
     if (view.ownTeam && brush !== "miner") {
       const camp = campFor(view.mode, view.ownTeam);
@@ -107,7 +110,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   }
   const targets = [...current.units, ...(current.bases ?? [])];
   const byId = new Map(targets.map(target => [target.id, target]));
-  const keepScale = scale * TOWER_ART_SCALE;
+  const keepScale = bodyScale * TOWER_ART_SCALE;
   for (const base of current.bases ?? []) {
     drawKeep(ctx, base, base.x*sx, base.y*sy, keepScale, tick);
     if (base.hp && (base.frozenUntil ?? 0)>tick) iceShell(ctx,base.x*sx,base.y*sy,25*keepScale,base.frozenUntil!-tick);
@@ -126,7 +129,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     const from = prior.get(unit.id) ?? unit;
     const jump = unit.warpedTick;
     const position = jump !== undefined && jump > previous.tick && jump <= current.tick ? Number(tick >= jump) : blend;
-    const radius = footprint(unit) * unitArtScale(unit.kind) * scale;
+    const radius = footprint(unit) * unitArtScale(unit.kind) * bodyScale;
     return { unit, from, position, radius, x: (from.x + (unit.x - from.x) * position) * sx, y: (from.y + (unit.y - from.y) * position) * sy };
   }).sort((a, b) => a.y - b.y || a.unit.id - b.unit.id);
   const krakenGrips = drawKrakenGrabs(ctx,bodies,current.bases,tick,sx,sy);
@@ -188,6 +191,16 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick); ctx.restore();
     } else if (crowd) drawCrowdUnit(ctx, x, y, r, pose, unit, bodyTick);
     else drawUnitToken(ctx, x, y, r, unit.team, unit.kind, pose, unit, bodyTick);
+    if (!hand && !stone && !frozen) {
+      const swing = tick - (unit.lastAttackTick ?? -Infinity);
+      if (unit.kind === "warrior" && swing >= 0 && swing < 9) {
+        drawEffect(ctx,"slash",x+pose.side*r*.42,y+r*.45,swing,9,r*2.9,pose.side);
+      } else if (unit.kind === "musketeer" && swing >= 0 && swing < 7) {
+        drawEffect(ctx,"muzzle",x+pose.side*r*1.40,y+r*.40,swing,7,r*1.8,pose.side);
+      } else if (unit.kind === "shieldbearer" && unit.lastBlockTick !== undefined) {
+        drawEffect(ctx,"block",x+pose.side*r*.48,y+r*.6,tick-unit.lastBlockTick,11,r*2.05,pose.side);
+      }
+    }
     if (krakenGrips) drawKrakenTips(ctx,krakenGrips.get(unit.id));
     if (stone) {
       ctx.save();ctx.translate(x,y);ctx.scale(r/11,r/11);
@@ -210,7 +223,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     if (u.kind==="sunlens" && u.targetId!==null) sunbeam(ctx,u,byId.get(u.targetId),tick,sx,sy);
     else if (u.kind==="prism") hasPrism=true;
   }
-  if (hasPrism) drawPrismLocks(ctx,bodies,current.bases,tick,current.tick,sx,sy);
+  if (hasPrism) drawPrismLocks(ctx,bodies,current.bases,tick,current.tick,sx,sy,bodyScale);
   for (const effect of current.effects ?? []) if (isAttackTrace(effect)) drawAttackTrace(ctx,effect,tick,sx,sy);
   for (const arrow of current.arrows) {
     if (tick < arrow.releasedTick) continue;
@@ -238,7 +251,9 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#f8f3df";
     ctx.fillStyle = INK;
-    for (const {unit,radius,x: centerX,y} of bodies) {
+    // Bodies overlap in depth order. The optional ID readout follows the server's stable IDs.
+    const byIdOrder = [...bodies].sort((a,b)=>a.unit.id-b.unit.id);
+    for (const {unit,radius,x: centerX,y} of byIdOrder) {
       const left = !deploying && ARMIES[unit.team].facing > 0;
       const offset = radius + 5;
       const x = centerX + (left ? -offset : offset);
@@ -254,7 +269,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   const radius = UNIT_DEFINITIONS[brush].radius;
   for (const point of preview) {
     const x = boundCenter(point.x, ARENA.width, radius), y = boundCenter(point.y, ARENA.height, radius);
-    drawUnitToken(ctx, x * sx, y * sy, radius * unitArtScale(brush) * scale, view.ownTeam ?? "red", brush);
+    drawUnitToken(ctx, x * sx, y * sy, radius * unitArtScale(brush) * bodyScale, view.ownTeam ?? "red", brush);
   }
   ctx.restore();
 }

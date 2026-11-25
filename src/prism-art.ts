@@ -74,7 +74,7 @@ function primary(c: Pens, a: Point, b: Point, k: number, dye: Dye, age: number, 
 // The positions in bodies have already been interpolated for this displayed
 // tick, including teleports. An ID lookup keeps the endpoint on that same body.
 export function drawPrismLocks(c: Pens, bodies: readonly Body[], bases: readonly Base[] | undefined,
-    tick: number, snapshotTick: number, sx: number, sy: number) {
+    tick: number, snapshotTick: number, sx: number, sy: number, bodyScale: number) {
   const k=Math.min(sx,sy);
   let positions: Map<number, Point & {unit:Target}> | undefined;
   function targetPoint(id: number, team: Team) {
@@ -95,7 +95,7 @@ export function drawPrismLocks(c: Pens, bodies: readonly Body[], bases: readonly
     const end=targetPoint(lock.targetId,lock.team);
     if (!end) continue;
     const age=tick-lock.focusSince, focus=crystalFocus(age);
-    const towerScale=k*TOWER_ART_SCALE;
+    const towerScale=bodyScale*TOWER_ART_SCALE;
     const origin={x, y:y-(11.2+crystalLift(tick,unit.id,focus))*UNIT_DEFINITIONS.prism.radius/11*towerScale};
     // A three-tick network update can already contain a later focus level.
     // Close the old side facet when the displayed clock reaches that level.

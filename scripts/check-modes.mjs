@@ -95,6 +95,33 @@ async function withField(check) {
   finally { closeRoom(); await new Promise(resolve => http.close(resolve)); }
 }
 
+async function pixelPreview(url) {
+  const page=await browser.newPage({viewport:{width:1280,height:720}});
+  try {
+    await page.addInitScript(()=>{
+      const draw=CanvasRenderingContext2D.prototype.drawImage;
+      const rows=new Set();
+      window.pixelEffectRows=rows;
+      CanvasRenderingContext2D.prototype.drawImage=function(image,...args) {
+        if (this.canvas.id==="arena" && image instanceof HTMLImageElement && /\/effects(?:-[\w-]+)?\.png/.test(image.src) && args.length===8) {
+          rows.add(args[1]);
+        }
+        return draw.call(this,image,...args);
+      };
+    });
+    const ready=()=>page.waitForFunction(()=>window.pixelEffectRows.size>=2 && document.getElementById("playground-pause").hasAttribute("data-paused"));
+    const capture=()=>page.locator("#arena").evaluate(c=>c.toDataURL());
+    await page.goto(new URL("?demo=pixels",url).href); await ready();
+    const frame=await capture(), tick=await page.locator("#tick").textContent();
+    await page.waitForTimeout(150); assert.equal(await capture(),frame);
+    await page.keyboard.press("Space");
+    await page.waitForFunction(start=>Number(document.getElementById("tick").textContent)>Number(start)+16,tick);
+    assert.notEqual(await capture(),frame);
+    await page.reload(); await ready(); assert.equal(await capture(),frame);
+    console.log("Pixel preview: multiple atlas effects paint while paused, resume with the fight, and reproduce the opening frame on reload.");
+  } finally { await page.close(); }
+}
+
 async function pausePlayground(url) {
   const {page, point} = await open(url, 960, 540, true);
   try {
@@ -774,6 +801,7 @@ async function match(url,size) {
 
 try {
   await withField(url => checkPausedPlacement(browser, url));
+  await withField(pixelPreview);
   await withField(pausePlayground);
   await withField(phoenixDuringDeployment);
   await withField(arrowFlash);

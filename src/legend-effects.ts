@@ -5,6 +5,7 @@ import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { TOWER_ART_SCALE } from "./tower-art.ts";
+import { drawEffect } from "./pixel-art/effect-player.ts";
 
 const circle = 2 * Math.PI;
 
@@ -210,7 +211,12 @@ export function drawAttackTrace(c: Pens, e: GroundEffect, tick: number, sx: numb
       c.strokeStyle = i ? "#d8d7aa" : "#728c77"; c.lineWidth = 1.4; c.stroke();
     }
   } else if (e.kind === "breath") {
-    fireBreath(c,length,e.radius,age);
+    c.save();
+    // The origin of the sheet is the dragon's mouth. Expand along the actual attack cone.
+    c.scale(1,Math.min(1.8,e.radius*2/(length*.62)));
+    const breath = drawEffect(c,"breath",0,0,age,life,length*(.74+.30*Math.min(1,(age+1)/4)));
+    c.restore();
+    if (!breath) fireBreath(c,length,e.radius,age);
   } else {
     const lengthLeft = length * (1 - .38*age/life);
     rope(c, lengthLeft, 2.2*Math.sin(age*.88)*(1-age/life));

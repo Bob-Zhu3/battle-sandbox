@@ -1,4 +1,6 @@
 import { maxHealth } from "./transformations.ts";
+import { whenEffectsLoad } from "./pixel-art/effect-player.ts";
+import { paintCrest } from "./pixel-art/crest.ts";
 import { createRoster } from "./roster.ts";
 import { createBattleSound } from "./battle-sound.ts";
 import { UNIT_DEFINITIONS, UNIT_KINDS } from "./units.ts";
@@ -18,6 +20,7 @@ function contextFor(canvas: HTMLCanvasElement) {
 }
 
 export function createField(mode?: MatchMode) {
+  paintCrest(element<HTMLCanvasElement>("battle-crest"));
   const canvas = element<HTMLCanvasElement>("arena");
   const ctx = contextFor(canvas);
   const roster = createRoster(element("brush-tool"), !!mode);
@@ -41,13 +44,16 @@ export function createField(mode?: MatchMode) {
   function watchSize(paint: () => void) {
     function resize() {
       const ratio = window.devicePixelRatio || 1;
-      const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
-      const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+      // Use whole device pixels per texel. Pointer and room coordinates stay in arena units.
+      const step = Math.max(1, Math.round(ratio * Math.max(1, canvas.clientWidth / 750)));
+      const width = Math.max(1, Math.round(canvas.clientWidth * ratio / step));
+      const height = Math.max(1, Math.round(canvas.clientHeight * ratio / step));
       canvas.width = width;
       canvas.height = height;
       paint();
     }
     resize();
+    whenEffectsLoad(paint);
     new ResizeObserver(resize).observe(canvas);
   }
   const health = sides.map(side => ({

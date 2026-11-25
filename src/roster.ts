@@ -18,6 +18,7 @@ function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key
 // Frame the taller and wider silhouettes in the same 72-unit portrait as the other towers.
 const towerPortraits: Partial<Record<RecruitKind, { radius: number; y: number }>> = {
   post:      { radius: 19,    y: 41 },
+  prism:     { radius: 17.7,  y: 47 },
   workshop:  { radius: 18.25, y: 46 },
   lobber:    { radius: 17.5,  y: 45 },
   sunlens:   { radius: 16.25, y: 46 },
@@ -78,9 +79,10 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   }
 
   function icon(key: Brush) {
-    const art = document.createElement("canvas");art.width=art.height=144;art.className="brush-icon";art.setAttribute("aria-hidden","true");
+    const art = document.createElement("canvas");art.width=art.height=44;art.className="brush-icon";art.setAttribute("aria-hidden","true");
     const c=art.getContext("2d")!;
-    c.scale(2,2);
+    c.imageSmoothingEnabled=false;
+    c.scale(art.width/72,art.height/72);
     if(isSpell(key)){c.translate(36,36);c.scale(1.95,1.95);drawSpellIcon(c,key);}
     else if (isBuilding(key)) {
       const { radius, y } = towerPortraits[key] ?? standardTowerPortrait;
@@ -97,8 +99,8 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     } else {
       const myth = key === "cyclops" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
       const longWeapon = key === "musketeer" || key === "lancer" || key === "miner";
-      const size = myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
-      const shift = key === "reaper" || key === "miner" ? -7 : longWeapon || key === "cyclops" ? -4 : 0;
+      const size = key === "reaper" ? 13.5 : myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
+      const shift = key === "lancer" || key === "reaper" ? -8 : key === "miner" ? -7 : longWeapon || key === "cyclops" ? -4 : 0;
       drawUnitToken(c,36 + ARMIES[team].facing * shift,myth ? 49 : 44,size,team,key);
     }
     return art;

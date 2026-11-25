@@ -7,6 +7,7 @@
     <title>Battle Sandbox</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/pixel-art/skin.css" />
   </head>
   <body>
     <main class="game">
@@ -15,7 +16,7 @@
       </canvas>
 
       <header class="top-hud">
-        <h1 class="wordmark" aria-label="Battle Sandbox"><span>Battle</span><span>Sandbox</span></h1>
+        <h1 class="wordmark" aria-label="Battle Sandbox"><canvas id="battle-crest" width="29" height="24" aria-hidden="true"></canvas><span>Battle</span><span>Sandbox</span></h1>
         <div id="score" class="score" role="group" aria-label="Units on the field"></div>
         <div class="demo-controls">
           <button id="playground-pause" class="demo-button clock-toggle" type="button" aria-label="Pause playground" aria-keyshortcuts="Space" title="Pause playground (Space)" hidden><i class="play-icon pause" aria-hidden="true"></i></button>

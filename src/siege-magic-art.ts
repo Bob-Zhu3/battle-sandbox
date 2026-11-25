@@ -1,3 +1,4 @@
+import { drawEffect } from "./pixel-art/effect-player.ts";
 import { ARMIES } from "./battlefield.ts";
 import { cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
@@ -31,6 +32,7 @@ export function drawSiegeSpell(c: Pens, spell: FieldSpell, tick: number, sx: num
   if(spell.kind === "fault") {
     c.scale(sx,sy);
     const later=age>=SPELLS.fault.aftershock, elapsed=later?age-SPELLS.fault.aftershock:t;
+    if (elapsed>=0) drawEffect(c,"fault",0,0,elapsed,later?rule.duration-SPELLS.fault.aftershock:SPELLS.fault.aftershock-rule.delay,radius*1.4);
     const grow=Math.min(1,Math.max(.16,(t+2)/8)), fade=Math.min(1,(rule.duration-age)/15);
     c.globalAlpha=(t<0?.34:.9)*fade;c.rotate((spell.id%7-3)*.085);
     for(let i=0;i<5;i++) {

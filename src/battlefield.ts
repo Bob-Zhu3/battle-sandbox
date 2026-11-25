@@ -4,10 +4,10 @@ export type Team = typeof TEAMS[number];
 export type MatchMode = "duel" | "ffa";
 
 export const ARMIES = {
-  red: { name: "Red", coat: "#d95340", hem: "#963a32", light: "#ffab79", facing: 1 },
-  blue: { name: "Blue", coat: "#387fc1", hem: "#30577f", light: "#9ed5ec", facing: -1 },
-  violet: { name: "Violet", coat: "#8c61b4", hem: "#604482", light: "#dfb6ee", facing: 1 },
-  amber: { name: "Amber", coat: "#d5962d", hem: "#906222", light: "#ffe194", facing: -1 },
+  red: { name: "Red", coat: "#e05050", hem: "#a63549", light: "#ff9270", facing: 1 },
+  blue: { name: "Blue", coat: "#468bd4", hem: "#365f9b", light: "#83c9f2", facing: -1 },
+  violet: { name: "Violet", coat: "#a974c5", hem: "#754b96", light: "#e1b7f1", facing: 1 },
+  amber: { name: "Amber", coat: "#eeb447", hem: "#b98334", light: "#ffe59a", facing: -1 },
 } as const;
 
 export const MATCHES: Record<MatchMode, { name: string; teams: readonly Team[]; minimum: number; socket: string }> = {

@@ -1,3 +1,4 @@
+import { drawEffect } from "./pixel-art/effect-player.ts";
 import { line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
 
@@ -120,6 +121,8 @@ export function drawMeteor(c: Pens, spell: FieldSpell, tick: number, sx: number,
     drawHead(c,age,distance,seed);
   }
   c.restore();
-  if (age >= delay) strike(c,age-delay,sx,sy,size,seed);
+  if (age >= delay && !drawEffect(c,"meteor",0,0,age-delay,duration-delay,2*SPELLS.meteor.radius*scale)) {
+    strike(c,age-delay,sx,sy,size,seed);
+  }
   c.restore();
 }

@@ -15,6 +15,7 @@
     "build:site": "npm run build && node scripts/build-hosted.mjs",
     "start": "node server/start.ts",
     "demo:sound": "vite --host 127.0.0.1 --open /?demo=sound",
+    "demo:pixels": "vite --host 127.0.0.1 --open /?demo=pixels",
     "predemo:encounters": "npm run build --silent",
     "demo:encounters": "node scripts/demo-encounters.mjs",
     "predemo:motion": "npm run build --silent",
