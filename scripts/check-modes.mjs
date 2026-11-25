@@ -12,6 +12,9 @@ import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { SPELLS } from "../src/spells.ts";
 import { FACE, INK } from "../src/ink.ts";
 import { checkPausedPlacement } from "./check-paused-placement.mjs";
+import { effects } from "../src/pixel-art/effects.ts";
+import { kirinShowcase } from "../src/pixel-art/showcase.ts";
+import { Playground } from "../src/playground.ts";
 
 const { values } = parseArgs({ options: { channel: { type: "string" }, output: { type: "string" } } });
 const browser = await chromium.launch({ headless: true, channel: values.channel ?? (existsSync(chromium.executablePath()) ? undefined : "chrome") });
@@ -120,6 +123,35 @@ async function pixelPreview(url) {
     assert.notEqual(await capture(),frame);
     await page.reload(); await ready(); assert.equal(await capture(),frame);
     console.log("Pixel preview: multiple atlas effects paint while paused, resume with the fight, and reproduce the opening frame on reload.");
+    const play=new Playground(); kirinShowcase(play);
+    const path=play.world.units.find(u=>u.kind==="kirin").arc.path;
+    assert.equal(path.length,5);
+    for (const width of [1280,390]) {
+      await page.setViewportSize({width,height:700});
+      await page.goto(new URL("?demo=kirin",url).href); await ready();
+      const rows=await page.evaluate(()=>[...window.pixelEffectRows]);
+      for (const art of [effects.kirinArc,effects.kirinFork]) {
+        assert.ok(rows.includes(art.y),"The Kirin draws both PixelFX hop variants");
+      }
+      const sampleLinks=()=>page.locator("#arena").evaluate((canvas,path)=>{
+        const sx=canvas.width/960, sy=canvas.height/360, scale=Math.max(Math.min(sx,sy),Math.min(sy,.71));
+        const radius=Math.ceil(13*scale);
+        const {data}=canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height);
+        return path.slice(1).map((to,i)=>{
+          const mx=Math.round((path[i].x+to.x)*sx/2), my=Math.round((path[i].y+to.y)*sy/2-(i===0?21:9)*scale);
+          const ink=[];
+          for(let y=my-radius;y<=my+radius;y++) for(let x=mx-radius;x<=mx+radius;x++) {
+            const p=(y*canvas.width+x)*4;
+            if (data[p+3]>120 && data[p+2]>data[p]+32 && data[p+1]>data[p]+16) ink.push(p);
+          }
+          return ink;
+        });
+      },path);
+      const joins=await sampleLinks();
+      assert.ok(joins.every(ink=>ink.length>4),"Electric pixels cross all four gaps at "+width+"px");
+      await page.reload(); await ready();
+      assert.deepEqual(await sampleLinks(),joins,"Reloading restores the same four bolts at "+width+"px");
+    }
   } finally { await page.close(); }
 }
 

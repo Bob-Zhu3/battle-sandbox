@@ -25,6 +25,30 @@ export function drawEffect(c: CanvasRenderingContext2D, name: EffectName, x: num
   return true;
 }
 
+// Stretch only the middle of the PixelFX hop. The hot knots and sparks at
+// either end keep their native size, including on short or nearly vertical jumps.
+export function drawKirinHop(c: CanvasRenderingContext2D, x: number, y: number, toX: number, toY: number,
+  progress: number, pitch: number, alternate: boolean) {
+  if (!sheet.complete || !sheet.naturalWidth) return;
+  const row=alternate ? effects.kirinFork : effects.kirinArc;
+  const frame=Math.min(row.frames-1,Math.floor(progress*row.frames));
+  const tx=frame%row.columns*row.w, ty=row.y+Math.floor(frame/row.columns)*row.h;
+  const dx=toX-x, dy=toY-y, length=Math.hypot(dx,dy);
+  c.save(); c.translate(x,y); c.rotate(Math.atan2(dy,dx)); c.imageSmoothingEnabled=false;
+  const cap=7, end=row.ox+row.span-cap;
+  if (length<=2*cap*pitch) {
+    // Touching footprints can leave room only for the contact spark.
+    const gap=length-cap*pitch;
+    if (gap>0) c.drawImage(sheet,tx+row.ox,ty,end-row.ox,row.h,0,-row.oy*pitch,gap,row.h*pitch);
+  } else {
+    const first=row.ox+cap;
+    c.drawImage(sheet,tx,ty,first,row.h,-row.ox*pitch,-row.oy*pitch,first*pitch,row.h*pitch);
+    c.drawImage(sheet,tx+first,ty,end-first,row.h,cap*pitch,-row.oy*pitch,length-2*cap*pitch,row.h*pitch);
+  }
+  c.drawImage(sheet,tx+end,ty,row.w-end,row.h,length-cap*pitch,-row.oy*pitch,(row.w-end)*pitch,row.h*pitch);
+  c.restore();
+}
+
 // The impact anchor stays fixed when the sheet crops its quieter floor frames.
 export function drawFloorFrame(c: CanvasRenderingContext2D, name: "faultFloor" | "crater" | "fulgurite",
   x: number, y: number, age: number, duration: number, width: number) {

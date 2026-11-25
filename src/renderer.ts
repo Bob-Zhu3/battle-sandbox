@@ -221,7 +221,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       ctx.beginPath();ctx.arc(x,y-r*.4,r*.85,0,Math.PI*1.5);ctx.stroke();ctx.restore();
     }
   }
-  for (const u of current.units) if (u.arc) drawChain(ctx,u.arc,tick,sx,sy);
+  for (const u of current.units) if (u.arc) drawChain(ctx,u.arc,tick,sx,sy,bodyScale,ARMIES[u.team].facing);
   let hasPrism=false;
   for (const u of current.units) {
     if (u.kind==="sunlens" && u.targetId!==null) sunbeam(ctx,u,byId.get(u.targetId),tick,sx,sy);

@@ -16,6 +16,9 @@ const folder = fileURLToPath(new URL("../src/pixel-art/", import.meta.url));
 const strata = ["#242339","#473748","#684850","#83594f","#9d6653","#ba825c","#d6a37a","#eed4a2"];
 const stormPalette=["#171431","#31215e","#493789","#584aa9","#556fd0","#80aae8","#cbe4fa","#fffbe2"];
 const boltSequence=(name,seed)=>[name,"lightning/lightning-strike",.76,1.84,27,112,{seed,light:.28,palette:stormPalette}];
+const kirinSequence=(name,seed)=>[name,"lightning/chain-lightning",.333,1.22,19,248,{seed,light:.25,
+  palette:["#172d46","#283957","#344574","#39679b","#2588a7","#73d5df","#b3eee8","#c7f8f0"],
+  sparks:["#fff9d7","#c5faf0","#77d8df","#249eb2"]}];
 const sequences = [
   ["slash", "melee/sword-slash", .035, .36, 9],
   ["muzzle", "projectiles/muzzle-pistol", .015, .42, 8],
@@ -52,13 +55,33 @@ const sequences = [
   ["outlet", "arcane/portal", .18, 2.50, 20, 102,
     { palette:["#302949","#57436e","#835894","#b372a0","#e19d9f","#ffcc8d","#fff0bc","#fff7de"] }],
   ["breath", "fire/fire-breath", .03, 1.45, 14],
+  kirinSequence("kirinArc",19), kirinSequence("kirinFork",53),
 ];
+// The stock effect chains through three staged targets. Extract its last hop,
+// (104,-30) to (150,-19), so each copy can end on a real enemy in the game.
+const kirinHop = {width:78,height:51,ox:6,oy:25,span:46};
+function isolateKirinHop(rgba,sourceWidth,originX,originY) {
+  const {width,height,ox,oy,span}=kirinHop;
+  const tile=new Uint8ClampedArray(width*height*4);
+  for (let x=0;x<width;x++) {
+    const dx=x-ox, slope=Math.round(11*Math.max(0,Math.min(1,dx/span)));
+    for (let y=0;y<height;y++) {
+      const dy=y-oy, distance=Math.hypot(Math.max(0,-dx,dx-span),dy);
+      const opacity=Math.max(0,Math.min(1,(24-distance)/6,x/3));
+      if (!opacity) continue;
+      const src=((originY-30+slope+dy)*sourceWidth+originX+104+dx)*4, dst=(y*width+x)*4;
+      tile.set(rgba.subarray(src,src+4),dst);
+      tile[dst+3]*=opacity;
+    }
+  }
+  return tile;
+}
 // Keep the brightest return stroke for two game ticks, then sample the two weaker strokes.
 const thunderTimes=[.7667,.7833,.7833,.80,.83,.86,.89,.93,.99,1.04,1.06,1.08,1.11,1.17,1.23,1.26,1.28,1.31,1.35,1.39,1.44,1.51,1.59,1.66,1.72,1.78,1.84];
 // These effects were authored over dark scenes. Put one native shadow pixel on their
 // brightly lit edges so the same silhouettes survive on the game's white arena.
 const edgeColors = { shower:[62,113,139], glass:[68,121,149], icewall:[47,85,146],
-  fury:[153,63,84], outlet:[117,73,112] };
+  fury:[153,63,84], outlet:[117,73,112], kirinArc:[50,66,110], kirinFork:[50,66,110] };
 function shadeEdges(tile,width,height,tint) {
   if (!tint) return;
   const mask=new Uint8Array(width*height);
@@ -86,7 +109,10 @@ const metadata = {};
 let atlasHeight = 0;
 for (const [name, id, beginning, end, count, nativeLimit = 78, options = {}] of sequences) {
   const { mod, meta } = await loadEffect(id);
-  const [w, h] = meta.size, [ox, oy] = meta.origin;
+  const [sourceW, sourceH] = meta.size, [sourceX, sourceY] = meta.origin;
+  const kirin = id === "lightning/chain-lightning";
+  const [w,h] = kirin ? [kirinHop.width,kirinHop.height] : meta.size;
+  const [ox,oy] = kirin ? [kirinHop.ox,kirinHop.oy] : meta.origin;
   const shrink = Math.max(1, Math.ceil(Math.max(w, h) / nativeLimit));
   // Preserve authored vertical bolt detail when the sky is much taller than the target sprite.
   const isBolt = name.startsWith("thunder");
@@ -94,8 +120,8 @@ for (const [name, id, beginning, end, count, nativeLimit = 78, options = {}] of 
   const bent = name === "fault" || name === "faultFloor", pad = bent ? 34 : 0;
   const offsets = bent ? Array.from({length:w},(_,x)=>faultOffset(x-ox)) : null;
   const sw = Math.ceil(w / shrink), sh = Math.ceil((h+2*pad) / verticalStep);
-  const frame = createFrame(w, h), rgba = new Uint8ClampedArray(w * h * 4);
-  const effect = createFx(mod, { x: ox, y: oy, seed: 378, ...options });
+  const frame = createFrame(sourceW,sourceH), rgba = new Uint8ClampedArray(sourceW*sourceH*4);
+  const effect = createFx(mod, { x:sourceX, y:sourceY, seed:378, ...options });
   let step = 0, left = sw, top = sh, right = -1, bottom = -1;
   const tiles = [];
   for (let i = 0; i < count; i++) {
@@ -104,17 +130,18 @@ for (const [name, id, beginning, end, count, nativeLimit = 78, options = {}] of 
     while (step < sample) { effect.update(1 / 60); step++; }
     clearFrame(frame);
     // Only the falling drops and crowns belong on the field. The source back layer is a solid pond.
-    effect.draw(frame, name === "shower" ? "front" : undefined);
+    effect.draw(frame, name === "shower" || kirin ? "front" : undefined);
     edgeFade(frame);
     composite(frame, rgba, null);
+    const pixels=kirin ? isolateKirinHop(rgba,sourceW,sourceX,sourceY) : rgba;
     const tile = new Uint8Array(sw * sh * 4);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const p = (y * w + x) * 4, alpha = rgba[p + 3];
+        const p = (y * w + x) * 4, alpha = pixels[p + 3];
         if (alpha < (nativeLimit > 78 ? 52 : 36)) continue;
         const tx = Math.floor(x / shrink), ty = Math.floor((y+pad+(offsets?.[x] ?? 0))/verticalStep), q = (ty * sw + tx) * 4;
         if (alpha <= tile[q + 3]) continue;
-        tile.set(rgba.subarray(p, p + 4), q);
+        tile.set(pixels.subarray(p, p + 4), q);
         // The falling rock owns the white core. Its ground burst goes through gold and soot.
         if ((name === "meteor" || name === "crater") && tile[q] > 235 && tile[q+1] > 215 && tile[q+2] > 160) {
           tile[q+1] = Math.min(tile[q+1], 223);
@@ -131,7 +158,8 @@ for (const [name, id, beginning, end, count, nativeLimit = 78, options = {}] of 
   const width = right - left + 1, height = bottom - top + 1;
   const columns = Math.min(count, Math.floor(atlasWidth / width));
   metadata[name] = { y: atlasHeight, w: width, h: height, ox: Math.round(ox / shrink) - left,
-    oy: Math.round((oy+pad) / verticalStep) - top, frames: count, columns, ...(verticalStep === shrink ? {} : { pixelAspect:verticalStep/shrink }) };
+    oy: Math.round((oy+pad) / verticalStep) - top, frames: count, columns, ...(kirin ? {span:kirinHop.span} : {}),
+    ...(verticalStep === shrink ? {} : { pixelAspect:verticalStep/shrink }) };
   for (const [i, tile] of tiles.entries()) {
     rows.push({ tile, sw, left, top, width, height, x: i % columns * width, y: atlasHeight + Math.floor(i / columns) * height });
   }

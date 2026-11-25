@@ -4,6 +4,7 @@ import type { Unit } from "./simulation.ts";
 import { TRAILS, TRAIL_TICKS } from "./trails.ts";
 import { cut, line, oval, type Pens } from "./ink.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
+import { drawEffect } from "./pixel-art/effect-player.ts";
 
 export function drawTrail(c: Pens,u: Unit,tick: number,sx: number,sy: number) {
   if (!u.trail || !(u.kind in TRAILS)) return;
@@ -37,8 +38,7 @@ export function drawTrail(c: Pens,u: Unit,tick: number,sx: number,sy: number) {
       cut(c,"M-3 1 Q-4 -1 -2 -4 L-1 -2 L2 -9 Q5 -5 3 -2 Q5 -2 4 0 Q2 3 -3 1Z","#ed7438",.75);
       cut(c,"M-1 1 L0 -2 L2 -4 L2 0Z","#fff09a",0);oval(c,4,-6-age*.055,1.25,.95,"#eba136");
     } else if(kind==="spark") {
-      c.translate(0,side*3); line(c,-4,1,-1,-1,"#528b98",1.7);line(c,-1,-1,1,.2,"#528b98",1.7);line(c,1,.2,4,-3,"#528b98",1.7);
-      line(c,-1,-1,1,.2,"#fff4ad",.95);line(c,1,.2,4,-3,"#fff4ad",.95);
+      drawEffect(c,"zap",0,side*3,age,TRAIL_TICKS,15,side);
     } else if(kind==="dust") {
       // A hoof print stays on the ground while three pieces of turf lift off it.
       const p = Math.min(1,age/23);

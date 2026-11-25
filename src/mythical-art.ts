@@ -152,9 +152,4 @@ export function kirin(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, ti
   oval(c, irisX, irisY, 1, 1.35, INK); oval(c, irisX + .3, irisY - .5, .35, .38, FACE); c.restore();
   line(c, 7.2, -15.5 - .8 * p.ready, 11.5, -14.6 + .7 * rear, "#506564", 1.05);
   oval(c, 16.25, -9.5, .65, .48, INK);
-  if (rear > 0) {
-    c.save(); c.globalAlpha *= rear;
-    cut(c, "M4.6 -26.1 L8.25 -24.15 L9.9 -26.25 L14.05 -24.45 L10.1 -24.55 L8.8 -22.4Z", "#fff1a3", .45);
-    c.restore();
-  }
 }

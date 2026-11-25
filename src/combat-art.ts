@@ -2,7 +2,9 @@ import { poisonBottle } from "./oddities-art.ts";
 import { drawMiasma } from "./field-effects.ts";
 import type { Unit } from "./simulation.ts";
 import { effectLifetime, type GroundEffect } from "./conditions.ts";
-import { drawEffect } from "./pixel-art/effect-player.ts";
+import { drawEffect, drawKirinHop } from "./pixel-art/effect-player.ts";
+import { eventFade } from "./character-pose.ts";
+import { UNIT_DEFINITIONS } from "./units.ts";
 import type { Arrow } from "./arrows.ts";
 import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { drawBomb } from "./roster-art.ts";
@@ -103,29 +105,23 @@ export function drawConditions(c: Pens, u: Unit, x: number, y: number, r: number
   if ((u.stunnedUntil??0)>tick && u.hp>0) drawStun(c,x,y-r*1.8-4*scale,scale,tick,u.id);
 }
 
-export function drawChain(c: Pens, arc: NonNullable<Unit["arc"]>, tick: number, sx: number, sy: number) {
-  const age=tick-arc.tick, k=Math.min(sx,sy);
-  if (age<0 || age>=21) return;
-  c.save(); c.lineJoin="round";c.lineCap="round";
-  for(let i=1;i<arc.path.length;i++) {
-    const phase=age-(i-1)*1.5;
-    if(phase<0) continue;
-    const from=arc.path[i-1], to=arc.path[i];
-    const x=from.x*sx, y=from.y*sy-(i===1?20:9)*k;
-    const dx=to.x*sx-x,dy=to.y*sy-9*k-y,length=Math.hypot(dx,dy)||1;
-    const nx=-dy/length,ny=dx/length;
-    c.beginPath();c.moveTo(x,y);
-    for(let n=1;n<5;n++){
-      const t=n/5,zig=(n%2?1:-1)*(2+.5*((i+n)%3))*k;
-      c.lineTo(x+t*dx+zig*nx,y+t*dy+zig*ny);
-    }
-    c.lineTo(x+dx,y+dy);
-    c.globalAlpha=Math.max(0,1-phase/22);
-    c.strokeStyle="#436d82";c.lineWidth=4*k;c.stroke();
-    c.strokeStyle="#fff7af";c.lineWidth=2*k;c.stroke();
-    if(phase<10){oval(c,x+dx,y+dy,(4-phase*.22)*k,(4-phase*.22)*k,"#fff9c2");}
+export function drawChain(c: Pens, arc: NonNullable<Unit["arc"]>, tick: number, sx: number, sy: number,
+  bodyScale: number, teamFacing: number) {
+  const {radius,stunTicks}=UNIT_DEFINITIONS.kirin, age=tick-arc.tick;
+  if (age<0 || age>=stunTicks || arc.path.length<2) return;
+  const [caster,first]=arc.path;
+  const dx=first.x-caster.x, dy=first.y-caster.y;
+  const facing=Math.abs(dx)>.08*Math.hypot(dx,dy) ? Math.sign(dx) : teamFacing;
+  const rear=eventFade(tick,arc.tick,19), mount=radius/11*bodyScale;
+  let x=caster.x*sx+facing*(13-9*rear)*mount, y=caster.y*sy-(25+6*rear)*mount;
+  for (let i=1;i<arc.path.length;i++) {
+    const to=arc.path[i], toX=to.x*sx, toY=to.y*sy-9*bodyScale;
+    // Damage is simultaneous. All contacts flash on the cast tick, then
+    // the return strokes flicker outward through the recorded hit positions.
+    const lag=(i-1)*.9, progress=Math.max(0,age-lag)/(stunTicks-lag);
+    drawKirinHop(c,x,y,toX,toY,progress,1.25*bodyScale,(arc.tick+i)%2===0);
+    x=toX; y=toY;
   }
-  c.restore();
 }
 
 export function drawSpecialShot(c: Pens, shot: Arrow, x: number, y: number, angle: number, k: number, tick: number) {

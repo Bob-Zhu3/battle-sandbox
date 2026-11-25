@@ -4,7 +4,7 @@ import { createField, element } from "./field.ts";
 import { crowdFormation } from "./crowd-formation.ts";
 import { reinforcements, windmillField } from "./deployment.ts";
 import { Playground } from "./playground.ts";
-import { pixelSkirmish, spellShowcase } from "./pixel-art/showcase.ts";
+import { kirinShowcase, pixelSkirmish, spellShowcase } from "./pixel-art/showcase.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 import { castHint } from "./spells.ts";
@@ -108,6 +108,10 @@ if (demo === "spells") {
   previous = play.world;
   play.paused = true;
   field.armBrush("wormhole");
+} else if (demo === "kirin") {
+  kirinShowcase(play);
+  previous=play.world;
+  field.armBrush("kirin");
 } else if (demo === "rhino") {
   play.place("red",{type:"place-rhino-riders",positions:[{x:310,y:178}]});
   play.place("blue",{type:"place-warriors",positions:[{x:570,y:178},{x:589,y:161},{x:589,y:195}]});

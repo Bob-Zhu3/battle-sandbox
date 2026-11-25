@@ -30,4 +30,6 @@ export const effects = {
   inlet: {"y":2905,"w":82,"h":61,"ox":44,"oy":60,"frames":22,"columns":12},
   outlet: {"y":3027,"w":58,"h":49,"ox":30,"oy":44,"frames":20,"columns":17},
   breath: {"y":3125,"w":48,"h":29,"ox":3,"oy":19,"frames":14,"columns":14},
+  kirinArc: {"y":3154,"w":74,"h":45,"ox":5,"oy":22,"frames":19,"columns":13,"span":46},
+  kirinFork: {"y":3244,"w":72,"h":45,"ox":5,"oy":22,"frames":19,"columns":14,"span":46},
 } as const;

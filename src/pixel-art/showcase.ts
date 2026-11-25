@@ -27,6 +27,16 @@ export function pixelSkirmish(play: Playground) {
   play.paused=true;
 }
 
+export function kirinShowcase(play: Playground) {
+  play.place("red",{type:"place-kirins",positions:[{x:324,y:170}]});
+  play.place("blue",{type:UNIT_DEFINITIONS.shieldbearer.command,positions:[{x:425,y:182}]});
+  play.place("blue",{type:UNIT_DEFINITIONS.drone.command,positions:[{x:477,y:150}]});
+  play.place("blue",{type:"place-warriors",positions:[{x:531,y:195}]});
+  play.place("blue",{type:"place-archers",positions:[{x:598,y:170}]});
+  for (let i=0;i<9;i++) play.advance();
+  play.paused=true;
+}
+
 // Open on the return stroke while the meteor is still in flight. All targets
 // and hit locations come from a normal playground battle.
 export function spellShowcase(play: Playground) {
