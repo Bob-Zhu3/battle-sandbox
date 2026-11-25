@@ -182,7 +182,7 @@ export function createBattleSound(button: HTMLButtonElement) {
   }
   function label() {
     button.setAttribute("aria-pressed",String(muted));
-    button.title = (muted ? "Unmute sound" : "Mute sound") + " (M)";
+    button.setAttribute("aria-description",(muted ? "Unmute sound" : "Mute sound")+" (M)");
   }
   function toggle() {
     muted = !muted; label(); unlock();

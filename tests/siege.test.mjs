@@ -110,7 +110,7 @@ test("both fault pulses crack buildings and bases, miss flyers, and bring a trav
   assert.equal(get(w,2).hp,defs.post.maxHp-24);assert.equal(w.bases[0].hp,base.hp-6);
 });
 
-test("Briar Snare holds feet but admits late arrivals, lets an Archer shoot, and unravels on a Phoenix hit",()=>{
+test("Vines holds feet but admits late arrivals, lets an Archer shoot, and unravels on a Phoenix hit",()=>{
   let w=createBattle([at(1,"lancer","blue",365),at(2,"archer","blue",365,145),at(3,"drone","blue",376,216),
     at(4,"warrior","red",465),at(5,"belltower","blue",334,158)]);
   w.spells=[cast("briar","red",365,177,-13)];get(w,1).runUp=55;

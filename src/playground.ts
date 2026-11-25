@@ -1,5 +1,5 @@
 import { Battle, createBattle, stepBattle, type Team } from "./simulation.ts";
-import { makeFieldSpell, type SpellKind } from "./spells.ts";
+import { floorAfterCast, makeFieldSpell, type SpellKind } from "./spells.ts";
 import { placementKind } from "./units.ts";
 import type { ArenaPoint, PlacementCommand } from "./deployment.ts";
 
@@ -20,7 +20,7 @@ export class Playground {
     const stroke = extendStroke ? this.strokes.at(-1) : undefined;
     if (stroke) stroke.push(...ids);
     else this.strokes.push(ids);
-    this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, undefined, this.world.spells, this.world.effects);
+    this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, undefined, this.world.spells, this.world.effects, this.world.marks);
     this.resting = false;
   }
 
@@ -29,14 +29,14 @@ export class Playground {
     const spell = makeFieldSpell(id,kind,team,x,y,this.world.tick,entrance);
     this.nextId++;
     this.strokes.push([id]);
-    this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, undefined, [...(this.world.spells ?? []), spell], this.world.effects);
+    this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, undefined, [...(this.world.spells ?? []), spell], this.world.effects, this.world.marks);
     this.resting = false;
   }
 
   undo() {
     const ids = new Set(this.strokes.pop());
     this.world = new Battle(this.world.tick, this.world.units.filter(u => !ids.has(u.id) && !(u.makerId !== undefined && ids.has(u.makerId))), this.world.arrows,
-      undefined, this.world.spells?.filter(spell => !ids.has(spell.id)), this.world.effects);
+      undefined, this.world.spells?.filter(spell => !ids.has(spell.id)), this.world.effects, this.world.marks?.filter(m => !ids.has(m.id)));
     this.resting = false;
   }
 
@@ -50,16 +50,17 @@ export class Playground {
   advance() {
     if (this.paused) return;
     const from = this.world;
-    if (!from.units.length && !from.arrows.length && !from.spells?.length && !from.effects?.length) return;
+    if (!from.units.length && !from.arrows.length && !from.spells?.length && !from.effects?.length && !from.marks?.length) return;
     // A quiet field needs only the clock for breathing and blinks. Placing a
     // squad wakes the simulation, including separation of coincident allies.
     if (this.resting) {
-      this.world = new Battle(from.tick + 1, from.units, from.arrows);
+      const tick=from.tick+1;
+      this.world = new Battle(tick, from.units, from.arrows, undefined, undefined, undefined, floorAfterCast(from.marks,undefined,tick));
       return;
     }
     const next = stepBattle(from);
     const units = next.units.filter(u => u.hp > 0 || (u.lastHitTick!==null && next.tick-u.lastHitTick<48));
-    this.world = new Battle(next.tick, units, next.arrows, undefined, next.spells, next.effects);
+    this.world = new Battle(next.tick, units, next.arrows, undefined, next.spells, next.effects, next.marks);
     this.resting = !next.spells?.length && !next.effects?.length && !next.arrows.length && units.every(u =>
       u.hp > 0 && u.targetId === null && u.pace < .001 && u.emberUntil === undefined &&
       !u.windup && !u.burstLeft && u.flurryStartedTick === undefined && !u.burn && !u.poison && !u.tunnel && !u.trail && !u.knockback &&

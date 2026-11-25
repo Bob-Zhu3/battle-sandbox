@@ -122,7 +122,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Meteor | 20 | A white-hot stone sheds flame and cinders from the top edge. It strikes the marked ground after 0.8 seconds, dealing 17 damage to enemies still inside or 6 to a base. |
 | Healing Rain | 15 | Crosses in the caster's color rise with each of three healing pulses. Each gives friendly people and creatures up to 5 HP, extinguishes burning allies, puts out enemy Phoenix eggs and fogs enemy Sun Lenses. |
 | Fault Line | 18 | Two tremors each deal 12 damage to enemy buildings, 3 to ground troops and 3 to bases. An underground Miner or Sandworm caught by either pulse surfaces right there. |
-| Briar Snare | 13 | At the moment the vines spring up, they catch grounded enemies for 1.3 seconds. Rooted troops can still shoot or strike within reach. A Phoenix hit burns the vines away. |
+| Vines | 13 | At the moment the vines spring up, they catch grounded enemies for 1.3 seconds. Rooted troops can still shoot or strike within reach. A Phoenix hit burns the vines away. |
 | Mirror Ward | 14 | Three circling panes intercept enemy arrows and bolts as they enter. Each shot turns back along its path and can hit its shooter. Bullets, boulders and magic pass through. The ward lasts three seconds. |
 | Freeze | 18 | Ice holds enemy troops and buildings for 1.1 seconds, or a base for 0.55 seconds. It interrupts a charge, extinguishes a burn, and leaves shots already in flight alone. A Phoenix strike breaks the ice. |
 | Lightning | 24 | Bolts hit the three enemies with the most remaining HP inside the circle. Each takes 18 damage, or 6 for a base, and a quarter-second stun. |

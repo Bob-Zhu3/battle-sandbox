@@ -16,8 +16,8 @@ export async function playSiege({place,show,clear,hp}) {
   await place("Red","Bell Tower",453,185);
   await place("Blue","Lancer",565,167);
   await place("Blue","Lancer",566,192);
-  await place("Red","Briar Snare",537,180);
-  await show(1250,"Briars hold the Lancers under the falling stone.");
+  await place("Red","Vines",537,180);
+  await show(1250,"Vines hold the Lancers under the falling stone.");
   assert.equal(await hp("blue"),2*(defs.lancer.maxHp-defs.lobber.damage));
   await show(1250,"The bell rings as they reach the front line.");
   assert.ok(await hp("blue")<=2*(defs.lancer.maxHp-defs.lobber.damage-defs.belltower.damage));

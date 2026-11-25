@@ -9,6 +9,7 @@ import { chromium } from "playwright";
 import { createGameServer } from "../server/http.ts";
 import { ARENA, ARMIES, TEAMS } from "../src/battlefield.ts";
 import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
+import { SPELLS } from "../src/spells.ts";
 import { FACE, INK } from "../src/ink.ts";
 import { checkPausedPlacement } from "./check-paused-placement.mjs";
 
@@ -120,6 +121,59 @@ async function pixelPreview(url) {
     await page.reload(); await ready(); assert.equal(await capture(),frame);
     console.log("Pixel preview: multiple atlas effects paint while paused, resume with the fight, and reproduce the opening frame on reload.");
   } finally { await page.close(); }
+}
+
+async function spellGround(url) {
+  const {page,point}=await open(url,960,540,true);
+  try {
+    const arena=page.locator("#arena");
+    const lettering=await page.evaluate(async()=>{
+      await document.fonts.ready;
+      const labels=[...document.querySelectorAll(".card-name,.palette-tabs button,.tool,.match-readout,summary")];
+      return document.fonts.check('14px "Battle Bitmap"','Vines 10g · ∞') &&
+        labels.every(el=>getComputedStyle(el).fontFamily.includes("Battle Bitmap"));
+    });
+    assert.ok(lettering,"The roster, controls and readout all use the game font");
+    const sample=(x,y,rx,ry)=>arena.evaluate((canvas,{x,y,rx,ry})=>{
+      const w=canvas.width,h=canvas.height;
+      const data=canvas.getContext("2d").getImageData(Math.round((x-rx)*w/960),Math.round((y-ry)*h/360),
+        Math.round(2*rx*w/960),Math.round(2*ry*h/360)).data;
+      let ink=0;
+      for (let i=3;i<data.length;i+=4) if (data[i]>60) ink++;
+      return ink;
+    },{x,y,rx,ry});
+    await page.getByRole("tab",{name:"Spells",exact:true}).click({force:true});
+    const vineCard=page.getByRole("button",{name:"Vines",exact:true});
+    await vineCard.hover({force:true}); await page.clock.runFor(450);
+    const tip=page.locator(".pixel-tip");
+    assert.equal(await tip.textContent(),await vineCard.getAttribute("aria-description"));
+    assert.ok(await tip.isVisible());
+    assert.ok((await tip.evaluate(el=>getComputedStyle(el).fontFamily)).includes("Battle Bitmap"));
+    await page.keyboard.press("Escape"); assert.equal(await tip.isVisible(),false);
+    for (const [kind,rule] of Object.entries(SPELLS)) {
+      const card=page.getByRole("button",{name:rule.name,exact:true});
+      await card.click({force:true});
+      if (kind==="wormhole") await page.mouse.click(...point(320,141));
+      await page.mouse.click(...point(485,169));
+      if (kind==="lightning") {
+        await page.clock.runFor(335);
+        assert.ok(await sample(485,7,70,6)>0,"Lightning connects the sky to the contact point");
+      }
+      await page.clock.runFor(Math.ceil((rule.duration+9)*1000/60));
+      assert.ok(await sample(485,169,67,35)>8,rule.name+" leaves visible ground pixels after its active spell ends");
+      if (kind==="wormhole") assert.ok(await sample(320,141,42,25)>8,"The entrance leaves its own mark");
+      if (kind==="meteor") {
+        await page.getByRole("button",{name:"Pause playground"}).click({force:true});
+        const still=await arena.evaluate(c=>c.toDataURL());
+        await page.clock.runFor(900);
+        assert.equal(await arena.evaluate(c=>c.toDataURL()),still);
+        await page.getByRole("button",{name:"Resume playground"}).click({force:true});
+      }
+      await page.locator("#clear").click({force:true});
+      assert.equal(await sample(485,169,70,38),0);
+    }
+  } finally { await page.context().close(); }
+  console.log("All ten spells leave visible ground marks. Lightning reaches the sky, both portals leave a mark, and Pause and Clear work on the residue.");
 }
 
 async function pausePlayground(url) {
@@ -418,7 +472,7 @@ async function browseRoster(url) {
       Machines:["Clockmouse","Bolt Drone","Trojan Horse"],
       Towers:["Watchpost","Mouse Workshop","Stone Lobber","Sun Lens","Bell Tower","Windmill","Harpoon Tower","Prism Tower","Snowman"],
       Mythical:["Cyclops","Storm Kirin","Frost Queen","Phoenix","Reaper","Witch","Zombie","Hydra","Medusa","Vampire","Sandworm","Slime","Headless Horseman","Werewolf","Cerberus","Kraken","Fire Dragon","Iron Golem"],
-      Spells:["Gust","Meteor","Healing Rain","Fault Line","Briar Snare","Mirror Ward","Freeze","Lightning","Rage","Wormhole"],
+      Spells:["Gust","Meteor","Healing Rain","Fault Line","Vines","Mirror Ward","Freeze","Lightning","Rage","Wormhole"],
     };
     const portraits=new Set();
     let placed=0;
@@ -574,16 +628,22 @@ async function weatherDuel(url) {
     while(!blue.frames.some(together) && Date.now()<deadline)await delay(10);
     const proof=blue.frames.find(together);
     assert.ok(proof,"the phone sees lightning hit Red's base while Blue's tower is frozen and Red's Archer is enraged");
-    const serverTick=proof.world.tick;
+    const bolt=proof.world.spells.find(s=>s.kind==="lightning");
+    const floorFrame=f=>f.world.marks?.some(m=>m.id===bolt.id);
+    while (!blue.frames.some(floorFrame) && Date.now()<deadline) await delay(10);
+    const floor=blue.frames.find(floorFrame);
+    assert.ok(floor,"The storm ended and its scorch is present before the phone reloads");
+    const serverTick=floor.world.tick;
     await blue.page.reload({waitUntil:"domcontentloaded"});
     await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" &&
       document.querySelector("#red-score").dataset.baseHp==="154");
     assert.equal(blue.joins[1].resumeToken,blue.joins[0].resumeToken);
     const frame=blue.frames.at(-1),limit=Date.now()+3000;
     assert.ok(frame.world.tick>=serverTick && frame.world.spells.some(s=>s.kind==="rage"));
+    assert.deepEqual(frame.world.marks.find(m=>m.id===bolt.id).strikes,bolt.strikes);
     while(!red.frames.some(f=>f.revision===frame.revision) && Date.now()<limit)await delay(10);
     assert.deepEqual(red.frames.find(f=>f.revision===frame.revision)?.world,frame.world);
-    console.log("Weather duel: desktop and phone saw all three spells, the same lightning damage, and the same world after a reconnect.");
+    console.log("Weather duel: desktop and phone saw all three spells, the same lightning damage, and identical strike marks after a reconnect.");
   } finally {await Promise.all(players.map(p=>p.page.context().close()));}
 }
 
@@ -693,7 +753,7 @@ async function turncoatDuel(url) {
     const destination=red.frames.at(-1).world.units[0].tunnel;
     assert.deepEqual([destination.toX,destination.toY].map(Math.round),[700,245]);
     await Promise.all(players.map(p=>p.page.getByRole("button",{name:"Ready",exact:true}).click()));
-    await blue.page.waitForFunction(()=>document.querySelector("#red-score").title.includes("Hex Pig") && document.querySelector("#red-score").title.includes("Zombie 2"));
+    await blue.page.waitForFunction(()=>document.querySelector("#red-score").getAttribute("aria-description")?.includes("Hex Pig") && document.querySelector("#red-score").getAttribute("aria-description")?.includes("Zombie 2"));
     const contact=blue.frames.find(f=>f.world.units[4]?.kind==="pig");
     const pig=contact.world.units[4];
     assert.ok(contact.world.units[0].tunnel && contact.world.units[0].x>destination.fromX);
@@ -701,7 +761,7 @@ async function turncoatDuel(url) {
     await picture(red.page,"witch-and-zombies");
     await blue.page.waitForFunction(tick=>Number(document.querySelector("#tick").textContent)>=tick,pig.hex.since+210);
     await blue.page.reload({waitUntil:"domcontentloaded"});
-    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" && document.querySelector("#red-score").title.includes("Hex Pig"));
+    await blue.page.waitForFunction(()=>document.querySelector(".game").dataset.team==="blue" && document.querySelector("#red-score").getAttribute("aria-description")?.includes("Hex Pig"));
     assert.equal(blue.joins[0].resumeToken,blue.joins[1].resumeToken);
     const returned=blue.frames.at(-1),limit=Date.now()+3000;
     while(!red.frames.some(f=>f.revision===returned.revision) && Date.now()<limit)await delay(10);
@@ -802,6 +862,7 @@ async function match(url,size) {
 try {
   await withField(url => checkPausedPlacement(browser, url));
   await withField(pixelPreview);
+  await withField(spellGround);
   await withField(pausePlayground);
   await withField(phoenixDuringDeployment);
   await withField(arrowFlash);

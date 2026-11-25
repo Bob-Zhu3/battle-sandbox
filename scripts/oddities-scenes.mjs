@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 
 export async function playOddities({page,place,show,clear,hp}) {
-  const roster=team=>page.locator("#"+team+"-score").getAttribute("title");
+  const roster=team=>page.locator("#"+team+"-score").getAttribute("aria-description");
   await place("Red","Frost Queen",335,132);await place("Red","Phoenix",333,202);
   await place("Blue","Watchpost",624,130);await place("Blue","Watchpost",625,200);
   await show(1450,"Frost crystals and sparks follow the actual path.");

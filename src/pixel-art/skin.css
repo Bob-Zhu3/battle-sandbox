@@ -10,9 +10,13 @@
   --paper: #f7f4e9;
   --gold: #ffc660;
   --pixel-type: "Battle Bitmap", monospace;
+  --display: var(--pixel-type);
+  font-family: var(--pixel-type);
+  font-weight: 400;
+  font-synthesis: none;
 }
 .field-layer, .brush-icon { image-rendering: pixelated; }
-.wordmark { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 8px; padding: 0; transform: none; }
+.wordmark { background: white; display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 8px; padding: 0; transform: none; }
 .wordmark canvas { grid-row: 1 / 3; width: 58px; height: 48px; image-rendering: pixelated; }
 .wordmark span { grid-column: 2; }
 .wordmark span {
@@ -88,4 +92,36 @@ button:focus-visible, summary:focus-visible { outline-color: #367eab; }
   .palette-tabs button { padding-inline: 6px; letter-spacing: 0; }
   .demo-controls { gap: 4px; }
   .wordmark span { font-size: 1.05rem; }
+}
+button, input, select, .tool i { font-family: var(--pixel-type); }
+.empty-guide p, .hint { line-height: 1.38; }
+.demo-button, .tool, .demo-options a { font-size: 1rem; }
+.card-name { font-size: 14px; line-height: 1.02; }
+.palette-card { flex-basis: 86px; grid-template-rows: 47px auto; }
+.card-price { font-size: 10px; }
+.palette-tabs button { font-size: 14px; padding-inline: 12px; }
+#invite-url { font: 400 13px/1.35 var(--pixel-type); }
+@media (max-width: 525px) {
+  .palette-tabs button { font-size: 12px; padding-inline: 6px; }
+  .pennant-name, .seat-label { letter-spacing: 0; }
+  .palette-card { flex-basis: 80px; }
+  .demo-button, .tool, .demo-options a { font-size: 13px; }
+}
+@media (max-width: 380px) {
+  .palette-tabs button { font-size: 11px; padding-inline: 4px; }
+}
+.flag-icon::after { background-size: 8px 8px; }
+.play-icon:not(.pause) {
+  border: 0; width: 10px; height: 14px; background: currentColor;
+  clip-path: polygon(0 0,2px 0,2px 2px,5px 2px,5px 4px,8px 4px,8px 6px,10px 6px,10px 8px,8px 8px,8px 10px,5px 10px,5px 12px,2px 12px,2px 14px,0 14px);
+}
+.palette-arrow::before {
+  width: 9px; height: 14px; border: 0; transform: none; background: currentColor;
+  clip-path: polygon(0 0,3px 0,3px 2px,5px 2px,5px 4px,7px 4px,7px 6px,9px 6px,9px 8px,7px 8px,7px 10px,5px 10px,5px 12px,3px 12px,3px 14px,0 14px,0 11px,2px 11px,2px 9px,4px 9px,4px 5px,2px 5px,2px 3px,0 3px);
+}
+.palette-arrow[data-direction="-1"]::before { transform: scaleX(-1); }
+.pixel-tip {
+  position: fixed; z-index: 20; pointer-events: none; max-width: min(32ch, calc(100vw - 16px));
+  padding: 8px 10px; border: 2px solid var(--ink); background: #fff7dc; color: var(--ink);
+  font: 400 14px/1.35 var(--pixel-type); box-shadow: 2px 2px 0 var(--ink);
 }

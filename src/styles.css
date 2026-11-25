@@ -1,13 +1,10 @@
-@import "@fontsource/barlow-condensed/latin-900-italic.css";
-@import "@fontsource/barlow-condensed/latin-800.css";
-@import "@fontsource/bricolage-grotesque/latin-600.css";
 
 :root {
   --ink: #252e2a;
   --paper: #fff7d9;
   --gold: #ffcf52;
-  --display: "Barlow Condensed", Impact, "Arial Narrow", sans-serif;
-  font-family: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --display: "Battle Bitmap", Impact, "Arial Narrow", sans-serif;
+  font-family: "Battle Bitmap", monospace;
   font-weight: 600;
   color: var(--ink);
   background: #fff;
@@ -90,7 +87,7 @@ button:disabled { cursor: default; }
 .game[data-mode="ffa"] .score, .game[data-mode="playground"] .score { gap: 4px; }
 .game:is([data-mode="ffa"], [data-mode="playground"]) .pennant { width: auto; min-width: 88px; padding-inline: 14px; gap: 6px; }
 .pennant.violet, .pennant.amber { --tail: polygon(0 0,100% 0,94% 50%,100% 100%,0 100%,6% 50%); padding-inline: 9px; }
-.tool i { font: 700 1.35rem/1 system-ui, sans-serif; }
+.tool i { font: 400 1.35rem/1 var(--display); }
 .tool .eraser { display: block; height: 11px; width: 15px; transform: rotate(-38deg); border: 2px solid currentColor; border-radius: 2px; background: linear-gradient(to right, currentColor 0 35%, transparent 35%); }
 .play { gap: 9px; background: var(--gold); padding-inline: 22px; border-radius: 5px 8px 4px 6px; font: italic 900 1.65rem/1 var(--display); text-transform: uppercase; }
 .play-icon { width: 0; height: 0; border-block: 6px solid transparent; border-left: 9px solid currentColor; }

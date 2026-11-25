@@ -1,12 +1,12 @@
-import { ARMIES } from "./battlefield.ts";
-import { drawEffect } from "./pixel-art/effect-player.ts";
+
+import { drawEffect, drawSkyStrike } from "./pixel-art/effect-player.ts";
 import { cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
 
-const tau = 2*Math.PI;
+
 function flake(c: Pens, r: number) {
   for (let i=0;i<6;i++) {
-    c.save();c.rotate(i*tau/6);
+    c.save();c.rotate(i*Math.PI/3);
     line(c,0,0,0,-r,"#48687c",r*.25);
     line(c,0,0,0,-r,"#c9f4ed",r*.13);
     for (const side of [-1,1]) line(c,0,-r*.43,side*r*.24,-r*.68,"#88c8d7",r*.17);
@@ -26,48 +26,27 @@ export function weatherIcon(c: Pens, kind: "freeze"|"lightning"|"rage") {
   }
 }
 
+export function drawLightning(c: Pens,s: FieldSpell,tick: number,sx: number,sy: number) {
+  const t=tick-s.startTick-SPELLS.lightning.delay;
+  if (t<0 || t>=SPELLS.lightning.duration-SPELLS.lightning.delay) return;
+  const ends=s.strikes?.length ? s.strikes : [s];
+  const width=84*Math.max(Math.min(sx,sy),Math.min(sy,.71));
+  for (const [i,end] of ends.entries()) {
+    drawSkyStrike(c,end.x*sx,end.y*sy,t,SPELLS.lightning.duration-SPELLS.lightning.delay,width,(s.id+i)%2 ? 1 : -1,i);
+  }
+}
+
 export function drawWeatherField(c: Pens,s: FieldSpell,tick: number,sx: number,sy: number) {
   const age=tick-s.startTick, rule=SPELLS[s.kind], t=age-rule.delay, k=Math.min(sx,sy);
-  c.save();c.lineCap="round";c.lineJoin="round";
-  if (s.kind==="lightning") {
-    if (t<0) {
-      c.globalAlpha=.4+.4*age/rule.delay;c.scale(k,k);
-      for(let i=0;i<3;i++){c.save();c.rotate(i*tau/3+age*.04);line(c,0,-(17-age*.35),0,-(12-age*.35),"#b38c43",1.8);c.restore();}
-    } else if (t<17) {
-      const strikes=s.strikes?.length?s.strikes:[s];
-      c.globalAlpha=Math.max(0,1-t/17);
-      const originX=(.5-s.id%2)*27*k, originY=-s.y*sy;
-      for(const [i,end] of strikes.entries()) {
-        const ex=(end.x-s.x)*sx,ey=(end.y-s.y)*sy-5*k;
-        c.beginPath();c.moveTo(originX,originY);
-        for(let j=1;j<8;j++) {
-          const f=j/8, split=(j+i+s.id)%2?1:-1;
-          c.lineTo(originX+(ex-originX)*f+split*(4+(j*7%13))*k,originY+(ey-originY)*f);
-        }
-        c.lineTo(ex,ey);c.strokeStyle="#9471ab";c.lineWidth=4.8*k;c.stroke();c.strokeStyle="#fff2aa";c.lineWidth=2.25*k;c.stroke();
-        if (drawEffect(c,"zap",ex,ey,t,17,45*k)) continue;
-        for(let j=0;j<5;j++){const a=j*tau/5+.3+i;line(c,ex+Math.cos(a)*(3+t*.45)*k,ey+Math.sin(a)*(3+t*.45)*k,
-          ex+Math.cos(a)*(8+t*.55)*k,ey+Math.sin(a)*(8+t*.55)*k,"#fff3bc",1.7*k);}
-      }
-    }
-  } else if (s.kind==="freeze") {
-    if (t>=0 && drawEffect(c,"snow",0,0,t,rule.duration-rule.delay,rule.radius*2*k)) { c.restore(); return; }
-    const spread=t<0?.20+age*.009:Math.min(1,(t+4)/13);
-    for(let i=0;i<6;i++) {
-      const a=i*tau/6+s.id*.31;
-      c.save();c.translate(Math.cos(a)*rule.radius*.73*spread*sx,Math.sin(a)*rule.radius*.73*spread*sy);
-      c.globalAlpha=Math.min(.86,(rule.duration-age)/12);c.scale(k,k);c.rotate(a);flake(c,(t<0?3.3:5.4)*spread+1);c.restore();
-    }
-  } else {
-    const dye=ARMIES[s.team];
-    c.globalAlpha=Math.min(.8,(rule.duration-age)/16)*(t<0?.5:1);
-    for(let i=0;i<8;i++) {
-      const a=i*tau/8+s.id*.3+age*.011;
-      c.save();c.translate(Math.cos(a)*rule.radius*.94*sx,Math.sin(a)*rule.radius*.94*sy);
-      c.scale(k,k);c.rotate(a);cut(c,"M-2.8 -5 L2.5 -.6 L-.8 4.1 L-.8 .8 L-3 -1Z",i%2?dye.light:"#d16a79",.7);c.restore();
-    }
+  if (t<0) return;
+  if (s.kind==="freeze") {
+    // The frost front races along the ground. The blades gather on that front and shatter.
+    drawEffect(c,"icewall",-.86*rule.radius*k,3*k,t,rule.duration-rule.delay,rule.radius*1.90*k);
+  } else if (s.kind==="rage") {
+    c.save(); c.globalAlpha*=Math.min(1,(rule.duration-age)/14);
+    drawEffect(c,"fury",0,0,t%80,80,2*rule.radius*k);
+    c.restore();
   }
-  c.restore();
 }
 
 export function iceShell(c: Pens,x: number,y: number,r: number,remaining: number) {

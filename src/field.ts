@@ -1,5 +1,6 @@
 import { maxHealth } from "./transformations.ts";
 import { whenEffectsLoad } from "./pixel-art/effect-player.ts";
+import { attachTooltips } from "./pixel-art/tooltips.ts";
 import { paintCrest } from "./pixel-art/crest.ts";
 import { createRoster } from "./roster.ts";
 import { createBattleSound } from "./battle-sound.ts";
@@ -20,6 +21,7 @@ function contextFor(canvas: HTMLCanvasElement) {
 }
 
 export function createField(mode?: MatchMode) {
+  attachTooltips();
   paintCrest(element<HTMLCanvasElement>("battle-crest"));
   const canvas = element<HTMLCanvasElement>("arena");
   const ctx = contextFor(canvas);
@@ -45,7 +47,7 @@ export function createField(mode?: MatchMode) {
     function resize() {
       const ratio = window.devicePixelRatio || 1;
       // Use whole device pixels per texel. Pointer and room coordinates stay in arena units.
-      const step = Math.max(1, Math.round(ratio * Math.max(1, canvas.clientWidth / 750)));
+      const step = Math.max(1, Math.round(ratio * Math.max(1, canvas.clientWidth / 800)));
       const width = Math.max(1, Math.round(canvas.clientWidth * ratio / step));
       const height = Math.max(1, Math.round(canvas.clientHeight * ratio / step));
       canvas.width = width;
@@ -54,6 +56,7 @@ export function createField(mode?: MatchMode) {
     }
     resize();
     whenEffectsLoad(paint);
+    void document.fonts.load('16px "Battle Bitmap"').then(paint);
     new ResizeObserver(resize).observe(canvas);
   }
   const health = sides.map(side => ({
@@ -74,9 +77,10 @@ export function createField(mode?: MatchMode) {
       const counts = new Map<string, number>();
       for (const unit of living) counts.set(unit.kind, (counts.get(unit.kind) ?? 0) + 1);
       const roster = UNIT_KINDS.filter(kind => counts.has(kind)).map(kind => UNIT_DEFINITIONS[kind].name + " " + counts.get(kind));
-      display.score.title = [living.length + " of " + army.length + " alive", ...roster, hp + "/" + max + " HP"].join(" · ");
+      const summary = [living.length + " of " + army.length + " alive", ...roster, hp + "/" + max + " HP"].join(" · ");
       const base = world.bases?.find(base => base.team === display.side);
-      if (base) { display.score.dataset.baseHp = String(base.hp); display.score.title += " · Base " + base.hp + "/" + BASE_HP + " HP"; }
+      if (base) display.score.dataset.baseHp = String(base.hp);
+      display.score.setAttribute("aria-description",summary+(base ? " · Base " + base.hp + "/" + BASE_HP + " HP" : ""));
       display.bar.style.transform = "scaleX(" + (base ? base.hp / BASE_HP : max ? hp / max : 0) + ")";
     }
   }

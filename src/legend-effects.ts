@@ -5,6 +5,7 @@ import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { TOWER_ART_SCALE } from "./tower-art.ts";
+import { segment } from "./pixel-art/stamps.ts";
 import { drawEffect } from "./pixel-art/effect-player.ts";
 
 const circle = 2 * Math.PI;
@@ -44,30 +45,18 @@ export function wormholeIcon(c: Pens) {
   cut(c, "M1.2 -4.7 L4.6 -5 L3 -2.1Z", "#f5cc88", .65);
 }
 
-function rimMarks(c: Pens, entrance: boolean, kick: number) {
-  // Inward hooks stay over the dark inlet. The outlet flares beyond its rim.
-  const tip=entrance ? 10.3-1.2*kick : 19+1.7*kick;
-  const back=entrance ? 15.7 : 14.6;
-  c.beginPath();
-  for (const sign of [-1,1]) {
-    c.moveTo(sign*back,-3.1); c.lineTo(sign*tip,0); c.lineTo(sign*back,3.1);
-  }
-  c.lineJoin=c.lineCap="round";
-  c.strokeStyle="#403348"; c.lineWidth=3; c.stroke();
-  c.strokeStyle="#fff1d0"; c.lineWidth=1.48; c.stroke();
-}
-
-function mouth(c: Pens, x: number, y: number, size: number, phase: number, team: Team, entrance: boolean, kick: number) {
+function mouth(c: Pens,x: number,y: number,size: number,phase: number,team: Team,entrance: boolean,kick: number) {
+  const width=size*(entrance ? 2.50-.22*kick : 2.18+.35*kick);
+  const frame=(phase/(2*Math.PI)%1+1)%1;
+  c.save(); c.translate(x,y); c.scale(1,.66);
+  drawEffect(c,entrance ? "inlet" : "outlet",0,width*(entrance ? .40 : .34),frame,1,width);
+  c.restore();
   c.save(); c.translate(x,y); c.scale(size/18,size/18);
-  gate(c,18,entrance ? 1-.07*kick : 1+.09*kick,phase,team,entrance);
-  rimMarks(c,entrance,kick);
-  if (!entrance) {
-    const lift=10.1+.65*Math.sin(phase)+3*kick;
-    // A shard lifting out of the bright well gives the exit a different silhouette.
-    line(c,0,-1.8,0,-lift,"#eee2ea",1.75);
-    c.translate(0,-lift);
-    cut(c,"M0 -5.8 L3.5 -.4 L.1 3.3 L-3.5 -.4Z",ARMIES[team].light,.94);
-    line(c,-.45,-2.8,-1.35,-.65,"#fff9df",.93);
+  // The inlet's two teeth point inwards. The exit's teeth spread when something arrives.
+  const tip=entrance ? 9-2*kick : 20+2*kick, tail=entrance ? 14 : 15;
+  for (const side of [-1,1]) {
+    segment(c,tail*side,-3,tip*side,0,"#44364f",2); segment(c,tip*side,0,tail*side,3,"#44364f",2);
+    segment(c,tail*side,-3,tip*side,0,ARMIES[team].light);
   }
   c.restore();
 }

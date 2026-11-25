@@ -99,7 +99,7 @@ function updateInterface() {
   element("brush-tool").hidden = !edit;
   undo.hidden = clear.hidden = !edit || !deploy;
   undo.disabled = clear.disabled = !ownCount;
-  undo.title = "Refund your last squad"; clear.title = "Refund your whole formation";
+  undo.setAttribute("aria-description","Refund your last squad"); clear.setAttribute("aria-description","Refund your whole formation");
   play.hidden = !closed && (reconnecting || live || countdown || !snap);
   play.disabled = !closed && (link !== "online" || (!!deploy && (!edit || !ownCount)));
   element("play-label").textContent = closed ? "Join again" : snap?.phase === "finished" ? "New round" : ready ? "Ready ✓" : "Ready";

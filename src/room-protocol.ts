@@ -7,7 +7,7 @@ import { currentUnitKind, RECRUIT_KINDS, UNIT_DEFINITIONS } from "./units.ts";
 export const ROOM_SOCKET = MATCHES.duel.socket;
 export const TEAM_LIMIT = Math.floor(STARTING_GOLD / Math.min(...RECRUIT_KINDS.map(kind => UNIT_DEFINITIONS[kind].cost)));
 export const SNAPSHOT_EVERY = 3;
-export type World = Pick<Battle, "tick" | "units" | "arrows" | "bases" | "spells" | "effects">;
+export type World = Pick<Battle, "tick" | "units" | "arrows" | "bases" | "spells" | "effects" | "marks">;
 // An older match can also name the original troop inside a pig, zombie or Cyclops meal.
 export function restoreUnitKinds(world: World) {
   for (const u of world.units) {

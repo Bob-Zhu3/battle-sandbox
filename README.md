@@ -4,6 +4,8 @@ Paint troops onto a shared field and watch them fight, alone in the playground o
 
 [Play online](https://bob-zhu3.github.io/battle-sandbox/) · [How to play](docs/gameplay.md) · [Live demo guide](docs/defense.md)
 
+Run `npm run demo:spells` for a paused volley of lightning, a falling meteor, and a fault opening beneath the front line. Press Space to see the impacts and their fading marks, then choose a spell to cast it yourself.
+
 On the pixel-art branch, run `npm run demo:pixels` to open a 32-troop skirmish just before a meteor lands. Press Space to play, or place your own troops on the field. The same artwork runs in the playground, duels and free-for-all matches. [Pixel effects and credits](third_party/pixelfx/README.md)
 
 ![A paused 200-troop playground battle at tick 70. The blue and red front lines have met, and 188 troops are still standing.](media/playground-crowd.png)

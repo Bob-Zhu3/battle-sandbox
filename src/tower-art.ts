@@ -7,7 +7,7 @@ const brass = "#e5af59", bronze = "#95653e", stone = "#b0b3a0", shade = "#7c887c
 
 export const TOWER_ART_SCALE = 1.2;
 const spriteSize: Partial<Record<UnitKind,number>> = {
-  warrior:1.22, archer:1.22, shieldbearer:1.16, medic:1.2, lancer:1.18,
+  bomber:.90, monk:.75, warrior:1.22, archer:1.22, shieldbearer:1.16, medic:1.2, lancer:1.18,
   musketeer:1.18, phoenix:1.2, frostqueen:1.22, drone:1.08,
 };
 export function unitArtScale(kind: UnitKind | "base") {

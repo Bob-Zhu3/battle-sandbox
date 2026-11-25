@@ -1,4 +1,5 @@
 import { ARMIES, type Team } from "./battlefield.ts";
+import { unitArtScale } from "./tower-art.ts";
 import { drawUnitToken } from "./characters.ts";
 import { drawSpellIcon } from "./magic-art.ts";
 import { SPELLS, type SpellKind } from "./spells.ts";
@@ -79,7 +80,7 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
   }
 
   function icon(key: Brush) {
-    const art = document.createElement("canvas");art.width=art.height=44;art.className="brush-icon";art.setAttribute("aria-hidden","true");
+    const art = document.createElement("canvas");art.width=art.height=53;art.className="brush-icon";art.setAttribute("aria-hidden","true");
     const c=art.getContext("2d")!;
     c.imageSmoothingEnabled=false;
     c.scale(art.width/72,art.height/72);
@@ -95,13 +96,13 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
       const shift=key==="firedragon" ? 2.5 : 0;
       const size=key==="slime" ? 18.5 : key==="vampire" || key==="irongolem" ? 16.5 : key==="firedragon" ? 13 : 13.6;
       const y=key==="slime" ? 43 : 47;
-      drawUnitToken(c,36+shift*ARMIES[team].facing,y,size,team,key);
+      drawUnitToken(c,36+shift*ARMIES[team].facing,y,size*(key==="monk" ? unitArtScale(key) : 1),team,key);
     } else {
       const myth = key === "cyclops" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
       const longWeapon = key === "musketeer" || key === "lancer" || key === "miner";
       const size = key === "reaper" ? 13.5 : myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
       const shift = key === "lancer" || key === "reaper" ? -8 : key === "miner" ? -7 : longWeapon || key === "cyclops" ? -4 : 0;
-      drawUnitToken(c,36 + ARMIES[team].facing * shift,myth ? 49 : 44,size,team,key);
+      drawUnitToken(c,36 + ARMIES[team].facing * shift,myth ? 49 : 44,size*(key==="bomber" ? unitArtScale(key) : 1),team,key);
     }
     return art;
   }
@@ -116,7 +117,6 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
       card.disabled = locked || tooDear;
       card.setAttribute("aria-pressed",String(kind === selected));
       const help = locked ? "Spells unlock when battle begins." : tooDear ? "You need " + catalog[kind].cost + " gold." : catalog[kind].description;
-      card.title = catalog[kind].name + " · " + help;
       card.setAttribute("aria-description",(priced ? catalog[kind].cost + " gold. " : "") + help);
     }
     for (let i=0; i<tabButtons.length; i++) {

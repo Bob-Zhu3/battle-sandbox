@@ -4,7 +4,7 @@ import { createField, element } from "./field.ts";
 import { crowdFormation } from "./crowd-formation.ts";
 import { reinforcements, windmillField } from "./deployment.ts";
 import { Playground } from "./playground.ts";
-import { pixelSkirmish } from "./pixel-art/showcase.ts";
+import { pixelSkirmish, spellShowcase } from "./pixel-art/showcase.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 import { castHint } from "./spells.ts";
@@ -41,8 +41,8 @@ document.title = "Playground · Battle Sandbox";
 element("match-state").textContent = "Playground";
 field.canvas.dataset.deploying = "true";
 scenario.hidden = false;
-undo.title = "Remove the last squad you drew";
-clear.title = "Clear the playground";
+undo.setAttribute("aria-description","Remove the last squad you drew");
+clear.setAttribute("aria-description","Clear the playground");
 clockButton.hidden = false;
 
 function choose(color: Team) {
@@ -58,7 +58,7 @@ for (const color of TEAMS) {
   const button = document.createElement("button");
   button.type = "button"; button.className = "swatch"; button.dataset.color = color;
   button.style.setProperty("--dye", ARMIES[color].coat);
-  button.title = ARMIES[color].name; button.setAttribute("aria-label", ARMIES[color].name + " army");
+  button.setAttribute("aria-description",ARMIES[color].name); button.setAttribute("aria-label", ARMIES[color].name + " army");
   button.addEventListener("click", () => {choose(color);updateBrushHint();}); colors.append(button);
 }
 choose(team);
@@ -74,7 +74,11 @@ game.addEventListener("brushchange",()=>{
   if (field.selectedSpell()!=="wormhole") spellBrush.cancel();
   updateBrushHint();
 });
-if (demo === "pixels") {
+if (demo === "spells") {
+  spellShowcase(play);
+  previous=play.world;
+  field.armBrush("lightning");
+} else if (demo === "pixels") {
   pixelSkirmish(play);
   previous=play.world;
   field.armBrush("archer");
@@ -138,7 +142,7 @@ function syncClockButton() {
   field.pauseSound(play.paused);
   const label = play.paused ? "Resume playground" : "Pause playground";
   clockButton.setAttribute("aria-label", label);
-  clockButton.title = label + " (Space)";
+  clockButton.setAttribute("aria-description",label+" (Space)");
   clockButton.toggleAttribute("data-paused", play.paused);
   clockButton.firstElementChild!.classList.toggle("pause", !play.paused);
   element("match-state").textContent = play.paused ? "Paused" : "Playground";
@@ -163,7 +167,7 @@ document.addEventListener("keydown", event => {
 });
 function update() {
   if(soundHint && play.world.units.length<3){soundHint=false;updateBrushHint();}
-  guide.hidden = !!(spellBrush.entrance || play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length);
+  guide.hidden = !!(spellBrush.entrance || play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || play.world.marks?.length);
   undo.disabled = !play.canUndo && !spellBrush.entrance;
   clear.disabled = !play.canUndo && !spellBrush.entrance && !play.world.units.length && !play.world.arrows.length;
   field.updateScore(play.world);
@@ -192,13 +196,13 @@ function frame(time: number) {
   lastTime = time;
   const startWorld = play.world, before = startWorld.tick;
   const beforeCount = play.world.units.length;
-  const beforeSpells = (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0);
+  const beforeSpells = (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0) + (play.world.marks?.length ?? 0);
   while (remainder >= tickMs) {
     remainder -= tickMs; previous = play.world; play.advance();
   }
   if (before !== play.world.tick) field.hear(startWorld,play.world);
-  if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
-  if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
+  if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0) + (play.world.marks?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
+  if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || play.world.marks?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
   animation = requestAnimationFrame(frame);
 }
 syncClockButton();

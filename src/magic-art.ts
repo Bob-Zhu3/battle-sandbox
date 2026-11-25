@@ -1,3 +1,5 @@
+import { indexPixels } from "./pixel-art/palette.ts";
+import { segment } from "./pixel-art/stamps.ts";
 import { drawEffect } from "./pixel-art/effect-player.ts";
 import { ARMIES } from "./battlefield.ts";
 import { INK, cut, line, oval, type Pens } from "./ink.ts";
@@ -14,7 +16,7 @@ function meteorIcon(c: Pens) {
   oval(c,2.65,-2.5,1.55,1.12,"#ffe799");
 }
 
-export function drawSpellIcon(c: Pens, kind: SpellKind) {
+function paintIcon(c: Pens, kind: SpellKind) {
   c.save(); c.lineCap="round"; c.lineJoin="round";
   if (kind === "meteor") {
     c.translate(3.5,4);c.rotate(-Math.PI/4);meteorIcon(c);
@@ -31,55 +33,70 @@ export function drawSpellIcon(c: Pens, kind: SpellKind) {
   c.restore();
 }
 
-export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: number, sy: number) {
-  if (spell.kind === "wormhole") { drawWormhole(c,spell,tick,sx,sy); return; }
-  const age=tick-spell.startTick, spec=SPELLS[spell.kind], r=spec.radius;
-  if (age < 0) return;
-  const scale=Math.min(sx,sy);
-  c.save(); c.translate(spell.x*sx,spell.y*sy);
-  const after=Math.max(0,age-spec.delay), life=Math.max(0,1-age/spec.duration);
-  c.beginPath();c.ellipse(0,0,r*sx,r*sy,0,0,2*Math.PI);
-  const spent=spell.kind==="mirror" && (spell.reflection?.count??0)>=SPELLS.mirror.panes;
-  if(!spent) {
-    const colors={meteor:"#cc7541",rain:"#71b4af",gust:"#d6eed1",briar:"#69a454",fault:"#ad8c5c",mirror:"#91c8d1",freeze:"#73c5e0",lightning:"#efd470",rage:"#cb687c"};
-    c.fillStyle=colors[spell.kind]+"20";c.fill();c.strokeStyle=ARMIES[spell.team].hem;c.globalAlpha=.55*life;
-    c.lineWidth=1.6*scale;c.setLineDash([5*scale,6*scale]);c.stroke();c.setLineDash([]);
+// Each icon has one native drawing. Repeated toolbar repaints and team changes reuse it.
+const icons=new Map<SpellKind,HTMLCanvasElement>();
+export function drawSpellIcon(c: Pens,kind: SpellKind) {
+  let icon=icons.get(kind);
+  if (!icon) {
+    icon=document.createElement("canvas"); icon.width=icon.height=32;
+    const p=icon.getContext("2d")!; p.translate(16,16); paintIcon(p,kind);
+    const image=p.getImageData(0,0,32,32); indexPixels(image); p.putImageData(image,0,0);
+    icons.set(kind,icon);
   }
-  c.globalAlpha=1;
-  if(spell.kind==="meteor") {
-    if (age < spec.delay) {
-      const t = age / spec.delay;
-      oval(c,0,0,(5+10*t*t)*sx,(3+5*t*t)*sy,"#805d485a");
+  c.imageSmoothingEnabled=false; c.drawImage(icon,-16,-16);
+}
+
+const cues: Record<Exclude<SpellKind,"wormhole">,string> = {
+  meteor:"#ac6945",rain:"#589ca6",gust:"#75a38d",briar:"#618941",fault:"#907150",
+  mirror:"#659aac",freeze:"#5da8c9",lightning:"#8064ae",rage:"#aa586a",
+};
+export function drawFieldSpell(c: Pens, spell: FieldSpell, tick: number, sx: number, sy: number) {
+  if (spell.kind==="wormhole") { drawWormhole(c,spell,tick,sx,sy); return; }
+  const age=tick-spell.startTick, spec=SPELLS[spell.kind], r=spec.radius;
+  if (age<0 || age>=spec.duration) return;
+  const k=Math.min(sx,sy), after=age-spec.delay;
+  c.save(); c.translate(spell.x*sx,spell.y*sy);
+  if (after<0 || spell.kind==="rage" || (spell.kind==="mirror" && (spell.reflection?.count??0)<3)) {
+    // The outer pips are in arena coordinates, even when the viewport stretches vertically.
+    const p=Math.min(1,age/Math.max(1,spec.delay));
+    c.save(); c.globalAlpha*=after<0 ? .45+.43*p : .53;
+    c.scale(k,k);
+    for (let i=0;i<12;i++) {
+      const a=i*Math.PI/6, x=Math.cos(a)*r*sx/k, y=Math.sin(a)*r*sy/k;
+      segment(c,x,y,x-Math.sin(a)*3,y+Math.cos(a)*3,cues[spell.kind],2);
     }
-  } else if(spell.kind==="gust") {
-    const t=Math.min(1,(after+2)/21);c.strokeStyle="#fcffe9";c.globalAlpha=.85*life;c.lineWidth=2.4*scale;
-    for(let i=0;i<3;i++){c.beginPath();c.ellipse(0,0,r*sx*t,r*sy*t,0,i*2.1+age*.025,i*2.1+1.4+age*.025);c.stroke();}
+    c.restore();
+  }
+  if (spell.kind==="meteor" && after<0) {
+    const t=age/spec.delay, width=(5+13*t*t)*k;
+    c.fillStyle="#765b5466"; c.fillRect(-width,-2*k,width*2,4*k);
+    c.fillStyle="#59435144"; c.fillRect(-width*.62,-4*k,width*1.24,8*k);
+  } else if (spell.kind==="gust" && after>=0) {
+    // A fan of leaves crosses the radius at the same moment the spell shoves outwards.
+    const p=Math.min(1,(after+2)/14);
+    c.save(); c.globalAlpha*=Math.min(1,(spec.duration-age)/8);
+    c.translate(0,7*k); c.scale(1,.65);
+    drawEffect(c,"gust",0,0,after,spec.duration-spec.delay,r*(.64+1.22*p)*k);
+    c.restore();
   } else if (spell.kind==="rain") {
-    c.globalAlpha=Math.min(1,life*4);c.lineWidth=1.6*scale;c.strokeStyle="#377f8a";
-    for(let i=0;i<11;i++){
-      const dx=Math.cos(i*2.4)*r*Math.sqrt((i+1)/12);
-      const dy=Math.sin(i*2.4)*r*Math.sqrt((i+1)/12);
-      const lift=(tick*2+i*11)%19;
-      line(c,dx*sx+2*scale,dy*sy-(20-lift)*scale,dx*sx,dy*sy-(15-lift)*scale,"#6babae",1.5*scale);
-    }
+    drawEffect(c,"shower",0,-2*k,age%52,52,2*r*k);
     const dye=ARMIES[spell.team];
     for (const pulse of [SPELLS.rain.delay,48,84]) {
       const elapsed=age-pulse;
-      if(elapsed<0 || elapsed>29) continue;
-      drawEffect(c,"heal",0,0,elapsed,27,r*1.35*scale);
-      for(let i=0;i<5;i++) {
-        const t=(elapsed-i*1.2)/24;
-        if(t<0 || t>=1) continue;
-        const angle=i*2.4+pulse*.07, distance=r*(i===0?.1:.45+.12*(i%3));
-        const x=Math.cos(angle)*distance*sx, y=Math.sin(angle)*distance*sy;
-        c.save(); c.translate(x+Math.sin(t*3+i)*2*scale,y-(2+22*t)*scale); c.scale(scale,scale);
-        c.globalAlpha=Math.min(1,t*8+.28,(1-t)*4);
-        cut(c,"M-1.6 -5 L1.6 -5 L1.6 -1.6 L5 -1.6 L5 1.6 L1.6 1.6 L1.6 5 L-1.6 5 L-1.6 1.6 L-5 1.6 L-5 -1.6 L-1.6 -1.6Z",dye.coat,1.1);
-        line(c,-.7,-3.6,-.7,-1.5,dye.light,1);
-        c.restore();
+      if (elapsed<0 || elapsed>=26) continue;
+      drawEffect(c,"heal",0,3*k,elapsed,26,r*1.52*k);
+      for (let i=0;i<5;i++) {
+        const t=(elapsed-i*1.15)/21;
+        if (t<0 || t>=1) continue;
+        const a=i*2.4+pulse*.07, reach=r*(i===0?.14:.46+.10*(i%3));
+        c.save(); c.translate(Math.cos(a)*reach*sx,Math.sin(a)*reach*sy-(3+22*t)*k);
+        c.scale(k,k); c.globalAlpha*=Math.min(1,(1-t)*4);
+        c.fillStyle=dye.hem; c.fillRect(-2,-5,4,10); c.fillRect(-5,-2,10,4);
+        c.fillStyle=dye.coat; c.fillRect(-1,-4,2,8); c.fillRect(-4,-1,8,2);
+        c.fillStyle=dye.light; c.fillRect(-1,-4,1,3); c.restore();
       }
     }
-  } else if (spell.kind==="freeze" || spell.kind==="lightning" || spell.kind==="rage") drawWeatherField(c,spell,tick,sx,sy);
-  else drawSiegeSpell(c,spell,tick,sx,sy);
+  } else if (spell.kind==="freeze" || spell.kind==="rage") drawWeatherField(c,spell,tick,sx,sy);
+  else if (spell.kind==="fault" || spell.kind==="briar" || spell.kind==="mirror") drawSiegeSpell(c,spell,tick,sx,sy);
   c.restore();
 }

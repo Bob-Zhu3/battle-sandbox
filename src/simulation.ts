@@ -2,7 +2,7 @@ import { collectSouls, hasSoul, hunt, resolveConversions, type Conversion, type 
 import { advanceTunnel, digFromHome, diveWorm, type Tunnel } from "./tunnels.ts";
 import { followWormHead, initialWormBody } from "./sandworm.ts";
 import { recordTrail, type TrailMark } from "./trails.ts";
-import { applyMagic, blownAway, prepareFieldMagic, pulses, SPELLS, type FieldSpell } from "./spells.ts";
+import { applyMagic, blownAway, prepareFieldMagic, pulses, SPELLS, floorAfterCast, type SpellMark, type FieldSpell } from "./spells.ts";
 import { transportEnemies } from "./wormhole.ts";
 import { reflectAtWards } from "./mirror.ts";
 import { channelPrism, focusLens, pickTowerTarget } from "./siege.ts";
@@ -128,15 +128,17 @@ export class Battle {
   arrows: Arrow[];
   bases?: Base[];
   spells?: FieldSpell[];
+  marks?: SpellMark[];
   effects?: GroundEffect[];
 
-  constructor(tick: number, units: Unit[], arrows: Arrow[], bases?: Base[], spells?: FieldSpell[], effects?: GroundEffect[]) {
+  constructor(tick: number, units: Unit[], arrows: Arrow[], bases?: Base[], spells?: FieldSpell[], effects?: GroundEffect[], marks?: SpellMark[]) {
     this.tick = tick;
     this.units = units;
     this.arrows = arrows;
     this.bases = bases;
     if (spells?.length) this.spells = spells;
     if (effects?.length) this.effects = effects;
+    if (marks?.length) this.marks = marks;
   }
 
   // Preserve the Warrior-only view used by the original Node callers.
@@ -659,7 +661,8 @@ export function stepBattle(battle: Battle): Battle {
     if (unit.kind==="sandworm" && unit.hp>0) followWormHead(unit,from,tick);
   });
   return new Battle(tick, units, fallen.size ? arrows.filter(a => !fallen.has(a.team)) : arrows, bases,
-    portals?.length ? remaining?.filter(s => s.kind!=="wormhole" || tick<s.startTick+SPELLS.wormhole.duration) : remaining, effects);
+    portals?.length ? remaining?.filter(s => s.kind!=="wormhole" || tick<s.startTick+SPELLS.wormhole.duration) : remaining, effects,
+    floorAfterCast(battle.marks,battle.spells,tick));
 }
 
 export function battleOutcome(battle: Battle): Outcome | null {

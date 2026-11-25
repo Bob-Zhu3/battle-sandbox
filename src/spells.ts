@@ -14,8 +14,8 @@ export const SPELLS = {
   fault: { name: "Fault Line", command: "cast-fault-line", cost: 18, radius: 60, delay: 16, aftershock: 44, duration: 66,
     structureDamage: 12, troopDamage: 3, baseDamage: 3,
     description: "Two tremors crack enemy buildings. A tremor under a tunneling Miner or Sandworm forces it to surface on the spot." },
-  briar: { name: "Briar Snare", command: "cast-briar-snare", cost: 13, radius: 57, delay: 14, duration: 42, holdTicks: 78,
-    description: "Roots catch enemy feet as the thorns rise. Rooted troops can still attack. Fire burns the vines away." },
+  briar: { name: "Vines", command: "cast-briar-snare", cost: 13, radius: 57, delay: 14, duration: 42, holdTicks: 78,
+    description: "Climbing vines wrap around enemy feet. Rooted troops can still attack. Fire burns the vines away." },
   mirror: { name: "Mirror Ward", command: "cast-mirror-ward", cost: 14, radius: 46, delay: 6, duration: 180, panes: 3,
     description: "Three panes turn incoming enemy arrows and bolts back toward their source. Bullets, boulders and magic pass through." },
   freeze: { name: "Freeze", command: "cast-freeze", cost: 18, radius: 62, delay: 12, duration: 39, hold: 66, baseHold: 33,
@@ -42,6 +42,27 @@ export interface FieldSpell {
   entrance?: ArenaPoint;
   lastPassageTick?: number;
   arrivalIds?: number[]; // Units deposited inside this mouth must leave before entering it again.
+}
+
+// These records describe the floor after a cast. Only active spells participate in combat.
+export type SpellMark = Pick<FieldSpell, "id" | "kind" | "team" | "x" | "y" | "startTick" | "entrance" | "strikes">;
+export const MARK_TICKS: Record<SpellKind, number> = {
+  gust: 105, meteor: 360, rain: 160, fault: 270, briar: 180, mirror: 145,
+  freeze: 210, lightning: 225, rage: 125, wormhole: 150,
+};
+export const MAX_SPELL_MARKS = 64;
+export function floorAfterCast(old: SpellMark[] | undefined, spells: FieldSpell[] | undefined, tick: number) {
+  const visible=(m: SpellMark)=>tick<m.startTick+SPELLS[m.kind].duration+MARK_TICKS[m.kind];
+  if (!spells?.length && (!old || old.every(visible))) return old;
+  const marks = old?.filter(visible) ?? [];
+  for (const s of spells ?? []) {
+    if (tick !== s.startTick + SPELLS[s.kind].duration) continue;
+    const mark: SpellMark = { id:s.id, kind:s.kind, team:s.team, x:s.x, y:s.y, startTick:s.startTick };
+    if (s.entrance) mark.entrance = s.entrance;
+    if (s.strikes) mark.strikes = s.strikes;
+    marks.push(mark);
+  }
+  return marks.length ? marks.slice(-MAX_SPELL_MARKS) : undefined;
 }
 
 export function makeFieldSpell(id: number, kind: SpellKind, team: Team, x: number, y: number, startTick: number, entrance?: ArenaPoint): FieldSpell {

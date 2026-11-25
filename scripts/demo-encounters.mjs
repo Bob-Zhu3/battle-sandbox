@@ -33,7 +33,7 @@ try {
   const shelves = {
     People:["Warrior","Archer","Lancer","Musketeer","Venom Scout","Bomber","Miner","Clown","Shieldbearer","Engineer","Field Medic"],
     Towers:["Watchpost","Stone Lobber","Bell Tower","Sun Lens"], Mythical:["Storm Kirin","Cyclops","Frost Queen","Phoenix","Reaper","Witch","Zombie"],
-    Spells:["Healing Rain","Gust","Mirror Ward","Briar Snare","Fault Line"],
+    Spells:["Healing Rain","Gust","Mirror Ward","Vines","Fault Line"],
   };
   async function brush(team,name) {
     await click(button(page,team+" army"));
@@ -122,7 +122,7 @@ try {
     await writeFile(join(values.frames,"timeline.json"),JSON.stringify(frames));
     const characters = values.siege ? [
       ["Red","Towers","Stone Lobber","Ground splash"], ["Blue","Towers","Sun Lens","Focused sunlight"], ["Amber","Towers","Bell Tower","Interrupts charges"],
-      ["Red","Spells","Briar Snare","Roots"], ["Blue","Spells","Mirror Ward","Reflects shots"], ["Violet","Spells","Fault Line","Two tremors"],
+      ["Red","Spells","Vines","Roots"], ["Blue","Spells","Mirror Ward","Reflects shots"], ["Violet","Spells","Fault Line","Two tremors"],
     ] : values.motion ? [
       ["Blue","Mythical","Phoenix","Flight and talon strike"], ["Blue","Mythical","Cyclops","Ground smash"],
       ["Red","People","Musketeer","Recoil and reload"], ["Violet","Mythical","Storm Kirin","Chain lightning"],

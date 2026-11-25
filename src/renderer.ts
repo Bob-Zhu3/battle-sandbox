@@ -4,6 +4,8 @@ import { type ArenaPoint } from "./deployment.ts";
 import { footprint, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { drawFieldSpell } from "./magic-art.ts";
 import { iceShell, rageRibbons } from "./weather-art.ts";
+import { drawSpellMark } from "./pixel-art/spell-floor.ts";
+import { drawLightning } from "./weather-art.ts";
 import { drawMeteor } from "./meteor-art.ts";
 import { stoneMarker } from "./siege-magic-art.ts";
 import { sunbeam, TOWER_ART_SCALE, unitArtScale } from "./tower-art.ts";
@@ -91,17 +93,19 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
     if (u.hp || (u.lastHitTick !== null && tick - u.lastHitTick < 48)) visible++;
     if (u.hp && (u.petrifiedUntil ?? 0) > tick) hasStatues = true;
   }
+  for (const mark of current.marks ?? []) drawSpellMark(ctx,mark,tick,sx,sy);
   const crowd = prepareCrowd(visible, tick, ctx.canvas.width / w, hasStatues);
   for (const unit of current.units) {
     drawTrail(ctx,unit,tick,sx,sy);
     if (unit.kind === "windmill") drawFanWind(ctx,unit,tick,sx,sy);
   }
   for (const effect of current.effects ?? []) if (!isAttackTrace(effect)) drawGroundEffect(ctx, effect, tick, sx, sy);
-  for (const spell of current.spells ?? []) drawFieldSpell(ctx, spell, tick, sx, sy);
+  const spells = [...(current.spells ?? [])];
   if (tick < current.tick) for (const spell of previous.spells ?? []) {
-    const end = spell.startTick + SPELLS.wormhole.duration;
-    if (spell.kind === "wormhole" && tick < end && end <= current.tick) drawFieldSpell(ctx, spell, tick, sx, sy);
+    const end = spell.startTick + SPELLS[spell.kind].duration;
+    if (tick < end && end <= current.tick) spells.push(spell);
   }
+  for (const spell of spells) drawFieldSpell(ctx,spell,tick,sx,sy);
   if (view.portalEntrance && view.ownTeam) drawWormholeEntrance(ctx,view.portalEntrance,view.ownTeam,tick,sx,sy);
   for (const unit of current.units) if (unit.headSpot) droppedHead(ctx,unit,tick,sx,sy);
   for (const shot of current.arrows) if (shot.kind==="stone" && shot.landTick!==undefined) {
@@ -242,10 +246,13 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       drawArrow(ctx,x,y-height*scale,angle,scale*(arrow.kind==="dart"?.73:1),arrow.team,length);
     }
   }
-  for (const spell of current.spells ?? []) if (spell.kind === "meteor") drawMeteor(ctx,spell,tick,sx,sy);
+  for (const spell of spells) {
+    if (spell.kind==="meteor") drawMeteor(ctx,spell,tick,sx,sy);
+    if (spell.kind==="lightning") drawLightning(ctx,spell,tick,sx,sy);
+  }
   if (view.showIds) {
     ctx.save();
-    ctx.font = '800 16px "Barlow Condensed", sans-serif';
+    ctx.font = '400 13px "Battle Bitmap", monospace';
     ctx.textBaseline = "middle";
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";

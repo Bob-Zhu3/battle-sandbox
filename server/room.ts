@@ -160,7 +160,7 @@ export class Room {
       this.nextId++;
       const ack: PlacementAck = { type: "placement-ack", round, commandId, unitIds: [], spellId: id };
       this.gold[team]! -= price;
-      this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, this.world.bases, [...(this.world.spells ?? []), cast], this.world.effects);
+      this.world = new Battle(this.world.tick, this.world.units, this.world.arrows, this.world.bases, [...(this.world.spells ?? []), cast], this.world.effects, this.world.marks);
       player.receipts.set(commandId, { ack, type: SPELLS[spell].command, points: spots });
       return { ack, fresh: true };
     }
@@ -186,7 +186,7 @@ export class Room {
     if (live) {
       this.gold[team]! -= price;
       const recruits = createBattle(units, this.world.tick, this.world.bases).units;
-      this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases, this.world.spells, this.world.effects);
+      this.world = new Battle(this.world.tick, [...this.world.units, ...recruits], this.world.arrows, this.world.bases, this.world.spells, this.world.effects, this.world.marks);
     } else {
       this.strokes.push(stroke);
       this.rebuild();
@@ -268,7 +268,7 @@ export class Room {
     restoreUnitKinds(world);
     Object.assign(room.seats,state.seats);
     Object.assign(room.gold,state.gold);
-    room.world = new Battle(world.tick,world.units,world.arrows,world.bases,world.spells,world.effects);
+    room.world = new Battle(world.tick,world.units,world.arrows,world.bases,world.spells,world.effects,world.marks);
     for (const player of saved.players) room.players[player.team] = {token:player.token,receipts:new Map(player.receipts)};
     return room;
   }

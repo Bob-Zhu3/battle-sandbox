@@ -77,8 +77,10 @@ export function drawConditions(c: Pens, u: Unit, x: number, y: number, r: number
   c.save(); c.translate(x,y); c.scale(scale,scale);
   const radius=r/scale;
   if ((u.rootedUntil??0)>tick) {
-    cut(c,"M-9 4 Q-6 5.5 -5.4 3.6 L-7 -1.6 Q-3.8 -.5 -3.2 3.9 Q-1 5.1 3.5 4 L6.5 -.7 L5.9 3.6 L9 .9 Q8.3 8.4 2.5 7.1 Q-6 9.8 -9 4Z","#7a9b58",1);
-    line(c,-5.7,5.3,1.8,6.2,"#b7c87d",1);
+    // Hold the author's cinched frame around the feet of each troop the simulation actually rooted.
+    const left=u.rootedUntil!-tick;
+    const bind=left<12 ? .56+.40*(1-left/12) : .33+.15*(.5+.5*Math.sin((tick+u.id)*.09));
+    drawEffect(c,"vines",0,5,bind,1,Math.max(20,radius*2.5));
   }
   if ((u.slowUntil??0)>tick) {
     cut(c,"M-9 4 L-10 -2 L-6 0 L-5 -4 L-2 3 L3 4 L6 -1 L8 -4 L9 4 L5 7 L-4 7Z","#b8ecf1",1);

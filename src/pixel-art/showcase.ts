@@ -26,3 +26,21 @@ export function pixelSkirmish(play: Playground) {
   for (let i=0;i<20;i++) play.advance();
   play.paused=true;
 }
+
+// Open on the return stroke while the meteor is still in flight. All targets
+// and hit locations come from a normal playground battle.
+export function spellShowcase(play: Playground) {
+  const troops: [Team,RecruitKind,number,number][] = [
+    ["red","bomber",174,155],["red","monk",197,169],["red","warrior",215,145],
+    ["blue","lobber",241,175],["blue","harpoon",302,135],["blue","prism",356,170],
+    ["red","archer",418,184],["blue","cyclops",511,161],["red","shieldbearer",471,177],
+    ["blue","warrior",664,168],["blue","monk",695,186],["red","monk",728,163],
+    ["red","lancer",778,208],["blue","rhinorider",812,190],
+  ];
+  for (const [team,kind,x,y] of troops) play.place(team,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
+  play.cast("red","rain",173,158); play.cast("red","meteor",516,178); play.cast("red","fault",660,169);
+  for (let i=0;i<15;i++) play.advance();
+  play.cast("red","lightning",299,157); play.cast("red","briar",784,198);
+  for (let i=0;i<19;i++) play.advance();
+  play.paused=true;
+}
