@@ -2,7 +2,7 @@
 
 Paint troops onto a shared field and watch them fight, alone in the playground or against one to three other players. The project's own work is underneath the field: a deterministic combat engine, and a match server that charges each purchase once even when a reply is lost, a player reconnects or the server crashes mid-save.
 
-[Play online](https://bob-zhu3.github.io/battle-sandbox/) · [How to play, the full roster and demo scenes](docs/gameplay.md)
+[Play online](https://bob-zhu3.github.io/battle-sandbox/) · [How to play](docs/gameplay.md) · [Live demo guide](docs/defense.md)
 
 ![A paused 200-troop playground battle at tick 70. The blue and red front lines have met, and 188 troops are still standing.](media/playground-crowd.png)
 
@@ -10,7 +10,7 @@ Paint troops onto a shared field and watch them fight, alone in the playground o
 
 - **Starting point.** An empty TypeScript canvas project, tagged [`project-start`](https://github.com/Bob-Zhu3/battle-sandbox/tree/project-start) at commit `6019281`. Everything after the tag is project work: [all changes since the start](https://github.com/Bob-Zhu3/battle-sandbox/compare/project-start...main).
 - **Change from the proposal.** This game replaces the agent-delivery simulator in the proposal. A live match puts concurrent purchases, reconnects and a server crash on screen in two browser windows at once.
-- **Who did what.** Bob Zhu chose the game and directed each change. OpenAI Codex wrote the code, tests and demo scripts from those prompts. The [commit history](https://github.com/Bob-Zhu3/battle-sandbox/commits/main) records each step.
+- **Team and contributions.** Bob Zhu and Cunzhou Ran are the team on the original proposal. Bob chose the game, specified the combat rules and set the expected outcome for the two server crashes. OpenAI Codex implemented the game, tests and demo scripts, ran the checks and helped prepare the writeup. The [commit history](https://github.com/Bob-Zhu3/battle-sandbox/commits/main) records the changes.
 - **Reused.** Vite serves and bundles the game, `ws` carries local WebSocket traffic, `sirv` serves the production build, Playwright drives the browser checks, and Node's built-in SQLite backs the local crash check and the hosted-match tests. Fonts come from Fontsource. Sound effects are edited CC0 recordings credited in [src/audio/SOURCES.md](src/audio/SOURCES.md). GitHub Pages hosts the public game. The hosted match service is configured in [.openai/hosting.json](.openai/hosting.json) and keeps matches in a D1 SQLite database.
 
 ## Components
