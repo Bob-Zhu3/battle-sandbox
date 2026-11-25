@@ -316,7 +316,7 @@ async function paletteAndMeteor(url) {
               if(pixels[i+3]>110 && r>178 && r>g*1.15 && g>b*1.4) wake[Math.floor((dy-9)/5)]++;
             }
           }
-          return {x:x/canvas.width*960,y:y/canvas.height*360,wake};
+          return {x:x/canvas.width*960,y:y/canvas.height*360,hotPixels:n,wake};
         });
       }
       await page.clock.runFor(48);const entry=await core();
@@ -325,6 +325,7 @@ async function paletteAndMeteor(url) {
       assert.ok(middle && middle.y>groundY*.28 && middle.y<groundY*.56);
       await page.clock.runFor(100);const later=await core();
       if(width===960) {
+        assert.ok(middle.hotPixels>=50,"The enlarged Meteor has a legible white-hot seam at normal scale");
         const difference=later.wake.reduce((total,pixels,i)=>total+Math.abs(pixels-middle.wake[i]),0);
         assert.ok(difference>middle.wake.reduce((a,b)=>a+b,0)*.10,"The wake changes shape after aligning the two moving cores");
         assert.deepEqual(await core(),later,"The same frozen frame holds the same cinders");

@@ -3,7 +3,7 @@ import { disabledUntil, type GroundEffect, type Hit } from "./conditions.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { exposed, nearestEnemy } from "./targeting.ts";
 import { hasSoul } from "./transformations.ts";
-import { footprint, isBuilding, UNIT_DEFINITIONS as defs } from "./units.ts";
+import { footprint, isBuilding, rhinoCharging, UNIT_DEFINITIONS as defs } from "./units.ts";
 
 export interface Impulse { id: number; dx: number; dy: number }
 type Point = {x: number; y: number};
@@ -144,7 +144,7 @@ export function continueFlurry(u: Unit, targets: readonly Target[], tick: number
 
 // Secondary hits use the same opening positions and damage ledger as ordinary melee.
 export function rosterStrike(u: Unit, primary: Target, targets: readonly Target[], tick: number, hit: Hit,
-  healing: Map<number,number>, impulses: Impulse[]) {
+  healing: Map<number,number>, impulses: Impulse[], effects: GroundEffect[]) {
   const spec=defs[u.kind];
   const damage=(t: Target,amount: number)=>hit(t,amount,u.team);
   switch (u.kind) {
@@ -162,10 +162,12 @@ export function rosterStrike(u: Unit, primary: Target, targets: readonly Target[
       break;
     }
     case "rhinorider": {
-      const charged=(u.runUp ?? 0)>=defs.rhinorider.runUp;
+      const charged=rhinoCharging(u);
       damage(primary,spec.damage+(charged ? defs.rhinorider.bonus : 0));
       if (charged) {
         u.runUp=0; u.lastChargeTick=tick;
+        const edge = primary.kind === "base" ? BASE_RADIUS : footprint(primary);
+        effects.push({kind:"smash", team:u.team, tick, radius:22, x:primary.x-u.aimX*edge, y:primary.y-u.aimY*edge});
         for (const t of enemies(u,targets,spec.reach+9)) {
           if (!mobile(t) || !inCone(u,t,spec.reach+9,22)) continue;
           if (t.id!==primary.id) damage(t,5);

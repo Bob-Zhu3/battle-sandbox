@@ -123,8 +123,8 @@ const recruits = {
     cost: 20, bounty: 10, attack: "melee", radius: 14, maxHp: troopHealth(44), speed: 86, reach: 42, damage: 9, cooldownTicks: 42, kickDamage: 7,
   },
   rhinorider: {
-    name: "Rhino Rider", command: "place-rhino-riders", description: "Lowers its horn after a straight run and plows through the front rank. At close range it keeps jabbing. Stuns cut the charge short.",
-    cost: 28, bounty: 14, attack: "melee", radius: 17, maxHp: troopHealth(69), speed: 108, reach: 50, damage: 10, cooldownTicks: 57, runUp: 46, bonus: 9, shove: 39,
+    name: "Rhino Rider", command: "place-rhino-riders", description: "Give it room to run. It lowers its horn, breaks into a gallop and shoves the front rank on contact. Close up it jabs. A stun or sharp turn breaks its charge.",
+    cost: 28, bounty: 14, attack: "melee", radius: 17, maxHp: troopHealth(69), speed: 108, reach: 50, damage: 10, cooldownTicks: 57, runUp: 46, chargeSpeed: 252, hornReach: 7, bonus: 9, shove: 39,
   },
   trojanhorse: {
     name: "Trojan Horse", command: "place-trojan-horses", description: "Rams an enemy and opens its hatch for two Warriors. Break the horse on the way and its passengers spill out early.",
@@ -198,6 +198,8 @@ export const UNIT_DEFINITIONS = { ...recruits, pig: {
 } } as const;
 export type RecruitKind = keyof typeof recruits;
 export type UnitKind = keyof typeof UNIT_DEFINITIONS;
+export const rhinoCharging = (unit: {kind: UnitKind; runUp?: number}) =>
+  unit.kind === "rhinorider" && (unit.runUp ?? 0) >= recruits.rhinorider.runUp;
 export const RECRUIT_KINDS = Object.keys(recruits) as RecruitKind[];
 export const UNIT_KINDS = Object.keys(UNIT_DEFINITIONS) as UnitKind[];
 export const isBuilding = (kind: UnitKind) => UNIT_DEFINITIONS[kind].speed === 0;

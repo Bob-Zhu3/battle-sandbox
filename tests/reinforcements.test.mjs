@@ -112,6 +112,59 @@ test("the rear Lion Dancer kicks, and stun stops a ready Rhino",()=>{
   assert.equal(unit(run,1).runUp,0);assert.equal(unit(run,1).lastChargeTick,undefined);
 });
 
+test("a Rhino gallops after a straight approach, hits the front rank once at horn range, and resumes from a snapshot",()=>{
+  const spec=defs.rhinorider;
+  let w=fight("rhinorider",[warrior(2,600),warrior(3,609,194),warrior(4,608,244)]);
+  const first=step(w);
+  assert.ok(Math.abs(unit(first,1).x-unit(w,1).x-spec.speed/60)<1e-8);
+  while (!unit(w,1).lastChargeReadyTick && w.tick<60) w=step(w);
+  const ready=w;
+  w=step(w);
+  assert.ok(Math.abs(unit(w,1).x-unit(ready,1).x-spec.chargeSpeed/60)<1e-8);
+  assert.ok(unit(w,1).trail.length);
+  while (!unit(w,1).lastChargeTick && w.tick<100) {
+    assert.equal(unit(w,2).hp,defs.warrior.maxHp);
+    const previous=w;
+    w=step(w);
+    if (unit(w,1).lastChargeTick) {
+      assert.ok(unit(previous,2).x-unit(previous,1).x<=spec.radius+defs.warrior.radius+spec.hornReach);
+      assert.ok(battleCues(previous,w).some(c=>c.kind==="smash"));
+    }
+  }
+  assert.equal(unit(w,1).lastChargeTick,w.tick);
+  assert.equal(unit(w,2).hp,defs.warrior.maxHp-spec.damage-spec.bonus);
+  assert.ok(unit(w,2).x>600 && unit(w,3).x>609);
+  assert.ok(unit(w,3).hp<defs.warrior.maxHp);
+  assert.equal(unit(w,4).hp,defs.warrior.maxHp);
+  assert.equal(unit(w,1).runUp,0);
+  const settled=step(w,14);
+  assert.equal(unit(settled,2).hp,unit(w,2).hp);
+  assert.deepEqual(json(step(json(ready),settled.tick-ready.tick)),json(settled));
+});
+
+test("a stun stops a galloping Rhino immediately, and a turn into a close enemy gives an ordinary jab",()=>{
+  const spec=defs.rhinorider;
+  const running=step(fight("rhinorider",[warrior(2,690)]),37);
+  const rider=unit(running,1);
+  assert.ok(rider.runUp>=spec.runUp);
+  const halted=json(running);
+  halted.spells=[spell(halted,"lightning","blue",rider.x)];
+  let w=step(halted);
+  assert.equal(unit(w,1).x,rider.x);
+  assert.equal(unit(w,1).runUp,0);
+  const until=unit(w,1).stunnedUntil;
+  w=step(w,until-w.tick-1);
+  assert.equal(unit(w,1).x,rider.x);
+  w=step(w);
+  assert.ok(Math.abs(unit(w,1).x-rider.x-spec.speed/60)<1e-8);
+  const turned=json(running);
+  unit(turned,2).x=rider.x-34;
+  w=step(turned);
+  assert.equal(unit(w,1).lastChargeTick,undefined);
+  assert.equal(unit(w,2).hp,defs.warrior.maxHp-spec.damage);
+  assert.equal(unit(w,2).knockback,undefined);
+});
+
 test("Trojan Horse unloads just once on contact or destruction and never after losing its base",()=>{
   for(const killed of [false,true]) {
     let w=fight("trojanhorse",[warrior(2,killed?580:442)]);

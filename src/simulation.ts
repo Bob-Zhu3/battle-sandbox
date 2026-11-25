@@ -14,7 +14,7 @@ import { finishTreatments, medicDuty } from "./medic.ts";
 import { nearestEnemy } from "./targeting.ts";
 import type { Arrow } from "./arrows.ts";
 import { advanceShot, applyClouds, deflectHead, releaseShot } from "./shots.ts";
-import { currentUnitKind, footprint, isHuman, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { currentUnitKind, footprint, isHuman, rhinoCharging, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
 import { continueFlurry, eruptWorm, releaseTelegraph, rosterStrike, rosterTarget, startTelegraph, type Impulse } from "./roster-attacks.ts";
 import { settleTroopBodies } from "./roster-life.ts";
 import { blowFan, firstFanContact, type FanContact } from "./windmill.ts";
@@ -181,13 +181,17 @@ export function createDuel(): Battle {
 }
 
 export type Target = Unit | Base;
+const straightRun = .93; // Cosine of the largest turn that can carry a run-up.
 function walkSpeed(unit: Unit) {
   const stride=unit.kind==="werewolf" && unit.wolfUntil!==undefined ? 1.45 : unit.smallSlime && unit.kind==="slime" ? 1.18 : 1;
-  return UNIT_DEFINITIONS[unit.kind].speed * stride * (unit.raging ? SPELLS.rage.speedFactor : 1);
+  const speed = rhinoCharging(unit) ? UNIT_DEFINITIONS.rhinorider.chargeSpeed : UNIT_DEFINITIONS[unit.kind].speed;
+  return speed * stride * (unit.raging ? SPELLS.rage.speedFactor : 1);
 }
 function moveToward(unit: Unit, x: number, y: number, stopAt: number) {
   const dx = x - unit.x, dy = y - unit.y;
   const distance = Math.hypot(dx, dy);
+  if (unit.kind === "rhinorider" && (unit.knockback || unit.rootedUntil !== undefined ||
+      dx*unit.aimX + dy*unit.aimY <= straightRun*distance)) unit.runUp = 0;
   unit.aimX = distance > 0 ? dx / distance : ARMIES[unit.team].facing;
   unit.aimY = distance > 0 ? dy / distance : 0;
   if (distance > stopAt && unit.rootedUntil === undefined) {
@@ -512,13 +516,14 @@ export function stepBattle(battle: Battle): Battle {
       startCyclopsSwing(next, starting, target, tick, distance);
       return next;
     }
-    if (definition.attack !== "lightning" && distance <= reach && tick >= unit.nextAttackTick) {
+    const attackReach = rhinoCharging(next) ? Math.min(reach, stopAt + UNIT_DEFINITIONS.rhinorider.hornReach) : reach;
+    if (definition.attack !== "lightning" && distance <= attackReach && tick >= unit.nextAttackTick) {
       if (startTelegraph(next,target,tick)) return next;
       if (unit.kind==="snowman" && next.snowStock===0) return next;
       next.nextAttackTick = tick + definition.cooldownTicks;
       next.lastAttackTick = tick;
       next.attackDirection = { x: next.aimX, y: next.aimY };
-      if (rosterStrike(next,target,targets,tick,hit,healing,impulses)) return next;
+      if (rosterStrike(next,target,targets,tick,hit,healing,impulses,effects)) return next;
       if (definition.attack === "melee") {
         let amount: number = definition.damage;
         if (unit.kind === "lancer" && (unit.runUp ?? 0) >= UNIT_DEFINITIONS.lancer.runUp) {
@@ -600,8 +605,10 @@ export function stepBattle(battle: Battle): Battle {
       unit.pace += ((speed ? Math.min(1, distance / speed) : 0) - unit.pace) * .3;
     }
     if ((unit.kind === "lancer" || unit.kind==="rhinorider") && unit.lastChargeTick !== tick) {
-      const straight = unit.aimX * from.aimX + unit.aimY * from.aimY > 0.93;
-      unit.runUp = distance > 0.15 && straight && !from.knockback && !unit.knockback && unit.rootedUntil===undefined && !control.shocks.has(unit.id) && tick >= disabledUntil(unit) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
+      const straight = unit.aimX * from.aimX + unit.aimY * from.aimY > straightRun;
+      const forward = (unit.x-from.x)*unit.aimX + (unit.y-from.y)*unit.aimY;
+      const pursuing = unit.kind !== "rhinorider" || (unit.targetId !== null && tick >= unit.nextAttackTick && forward > .85*distance);
+      unit.runUp = distance > 0.15 && straight && pursuing && !from.knockback && !unit.knockback && unit.rootedUntil===undefined && !control.shocks.has(unit.id) && tick >= disabledUntil(unit) ? Math.min(60, (from.runUp ?? 0) + Math.min(distance, speed)) : 0;
       const threshold=UNIT_DEFINITIONS[unit.kind].runUp;
       if ((from.runUp ?? 0) < threshold && unit.runUp >= threshold) unit.lastChargeReadyTick=tick;
     }

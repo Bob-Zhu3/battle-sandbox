@@ -6,7 +6,7 @@ import type { Pens } from "../ink.ts";
 const base: Record<string, string> = {
   K: "#242339", m: "#516077", S: "#91acb4", I: "#e4eee4",
   b: "#684856", r: "#aa6654", f: "#e79c73", F: "#ffcf93",
-  Y: "#ffc660", y: "#bd7746", W: "#fff2c4", t: "#84434e",
+  Y: "#ffc660", y: "#bd7746", W: "#fff2c4", H: "#fffce8", t: "#84434e",
   O: "#ff793d", R: "#c43b45", v: "#85394f", g: "#6c9976",
   j: "#3c7181", a: "#74d0ce",
 };

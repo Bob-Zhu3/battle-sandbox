@@ -6,16 +6,16 @@ Paint troops onto a shared field and watch them fight, alone in the playground o
 
 Run `npm run demo:spells` for a paused volley of lightning, a falling meteor, and a fault opening beneath the front line. Press Space to see the impacts and their fading marks, then choose a spell to cast it yourself.
 
-On the pixel-art branch, run `npm run demo:pixels` to open a 32-troop skirmish just before a meteor lands. Press Space to play, or place your own troops on the field. The same artwork runs in the playground, duels and free-for-all matches. [Pixel effects and credits](third_party/pixelfx/README.md)
+Run `npm run demo:pixels` to open a 32-troop skirmish just before a meteor lands. The pixel artwork runs in the playground, duels and free-for-all matches. To watch a Rhino Rider build up speed and scatter a front rank, open the [charge demo](https://bob-zhu3.github.io/battle-sandbox/?demo=rhino) and press Play.
 
-![A paused 200-troop playground battle at tick 70. The blue and red front lines have met, and 188 troops are still standing.](media/playground-crowd.png)
+![A flaming Meteor drops toward a Cyclops as lightning strikes the towers. The selected Meteor card shows the same cracked stone.](media/spell-volley.png)
 
 ## Starting point and contributions
 
 - **Starting point.** An empty TypeScript canvas project, tagged [`project-start`](https://github.com/Bob-Zhu3/battle-sandbox/tree/project-start) at commit `6019281`. Everything after the tag is project work: [all changes since the start](https://github.com/Bob-Zhu3/battle-sandbox/compare/project-start...main).
 - **Change from the proposal.** This game replaces the agent-delivery simulator in the proposal. A live match puts concurrent purchases, reconnects and a server crash on screen in two browser windows at once.
 - **Team and contributions.** Bob Zhu and Cunzhou Ran shared the game design and the work of deciding how multiplayer should behave when something goes wrong. Bob specified troop interactions and the expected results of the two server crashes. Cunzhou helped design how matches should handle failures and proposed cases to test that behavior. OpenAI Codex implemented the game, tests and demo scripts, ran the checks and helped prepare the writeup. The [commit history](https://github.com/Bob-Zhu3/battle-sandbox/commits/main) records the changes.
-- **Reused.** Vite serves and bundles the game, `ws` carries local WebSocket traffic, `sirv` serves the production build, Playwright drives the browser checks, and Node's built-in SQLite backs the local crash check and the hosted-match tests. Fonts come from Fontsource. Sound effects are edited CC0 recordings credited in [src/audio/SOURCES.md](src/audio/SOURCES.md). GitHub Pages hosts the public game. The hosted match service is configured in [.openai/hosting.json](.openai/hosting.json) and keeps matches in a D1 SQLite database.
+- **Reused.** Vite bundles the game, `ws` carries local WebSocket traffic, `sirv` serves the production build, Playwright drives the browser checks, and Node's built-in SQLite backs the local crash check and the hosted-match tests. The [animation credits](third_party/pixelfx/README.md) and [sound credits](src/audio/SOURCES.md) list the sources used. GitHub Pages hosts the public game. The [hosted match service](.openai/hosting.json) keeps matches in a D1 SQLite database.
 
 ## Components
 

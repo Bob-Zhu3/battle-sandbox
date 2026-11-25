@@ -2,7 +2,7 @@ import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { cut, eye, FACE, INK, IRON, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import { crystalFocus, crystalLift } from "./prism-art.ts";
 import type { Unit } from "./simulation.ts";
-import { UNIT_DEFINITIONS } from "./units.ts";
+import { rhinoCharging, UNIT_DEFINITIONS } from "./units.ts";
 import { FAN_HUB_HEIGHT, FAN_HUB_OFFSET, fanGustProgress, MILL_MODEL_SCALE } from "./fan-wind.ts";
 
 export type ExpeditionKind = "monk" | "liondancers" | "rhinorider" | "trojanhorse" |
@@ -166,33 +166,39 @@ function rhinoLeg(c: Pens, hip: number, stride: number, color: string) {
 
 function rhinoRider(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const rush = Math.min(1, (u?.runUp ?? 0) / UNIT_DEFINITIONS.rhinorider.runUp);
+  const galloping = u && rhinoCharging(u) && tick >= (u.lastChargeReadyTick ?? 0);
+  const stride = p.step * (galloping ? 1.95 : 1);
+  const impact = eventFade(tick, u?.lastChargeTick, 12);
   const jab = eventFade(tick, u?.lastAttackTick, 16);
   const tuck = Math.max(rush, p.ready * .67);
-  rhinoLeg(c, -8.2, -p.step, farHide); rhinoLeg(c, 7.4, p.step, farHide);
-  c.translate(1.2 * jab, -p.lift * 1.6 - .35 * p.breath);
+  if (galloping) c.translate(0,-2.3*Math.max(0,p.step));
+  rhinoLeg(c, -8.2, -stride, farHide); rhinoLeg(c, 7.4, stride, farHide);
+  c.translate(1.2 * jab + 1.9 * impact, -p.lift * 1.6 - .35 * p.breath + rush);
   c.save(); c.translate(-11, -3); c.rotate(.14 * p.step + .4 * tuck);
   line(c, 0, 0, -5.3, 2.1, INK, 1.3); oval(c, -5.45, 2.25, 1.55, 1.15, farHide); c.restore();
   cut(c, "M-13.65 -2.35 C-14.2 -8.25 -9.5 -11.1 -5.25 -10.7 Q-1.5 -12.3 3.1 -10.45 Q8.25 -13.05 11 -8.5 L12 .2 Q9.4 4.8 3.6 4.9 Q-.3 6.6 -4.75 4.5 Q-11.95 5.75 -13.65 -2.35Z", hide, 1.3);
-  rhinoLeg(c, -8.75, p.step, hide); rhinoLeg(c, 4.9, -p.step, hide);
+  rhinoLeg(c, -8.75, stride, hide); rhinoLeg(c, 4.9, -stride, hide);
   cut(c, "M-8.9 -9.1 Q-5.4 -10.8 -1.6 -10.25 L.3 -4.1 L-2 .25 Q-6.65 .85 -9.35 -1.95Z", d.coat, 1);
   cut(c, "M-8.4 -2.55 Q-4.35 -.45 -1 -.95 L-2 .35 Q-6.35 1 -8.95 -1Z", d.light, .6);
-  c.save(); c.translate(7.9, -5.75); c.rotate(.2 * tuck - .4 * jab + .065 * p.pitch);
+  c.save(); c.translate(7.9 + rush, -5.75 + 2*rush); c.rotate(.18 * tuck + .51*rush - .4 * jab - .24*impact + .065 * p.pitch);
   cut(c, "M-2.95 -2.2 Q-5.95 -7.35 -3.5 -10.8 Q-.75 -10.1 .1 -6.6 Q2.2 -8.1 4.65 -6.95 Q8 -6.2 8.45 -3.25 Q12.55 -3.9 13.15 -.85 Q14 2.9 10.3 3.8 Q5.4 5.1 1.65 2.65 Q-2.5 2.3 -2.95 -2.2Z", hide, 1.2);
   cut(c, "M7.7 -3.15 Q9.2 -7.15 9.05 -9.65 Q11.35 -7.1 11.05 -3.25Z", "#e6d8b6", .8);
   cut(c, "M10.35 -2.55 Q16.1 -6.25 18.1 -11.3 Q18.75 -4.15 13.35 -.95Z", ivory, 1.1);
   eye(c, 4.25, -3.1, 1.8, 1.44 - .55 * tuck - 1.22 * p.blink, p.lookX, p.lookY);
   oval(c, 11.7, 1.15, .85, .65, INK); c.restore();
-  c.save(); c.translate(-3.8, -9.9); c.rotate(.28 * tuck + .07 * p.step - .16 * jab);
+  c.save(); c.translate(-3.8 + 2*rush, -9.9 + rush); c.rotate(.24 * tuck + .39*rush + .07 * p.step - .16 * jab - .24*impact);
   cut(c, "M-4.1 -.1 Q-4.2 -4.85 -.9 -6.1 Q2.65 -7.25 4.35 -3.75 L5.25 .9 L2.1 2.65Z", d.hem, .95);
   limb(c, 1.4, .8, 4.7, 3.65, leather, 2.15); line(c, 4.65, 3.65, 6.65, 3.65, INK, 1.9);
   oval(c, .8, -8.25, 3, 3.2, INK); oval(c, 1.25, -8.15, 2.55, 2.75, FACE);
   cut(c, "M-2.8 -8.85 Q-3.15 -12.55 .15 -12.8 Q3.45 -13.6 4.25 -10.1 L5.35 -9.5 Q2.35 -9.4 .75 -9.95 Q-1 -8.4 -2.8 -8.85Z", d.coat, .9);
   oval(c, 2.75, -8, .75, .8, INK);
-  cut(c, "M-2 -6.85 Q-5.45 -6.1 -8.7 -9.15 Q-7.55 -5 -5.75 -4.4 L-2 -5.1Z", d.light, .7);
+  c.save(); c.translate(-2,-6); c.rotate(-.7*rush); c.scale(1+.55*rush,1);
+  cut(c, "M0 -.85 Q-3.45 .1 -6.7 -3.15 Q-5.55 1 -3.75 1.6 L0 .9Z", d.light, .7);
+  c.restore();
   limb(c, 2.15, -3.15, 6.1 + 1.75 * tuck, -2.15, FACE, 1.5);
   c.restore();
   c.strokeStyle = leather; c.lineWidth = .95; c.beginPath();
-  c.moveTo(3 + tuck, -11.9); c.quadraticCurveTo(8.6, -5.2 + 1.3 * p.step, 18.5, -5.4 + 2.1 * tuck - 3.7 * jab); c.stroke();
+  c.moveTo(3 + 4*tuck, -11.9 + 2*rush); c.quadraticCurveTo(8.6, -5.2 + 1.3 * p.step - 2*rush, 18.5, -5.4 + 7.3 * rush - 3.7 * jab); c.stroke();
 }
 
 function wheel(c: Pens, x: number, y: number, radius: number, spin: number, trim: string) {

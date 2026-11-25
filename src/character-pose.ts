@@ -108,7 +108,7 @@ export function characterPose(unit: Unit, target: Target | undefined, tick: numb
 }
 
 const strideLength: Partial<Record<UnitKind, number>> = {
-  warrior: 4.8, lancer: 6.2, shieldbearer: 5.7, kirin: 6.9, cyclops: 11.5, zombie: 7.7,
+  warrior: 4.8, lancer: 6.2, shieldbearer: 5.7, rhinorider: 8.4, kirin: 6.9, cyclops: 11.5, zombie: 7.7,
 };
 
 // Shoulder and wrist reverse at different times. The long, nearly level

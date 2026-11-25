@@ -82,7 +82,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Engineer | 21 | 10 | Hammers together one Watchpost near the fight, then repairs damaged machines. |
 | Monk | 18 | 9 | Plants his feet and throws four alternating punches down a short lane. Each punch hits every enemy still in its path. |
 | Lion Dancers | 20 | 10 | The front dancer bites while the rear dancer kicks an enemy crowding the tail. |
-| Rhino Rider | 28 | 14 | A straight run lowers the horn for a shove through the front rank. It can jab from a standing start. |
+| Rhino Rider | 28 | 14 | Give it 46 units of straight running room. It lowers its horn and gallops at 252 units per second, dealing 19 damage to the target and shoving nearby enemies in front. A stun or sharp turn breaks the charge. Up close it jabs for 10. |
 | Clockmouse | 8 | 4 | A squeak at a Cyclops's boots can interrupt a raised club, even on its own team. |
 | Bolt Drone | 15 | 7 | Commits to one line for a three-bolt burst. A sidestepping enemy can escape the later shots. |
 | Trojan Horse | 36 | 6 | Rams an enemy and drops a hatch for two Warriors. Destroying the horse en route releases them early. |

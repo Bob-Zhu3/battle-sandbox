@@ -2,24 +2,17 @@ import { indexPixels } from "./pixel-art/palette.ts";
 import { segment } from "./pixel-art/stamps.ts";
 import { drawEffect } from "./pixel-art/effect-player.ts";
 import { ARMIES } from "./battlefield.ts";
-import { INK, cut, line, oval, type Pens } from "./ink.ts";
+import { INK, line, oval, type Pens } from "./ink.ts";
+import { drawMeteorPortrait } from "./meteor-art.ts";
 import { SPELLS, type FieldSpell, type SpellKind } from "./spells.ts";
 import { drawSiegeSpell, siegeSpellIcon } from "./siege-magic-art.ts";
 import { drawWeatherField, weatherIcon } from "./weather-art.ts";
 import { drawWormhole, wormholeIcon } from "./legend-effects.ts";
 
-function meteorIcon(c: Pens) {
-  c.lineJoin="round";
-  cut(c,"M-4.8 -1.6 Q-6.5 -6.7 -5.4 -12.8 Q-2.7 -10.15 -2.3 -8.3 Q.1 -13.05 -.8 -17 Q4.5 -12.1 4.9 -4.0 L3.7 -1Z","#f4ae58",1);
-  cut(c,"M-6.25 -.55 Q-5.95 -5.35 -1.95 -6.55 Q2.5 -7.3 5.55 -3.6 Q7.55 .25 5.1 4.45 Q2.1 7.3 -2.85 5.85 Q-6.3 4.05 -6.25 -.55Z","#e7924c",1.55);
-  cut(c,"M-4.55 -.5 Q-2.95 1.1 -.6 2.1 Q1.7 2.4 2.8 4.1 Q.4 5.6 -2.1 4.3 Q-4.45 2.95 -4.55 -.5Z","#b86946",0);
-  oval(c,2.65,-2.5,1.55,1.12,"#ffe799");
-}
-
 function paintIcon(c: Pens, kind: SpellKind) {
   c.save(); c.lineCap="round"; c.lineJoin="round";
   if (kind === "meteor") {
-    c.translate(3.5,4);c.rotate(-Math.PI/4);meteorIcon(c);
+    drawMeteorPortrait(c);
   } else if (kind === "gust") {
     const curls=new Path2D("M-11 -4 Q-4 -7 2 -4 Q10 0 9 -6 M-12 2 Q-6 -1 1 2 Q8 5 12 1 M-6 7 Q0 5 5 8");
     c.strokeStyle=INK;c.lineWidth=3.3;c.stroke(curls);c.strokeStyle="#a6d9c5";c.lineWidth=1.65;c.stroke(curls);

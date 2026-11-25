@@ -77,7 +77,7 @@ game.addEventListener("brushchange",()=>{
 if (demo === "spells") {
   spellShowcase(play);
   previous=play.world;
-  field.armBrush("lightning");
+  field.armBrush("meteor");
 } else if (demo === "pixels") {
   pixelSkirmish(play);
   previous=play.world;
@@ -108,6 +108,12 @@ if (demo === "spells") {
   previous = play.world;
   play.paused = true;
   field.armBrush("wormhole");
+} else if (demo === "rhino") {
+  play.place("red",{type:"place-rhino-riders",positions:[{x:310,y:178}]});
+  play.place("blue",{type:"place-warriors",positions:[{x:570,y:178},{x:589,y:161},{x:589,y:195}]});
+  previous=play.world;
+  play.paused=true;
+  field.armBrush("rhinorider");
 } else if (demo === "monk") {
   play.place("red",{type:"place-monks",positions:[{x:424,y:180}]});
   play.place("blue",{type:"place-archers",positions:[{x:451,y:180},{x:471,y:183}]});

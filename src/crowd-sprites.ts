@@ -110,7 +110,7 @@ export function drawCrowdUnit(ctx: CanvasRenderingContext2D, x: number, y: numbe
   // display time. Refresh again precisely when the drawn timeline crosses it.
   const due = (event: number | null | undefined) => event != null && event > stamp.paintTick && event <= tick;
   const eventStarted = due(unit.lastAttackTick) || due(unit.lastAttentionTick) || due(unit.lastDrawTick) ||
-    due(unit.lastBraceTick) || due(unit.arc?.tick) || due(unit.windup?.since) || due(unit.lastSmashTick);
+    due(unit.lastBraceTick) || due(unit.lastChargeReadyTick) || due(unit.arc?.tick) || due(unit.windup?.since) || due(unit.lastSmashTick);
   const changingPose = stamp.frame !== poseFrame && (!infantry || visiblyMoved(stamp.pose, pose));
   if (resized || changingPose || eventStarted || stamp.side !== pose.side || stamp.flash !== flash || actionChanged(stamp.snapshot, unit)) {
     if (resized) {

@@ -33,7 +33,7 @@ const sequences = [
   ["faultFloor", "nature/quake", 2.05, 2.63, 8, 112, { palette:strata }],
   ["crater", "fire/meteor", 2.52, 4.40, 11, 112],
   ["fulgurite", "lightning/lightning-strike", 1.86, 2.73, 9, 112, { seed:23, light:.36 }],
-  ["comet", "fire/fireball", .08, 1.16, 18, 84, { light:.40 }],
+  ["comet", "fire/fireball", .08, 1.16, 18, 136, { light:.40 }],
   boltSequence("thunder",23),
   boltSequence("thunderLeft",5),
   boltSequence("thunderRight",72),

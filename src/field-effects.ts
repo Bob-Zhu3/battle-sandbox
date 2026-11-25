@@ -39,6 +39,15 @@ export function drawTrail(c: Pens,u: Unit,tick: number,sx: number,sy: number) {
     } else if(kind==="spark") {
       c.translate(0,side*3); line(c,-4,1,-1,-1,"#528b98",1.7);line(c,-1,-1,1,.2,"#528b98",1.7);line(c,1,.2,4,-3,"#528b98",1.7);
       line(c,-1,-1,1,.2,"#fff4ad",.95);line(c,1,.2,4,-3,"#fff4ad",.95);
+    } else if(kind==="dust") {
+      // A hoof print stays on the ground while three pieces of turf lift off it.
+      const p = Math.min(1,age/23);
+      c.globalAlpha = (1-p)*.85;
+      c.translate(side*3,2);
+      c.fillStyle="#a68c70"; c.fillRect(-3,0,5,2);
+      const lift=Math.round(8*Math.sin(Math.PI*p)), spread=Math.round(p*6);
+      c.fillStyle="#bda585"; c.fillRect(-3-spread,-lift,4,3); c.fillRect(2+spread,-lift-2,3,3);
+      c.fillStyle="#dcc5a0"; c.fillRect(-2-spread,-lift-1,3,2);
     } else if(kind==="track" || kind==="shuffle") {
       c.translate(0,side*(kind==="track"?4:2.6));c.rotate(side*.23);
       oval(c,0,1,kind==="track"?5.2:3.2,kind==="track"?2.15:1.35,kind==="track"?"#aa9270":"#899967");

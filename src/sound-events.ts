@@ -107,7 +107,7 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
       if(u.beam && fresh(u.beam.tick))add("lens",u.x,u.id,u.beam.tick);
       if(u.arc && fresh(u.arc.tick)){add("howl",u.x,u.id,u.arc.tick);add("thunder",u.x,u.id,u.arc.tick);}
       if(!fresh(u.lastAttackTick))continue;
-      const sound=attacks[u.kind];
+      const sound=u.kind==="rhinorider" && u.lastChargeTick===u.lastAttackTick ? "smash" : attacks[u.kind];
       if(sound)add(sound,u.x,u.id,u.lastAttackTick);
     }
   }
