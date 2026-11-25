@@ -1,5 +1,7 @@
 
 import { drawEffect, drawSkyStrike } from "./pixel-art/effect-player.ts";
+import { effects } from "./pixel-art/effects.ts";
+import { stamp } from "./pixel-art/stamps.ts";
 import { cut, line, oval, type Pens } from "./ink.ts";
 import { SPELLS, type FieldSpell } from "./spells.ts";
 
@@ -49,16 +51,24 @@ export function drawWeatherField(c: Pens,s: FieldSpell,tick: number,sx: number,s
   }
 }
 
-export function iceShell(c: Pens,x: number,y: number,r: number,remaining: number) {
-  c.save();c.translate(x,y);c.scale(r/12,r/12);c.globalAlpha=Math.min(1,.35+remaining/9);
-  cut(c,"M-12.7 3.7 L-13.5 -9 L-6.7 -18 L3.9 -20 L12.5 -12.5 L13.4 1.4 L7.1 7.5 L-7.4 8.4Z","#b7e7ee4d",0);
-  c.beginPath();c.moveTo(-9,4.6);c.lineTo(-12.3,-7.7);c.lineTo(-6.3,-16.1);c.lineTo(1.9,-18.6);c.strokeStyle="#ecfaf0";c.lineWidth=1.55;c.stroke();
-  cut(c,"M5.4 6 L9 -.2 L10.1 2.4 L12.2 -4.2 L13.4 1.7 L8.4 6.9Z","#77bcd4",.72);
-  if(remaining<14){c.beginPath();c.moveTo(5,-17.5);c.lineTo(2,-11);c.lineTo(4.6,-9);c.lineTo(1.8,-4);c.strokeStyle="#6da9bd";c.lineWidth=1;c.stroke();}
+export function iceShell(c: Pens,x: number,y: number,r: number,age: number,remaining: number) {
+  const row=effects.iceShell;
+  const frame=remaining<12 ? .72+.27*(1-remaining/12)
+    : age<8 ? .04+.25*age/8 : .29+.27*(.5-.5*Math.cos((age-8)*.1));
+  c.save(); c.globalAlpha*=.76;
+  drawEffect(c,"iceShell",x,y+r*.45,frame,1,1.85*r*row.w/row.shellWidth);
   c.restore();
 }
+
+const rageStreaks = [
+  ["....vROO..","vvvvROYYO.",".RROYY..O.","...OO....Y","vvROO.....",".OO......."],
+  ["...vROO...","vvvROYYO..","..ROO..YY.",".......Y..","..vRO.....","vROO......"],
+  [".....vRO..","..vvROYYO.","vvROO...YY",".OO.......","...vROO...","vvROO....."],
+] as const;
+
 export function rageRibbons(c: Pens,x: number,y: number,r: number,tick: number,id: number,side: number) {
-  c.save();c.translate(x,y);c.scale(side*r/12,r/12);c.translate(-7,1);c.rotate(.09*Math.sin(tick*.2+id));
-  cut(c,"M3 -3 Q-3.6 -.9 -8.4 -4.4 L-5.3 -1.2 L-12 -2.7 Q-5.3 3 2 -.2Z","#d65e72",.8);
-  line(c,-4.6,-.7,-.5,-.8,"#ffe1a2",.78);c.restore();
+  const frame=Math.floor((tick+id*3)/5)%rageStreaks.length;
+  c.save(); c.translate(x,y); c.scale(side*r/10,r/10);
+  stamp(c,"red",rageStreaks[frame],-17,-5);
+  c.restore();
 }

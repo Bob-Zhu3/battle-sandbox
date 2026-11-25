@@ -1,81 +1,41 @@
 import { poisonBottle } from "./oddities-art.ts";
-import { drawMiasma } from "./field-effects.ts";
 import type { Unit } from "./simulation.ts";
 import { effectLifetime, type GroundEffect } from "./conditions.ts";
-import { drawEffect, drawKirinHop } from "./pixel-art/effect-player.ts";
+import { drawBeam, drawEffect } from "./pixel-art/effect-player.ts";
+import { effects } from "./pixel-art/effects.ts";
 import { eventFade } from "./character-pose.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
 import type { Arrow } from "./arrows.ts";
 import { cut, INK, line, oval, type Pens } from "./ink.ts";
 import { drawBomb } from "./roster-art.ts";
 import { TOWER_ART_SCALE } from "./tower-art.ts";
-import { drawBreach } from "./legend-effects.ts";
+
+const groundAnimations = { blast:"bomb", smash:"smash", frost:"shards", miasma:"poison",
+  stonefall:"rubble", breach:"sandBreach", glass:"bottleShards" } as const;
 
 export function drawGroundEffect(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
-  const mapped = groundAnimations[e.kind as keyof typeof groundAnimations];
-  if (mapped && drawEffect(c, mapped, e.x*sx, e.y*sy, tick-e.tick, effectLifetime(e), e.radius*2*Math.min(sx,sy))) return;
-  if (e.kind === "breach") { drawBreach(c,e,tick,sx,sy); return; }
-  if (e.kind==="miasma") { drawMiasma(c,e,tick,sx,sy); return; }
-  if (e.kind==="glass") {
-    const age=tick-e.tick;
-    if (age>=0 && age<19) {
-      const t=age/19, k=Math.min(sx,sy);
-      for (let i=0;i<6;i++) {
-        const a=i*2.4+.5, reach=6+17*t;
-        c.save();c.translate((e.x+Math.cos(a)*reach)*sx,(e.y+Math.sin(a)*reach*.65)*sy-11*Math.sin(t*Math.PI)*k);
-        c.scale(k,k);c.rotate(a+t*4);c.globalAlpha=1-t;
-        cut(c,"M-1.7 -2.2 L2.1 -.7 L-.6 2.3Z",i%2?"#c4eee4":"#fff8e3",.72);c.restore();
-      }
-    }
+  const age=tick-e.tick;
+  if (e.kind==="toll") {
+    // The sound wave follows the circular shove area even on a tall, narrow screen.
+    const row=effects.bellWave;
+    c.save(); c.translate(e.x*sx,e.y*sy); c.scale(sx,sy);
+    drawEffect(c,"bellWave",0,0,age,effectLifetime(e),e.radius*row.w/row.radius);
+    c.restore();
     return;
   }
-  const age=tick-e.tick;
-  if (age<0 || age>=34) return;
-  const k=Math.min(sx,sy), fade=1-age/34, expand=Math.min(1,(age+2)/13);
-  c.save(); c.translate(e.x*sx,e.y*sy); c.scale(sx,sy);
-  c.globalAlpha=fade;
-  c.beginPath(); c.arc(0,0,e.radius*expand,0,Math.PI*2);
-  c.strokeStyle=e.kind==="toll"?"#c69c55":e.kind==="smash" || e.kind==="stonefall"?"#8c6d51":e.kind==="blast"?"#d98045":"#72bac7";
-  c.lineWidth=e.kind==="smash"?2.4:2; c.stroke();
-  if (e.kind==="toll") {
-    for(let i=1;i<=2;i++){c.beginPath();c.arc(0,0,e.radius*Math.max(.02,Math.min(1,(age+2-i*4)/16)),0,Math.PI*2);c.strokeStyle=i===1?"#fff0ae":"#d1a75f";c.lineWidth=i===1?2:1;c.stroke();}
-  } else if(e.kind==="stonefall") {
-    for(let i=0;i<9;i++){const a=i*2.4,r=(.55+.09*(i%4))*e.radius*expand;
-      oval(c,Math.cos(a)*r,Math.sin(a)*r-6*Math.sin(age/34*Math.PI),2+2*fade,1.8+fade,i%3?"#ac916f":"#858478");}
-  } else if (e.kind==="frost") {
-    c.fillStyle="#b1e7f24a"; c.fill();
-    for(let i=0;i<6;i++){
-      c.save();c.rotate(i*Math.PI/3);line(c,1,0,e.radius*expand*.8,0,"#edfbef",1.6);
-      line(c,e.radius*expand*.5,0,e.radius*expand*.62,-4,"#d2f3f5",1.3);c.restore();
-    }
-  } else if(e.kind==="smash") {
-    for(let i=0;i<6;i++){
-      c.save();c.rotate(i*1.05+.42);c.beginPath();c.moveTo(4,0);c.lineTo(e.radius*.32*expand,2.5);
-      c.lineTo(e.radius*.52*expand,-1.8);c.lineTo(e.radius*.8*expand,1);c.strokeStyle="#796a54";c.lineWidth=1.4;c.stroke();c.restore();
-    }
-  } else {
-    c.fillStyle="#e89a4e29";c.fill();
-    for(let i=0;i<8;i++){
-      const a=i*2.4, r=(5+Math.min(17,age)*1.35)*(i%2?.75:1);
-      oval(c,Math.cos(a)*r,Math.sin(a)*r-4*fade,(2.5+4*fade),(1.6+4*fade),i%2?"#f9c967":"#9c8070");
-    }
-    if(age<10){c.scale(k/sx,k/sy);cut(c,"M-11 2 L-5 -2 L-8 -10 L-2 -7 L1 -15 L4 -6 L11 -8 L8 -1 L15 2 L6 4 L4 11 L-1 6 L-7 8 L-5 4Z","#fff2b1",1);}
-  }
-  c.restore();
+  const name=groundAnimations[e.kind as keyof typeof groundAnimations];
+  if (!name) return;
+  const scale=Math.min(sx,sy);
+  // The bottle breaks at its landing point. Its full-sized gas cloud draws separately.
+  const width=e.kind==="glass" ? 33 : e.radius*2;
+  drawEffect(c,name,e.x*sx,e.y*sy,age,effectLifetime(e),width*scale);
 }
-
-const groundAnimations = { blast: "bomb", smash: "smash", frost: "shards", miasma: "poison", stonefall: "rubble" } as const;
 
 export function drawStun(c: Pens, x: number, y: number, size: number, tick: number, id: number) {
-  c.save(); c.translate(x,y); c.scale(size,size);
-  for(let i=0;i<2;i++) {
-    const a=tick*.17+id+i*Math.PI;
-    c.save(); c.translate(Math.cos(a)*7,Math.sin(a)*2); c.rotate(a*.3);
-    cut(c,"M0 -3.4 L1 -1 L3.3 0 L1 1 L0 3 L-1 1 L-3.3 0 L-1 -1Z","#ffdc70",.85); c.restore();
-  }
-  c.restore();
+  drawEffect(c,"daze",x,y,(tick+id*7)%42,42,25*size);
 }
-export function drawConditions(c: Pens, u: Unit, x: number, y: number, r: number, scale: number, tick: number) {
+
+export function drawConditions(c: Pens, u: Unit, from: Unit, x: number, y: number, r: number, scale: number, tick: number) {
   c.save(); c.translate(x,y); c.scale(scale,scale);
   const radius=r/scale;
   if ((u.rootedUntil??0)>tick) {
@@ -85,21 +45,19 @@ export function drawConditions(c: Pens, u: Unit, x: number, y: number, r: number
     drawEffect(c,"vines",0,5,bind,1,Math.max(20,radius*2.5));
   }
   if ((u.slowUntil??0)>tick) {
-    cut(c,"M-9 4 L-10 -2 L-6 0 L-5 -4 L-2 3 L3 4 L6 -1 L8 -4 L9 4 L5 7 L-4 7Z","#b8ecf1",1);
-    line(c,-6,4,-3,5,"#ffffff",1.1);
+    const left=u.slowUntil!-tick;
+    const frame=left<12 ? .65+.34*(1-left/12) : .27+.24*(.5+.5*Math.sin((tick+u.id)*.1));
+    drawEffect(c,"rime",0,5,frame,1,Math.max(14,radius*1.85));
   }
-  if (u.burn && u.hp>0) {
-    c.save(); c.translate(-radius*.38,3);
-    c.scale(1,1+Math.sin(tick*.32+u.id)*.16);
-    cut(c,"M-4 3 Q-7 -2 -4 -6 L-3 -3 L0 -11 Q5 -7 3 -3 L6 -4 Q8 2 3 4Z","#ed814a",1);
-    cut(c,"M-2 3 Q-3 0 0 -5 L2 -1 L3 -2 Q5 2 1 3Z","#ffe58a",0); c.restore();
+  // Snapshots can contain a refresh a few ticks ahead of the displayed clock.
+  const burn=u.burn && tick>=u.burn.applied ? u.burn : from.burn;
+  const poison=u.poison && tick>=u.poison.applied ? u.poison : from.poison;
+  if (burn && tick>=burn.applied && tick<burn.until) {
+    const phase=(tick+u.id*7)%48;
+    drawEffect(c,"cinder",-radius*.44,3,phase,48,Math.max(12,Math.min(21,radius*1.5)),u.id%2 ? 1 : -1);
   }
-  if(u.poison && u.hp>0){
-    for(let i=0;i<2;i++){
-      const p=((tick+u.id*5+i*12)%25+25)%25/25;
-      oval(c,radius*.72+i*3,-radius*.45-p*8,2.4-p,2.4-p,"#71567f");
-      oval(c,radius*.72+i*3-.5,-radius*.45-p*8-.5,.9,.9,"#ecbde8");
-    }
+  if (poison && tick>=poison.applied && tick<poison.until) {
+    drawEffect(c,"venom",radius*.60,-radius*.34,(tick+u.id*9)%54,54,14);
   }
   c.restore();
   if ((u.stunnedUntil??0)>tick && u.hp>0) drawStun(c,x,y-r*1.8-4*scale,scale,tick,u.id);
@@ -119,7 +77,7 @@ export function drawChain(c: Pens, arc: NonNullable<Unit["arc"]>, tick: number, 
     // Damage is simultaneous. All contacts flash on the cast tick, then
     // the return strokes flicker outward through the recorded hit positions.
     const lag=(i-1)*.9, progress=Math.max(0,age-lag)/(stunTicks-lag);
-    drawKirinHop(c,x,y,toX,toY,progress,1.25*bodyScale,(arc.tick+i)%2===0);
+    drawBeam(c,(arc.tick+i)%2===0 ? "kirinFork" : "kirinArc",x,y,toX,toY,progress,1.25*bodyScale);
     x=toX; y=toY;
   }
 }

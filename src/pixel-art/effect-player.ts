@@ -8,6 +8,21 @@ export function whenEffectsLoad(paint: () => void) {
   if (!sheet.complete) sheet.addEventListener("load", paint, { once: true });
 }
 
+// Small, moving trail stamps can occupy just a few screen pixels. Isolate their
+// native frames so the browser samples the same texels on cold and cached loads.
+const trailRows=new Map<EffectName,HTMLCanvasElement>();
+function trailStrip(name: EffectName) {
+  let strip=trailRows.get(name);
+  if (strip) return strip;
+  const row=effects[name];
+  strip=document.createElement("canvas");
+  strip.width=row.w*row.columns;
+  strip.height=row.h*Math.ceil(row.frames/row.columns);
+  strip.getContext("2d")!.drawImage(sheet,0,row.y,strip.width,strip.height,0,0,strip.width,strip.height);
+  trailRows.set(name,strip);
+  return strip;
+}
+
 // The anchor is the effect author's ground/impact point, including off-center effects.
 export function drawEffect(c: CanvasRenderingContext2D, name: EffectName, x: number, y: number,
   age: number, duration: number, width: number, facing = 1) {
@@ -19,18 +34,19 @@ export function drawEffect(c: CanvasRenderingContext2D, name: EffectName, x: num
   c.translate(x, y);
   c.scale(facing * scale, scale);
   c.imageSmoothingEnabled = false;
-  c.drawImage(sheet, frame % row.columns * row.w, row.y + Math.floor(frame / row.columns) * row.h,
+  const strip=name==="cinder" || name==="rime" || name==="wisp";
+  c.drawImage(strip ? trailStrip(name) : sheet, frame % row.columns * row.w, (strip ? 0 : row.y) + Math.floor(frame / row.columns) * row.h,
     row.w, row.h, -row.ox, -row.oy, row.w, row.h);
   c.restore();
   return true;
 }
 
-// Stretch only the middle of the PixelFX hop. The hot knots and sparks at
-// either end keep their native size, including on short or nearly vertical jumps.
-export function drawKirinHop(c: CanvasRenderingContext2D, x: number, y: number, toX: number, toY: number,
-  progress: number, pitch: number, alternate: boolean) {
+// Stretch the middle of a ray between the two world points. Keep the source flare
+// and contact sparks the same size even when the target is almost touching.
+export function drawBeam(c: CanvasRenderingContext2D, name: "kirinArc" | "kirinFork" | "solarRay" | "prismRay",
+  x: number, y: number, toX: number, toY: number, progress: number, pitch: number) {
   if (!sheet.complete || !sheet.naturalWidth) return;
-  const row=alternate ? effects.kirinFork : effects.kirinArc;
+  const row=effects[name];
   const frame=Math.min(row.frames-1,Math.floor(progress*row.frames));
   const tx=frame%row.columns*row.w, ty=row.y+Math.floor(frame/row.columns)*row.h;
   const dx=toX-x, dy=toY-y, length=Math.hypot(dx,dy);

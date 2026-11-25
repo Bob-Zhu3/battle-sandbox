@@ -1,5 +1,6 @@
 import { ARMIES, type Base, type Team } from "./battlefield.ts";
-import { line, oval, type Dye, type Pens } from "./ink.ts";
+import { line, type Dye, type Pens } from "./ink.ts";
+import { drawBeam } from "./pixel-art/effect-player.ts";
 import { prismLevel } from "./siege.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { exposed } from "./targeting.ts";
@@ -28,13 +29,9 @@ function refracted(c: Pens, length: number, offset: number, color: string) {
 }
 
 function secondary(c: Pens, a: Point, b: Point, k: number, color: string, age: number) {
-  const dx = b.x-a.x, dy = b.y-a.y;
-  line(c,a.x,a.y,b.x,b.y,color,1.35*k);
-  const phase = ((age % 41) + 1) / 42;
-  const t = Math.min(1,phase+.065);
-  line(c,a.x+dx*phase,a.y+dy*phase,a.x+dx*t,a.y+dy*t,"#ffebc8",1.15*k);
-  oval(c,b.x,b.y,2.0*k,2.0*k,color);
-  oval(c,b.x,b.y,.9*k,.9*k,"#fff3cb");
+  line(c,a.x,a.y,b.x,b.y,color,1.8*k);
+  drawBeam(c,"prismRay",a.x,a.y,b.x,b.y,(age%41)/41,.33*k);
+
 }
 
 function primary(c: Pens, a: Point, b: Point, k: number, dye: Dye, age: number, id: number) {
@@ -43,32 +40,19 @@ function primary(c: Pens, a: Point, b: Point, k: number, dye: Dye, age: number, 
   const focus=crystalFocus(age), level=prismLevel(age);
   const phase=(age+id*7)*.12;
   const spread=Math.min(length*.085,6.8) * (1-focus);
-  const width=1.05+3.4*focus;
   c.save();c.translate(a.x,a.y);c.rotate(Math.atan2(dy,dx));c.scale(k,k);
-  c.lineCap="round";c.lineJoin="round";
-  if (focus>.55) {
-    c.save();c.globalAlpha*=.34*(focus-.55);
-    line(c,0,0,length,0,dye.coat,width+5.2);
-    c.restore();
-  }
-  if (spread > .45) {
+  c.lineJoin="round";
+  if (spread>.45) {
     const drift=.40*Math.sin(phase)*(1-focus);
-    refracted(c,length,-spread+drift,"#ad638b");
+    refracted(c,length,-spread+drift,"#a96092");
     refracted(c,length,spread+drift,"#4399a4");
   }
-  line(c,0,0,length,0,dye.hem,width+1.1);
-  line(c,0,0,length,0,level<3 ? "#efbb67" : dye.light,width);
-  if (focus>.04) line(c,0,0,length,0,"#fff6c9",.47+2.25*focus);
-  // A single highlight runs along the glass. Its direction stays clear in a still crowd.
-  const start=length*((age+id*3)%28)/28;
-  line(c,start,0,Math.min(length,start+6+6*focus),0,"#fffdeb",.85+focus);
-  const spark=1.85+2.25*focus+.33*Math.sin(phase);
-  c.translate(length,0);
-  c.beginPath();c.moveTo(spark*1.2,0);c.lineTo(spark*.29,spark*.29);
-  c.lineTo(0,spark);c.lineTo(-spark*.32,spark*.27);c.lineTo(-spark*1.25,0);
-  c.lineTo(-spark*.31,-spark*.27);c.lineTo(0,-spark);c.lineTo(spark*.28,-spark*.29);c.closePath();
-  c.fillStyle="#fff4c3";c.fill();c.strokeStyle=dye.hem;c.lineWidth=.68;c.stroke();
+  // The colored facets converge as the real lock grows stronger. The core keeps
+  // streaming on the ticks between hits, including on a stationary target.
+  line(c,0,0,length,0,dye.hem,1.25+3.75*focus);
   c.restore();
+  const pitch=(.29+.54*focus+.055*level)*k;
+  drawBeam(c,"prismRay",a.x,a.y,b.x,b.y,((age+id*7)%36)/36,pitch);
 }
 
 // The positions in bodies have already been interpolated for this displayed

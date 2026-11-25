@@ -4,7 +4,7 @@ import { createField, element } from "./field.ts";
 import { crowdFormation } from "./crowd-formation.ts";
 import { reinforcements, windmillField } from "./deployment.ts";
 import { Playground } from "./playground.ts";
-import { kirinShowcase, pixelSkirmish, spellShowcase } from "./pixel-art/showcase.ts";
+import { kirinShowcase, pixelSkirmish, spellShowcase, troopEffectsShowcase } from "./pixel-art/showcase.ts";
 import { drawArena } from "./renderer.ts";
 import { UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
 import { castHint } from "./spells.ts";
@@ -74,7 +74,11 @@ game.addEventListener("brushchange",()=>{
   if (field.selectedSpell()!=="wormhole") spellBrush.cancel();
   updateBrushHint();
 });
-if (demo === "spells") {
+if (demo === "effects") {
+  troopEffectsShowcase(play);
+  previous=play.world;
+  field.armBrush("medusa");
+} else if (demo === "spells") {
   spellShowcase(play);
   previous=play.world;
   field.armBrush("meteor");

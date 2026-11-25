@@ -3,6 +3,7 @@ import type { Pens } from "./ink.ts";
 import type { Unit } from "./simulation.ts";
 import { TOWER_ART_SCALE } from "./tower-art.ts";
 import { UNIT_DEFINITIONS } from "./units.ts";
+import { stamp } from "./pixel-art/stamps.ts";
 
 // Fit the four-sail drawing to a tower-sized token. The axle is measured in that drawing.
 export const MILL_MODEL_SCALE = .76;
@@ -17,31 +18,23 @@ export function fanGustProgress(unit: Unit | undefined, tick: number) {
   return Math.max(0, Math.min(1, (tick - unit.millFastUntil + duration) / duration));
 }
 
-// Each mark travels away from the mouth, widens off-axis, then fades. Short
-// tapered shapes leave the bodies and the arrow's change of course legible.
-function airRibbon(c: Pens, distance: number, length: number, lane: number, phase: number, strong: boolean) {
-  const end = distance + length;
-  const flutter = Math.sin(phase * Math.PI * 2 + lane * 1.6);
-  const fromY = lane * (2.3 + distance * .34);
-  const toY = lane * (2.3 + end * .34) + 1.65 * flutter;
-  const bend = (lane < 0 ? -1 : 1) * (1.7 + 2.4 * phase);
-  const width = (strong ? 1.75 : 1.32) * (1 - .25 * phase);
-  c.beginPath();
-  c.moveTo(distance, fromY);
-  c.bezierCurveTo(distance + .27 * length, fromY + bend + width, end - .24 * length, toY + bend + width, end, toY);
-  c.bezierCurveTo(end - .22 * length, toY + bend - .45 * width, distance + .3 * length, fromY + bend - .5 * width, distance, fromY);
-  c.closePath();
-  c.fill();
-}
+// A crest rolls forward along each lane. The short tail and curled lip point
+// away from the mill. The world transform below aims them with the actual wind.
+const airCrests = [
+  ["................aaaI..",".............aaa...Ia.",".......aaaaaj.......a.","...aaaaj............j.","aaa...............jj.."],
+  ["...............aaI....","..........aaaaa..Ia...",".....aaaaj........a...","..aaaj............ja..","aa...............jj..."],
+  ["...............aaa....","............aaa..Ia...",".......aaaaa......j...","..aaaaaj.........aj...","aa..............jj...."],
+] as const;
+const hubCurl=["..........aaaI.","........aa...Ia","....aaaa......j","aaaa........jj.","..........aa..."];
 
-export function drawFanWind(c: Pens, unit: Unit, tick: number, sx: number, sy: number) {
+export function drawFanWind(c: Pens, unit: Unit, tick: number, sx: number, sy: number, bodyScale: number) {
   if (!unit.hp || tick < Math.max(unit.stunnedUntil ?? 0, unit.frozenUntil ?? 0, unit.petrifiedUntil ?? 0)) return;
   const length = Math.hypot(unit.aimX, unit.aimY);
   const dx = length ? unit.aimX / length : ARMIES[unit.team].facing;
   const dy = length ? unit.aimY / length : 0;
   const definition = UNIT_DEFINITIONS.windmill;
   const artUnits = definition.radius * TOWER_ART_SCALE * MILL_MODEL_SCALE / 11;
-  const figureScale = Math.min(sx, sy) * artUnits;
+  const figureScale = bodyScale * artUnits;
   const gust = fanGustProgress(unit, tick);
   const boosted = unit.millFastUntil !== undefined &&
     tick >= unit.millFastUntil - definition.spinTicks && tick < unit.millFastUntil;
@@ -55,13 +48,8 @@ export function drawFanWind(c: Pens, unit: Unit, tick: number, sx: number, sy: n
     unit.y * sy - FAN_HUB_HEIGHT * figureScale + dy * FAN_HUB_OFFSET * figureScale);
   c.transform(dx * sx, dy * sy, -dy * sx, dx * sy, 0, 0);
   const breath = Math.sin(tick * .14 + unit.id);
-  c.strokeStyle = "#75a6ac"; c.lineWidth = boosted ? 1.35 : 1.05; c.lineCap = "round";
-  c.globalAlpha = boosted ? .78 : .63;
-  c.beginPath();
-  c.moveTo(9, -2.1);
-  c.bezierCurveTo(15.8, -2.7 - breath, 21.9, -7.8 + breath, 28.5, -5.4 + breath);
-  c.bezierCurveTo(32.4, -4.1 + breath, 33.2, -8.4 + breath, 30.1, -8.2 + breath);
-  c.stroke();
+  c.globalAlpha = boosted ? .86 : .68;
+  stamp(c,unit.team,hubCurl,8,-4+breath);
   for (let i = 0; i < lanes; i++) {
     const lane = i === 0 ? -.82 : i === 1 ? .16 : i === 2 ? .86 : -.31;
     const offset = i === 3 ? .17 : i / 3;
@@ -71,8 +59,11 @@ export function drawFanWind(c: Pens, unit: Unit, tick: number, sx: number, sy: n
     const fade = Math.min(1, phase * 9, (1 - phase) * 5);
     const lit = boosted ? .85 : unit.targetId === null ? .59 : .70;
     c.globalAlpha = fade * (lit + (1 - lit) * deflection);
-    c.fillStyle = i === 1 ? "#5c969c" : "#79abb0";
-    airRibbon(c, depth, span, lane, phase, boosted);
+    const frame=Math.floor(phase*8)%airCrests.length;
+    c.save(); c.translate(depth,lane*(2.3+depth*.34)); c.rotate(Math.atan(lane*.34));
+    c.scale(span/22,(lane<0 ? -1 : 1)*(boosted ? 1.22 : 1));
+    stamp(c,unit.team,airCrests[frame],0,-2);
+    c.restore();
   }
   c.restore();
 }

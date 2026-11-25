@@ -2,6 +2,7 @@ import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { INK, WOOD, cut, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { isBuilding, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
+import { drawBeam } from "./pixel-art/effect-player.ts";
 
 const brass = "#e5af59", bronze = "#95653e", stone = "#b0b3a0", shade = "#7c887c";
 
@@ -74,21 +75,25 @@ export function bellTower(c: Pens, d: Dye, u: Unit|undefined, tick: number) {
   oval(c,-.35,-18.6,1.55,1.3,brass);
 }
 
-export function sunbeam(c: Pens, u: Unit, target: Target|undefined, tick: number, sx: number, sy: number) {
+export function sunbeam(c: Pens, u: Unit, target: Target|undefined, tick: number, sx: number, sy: number, bodyScale: number) {
   if (!u.hp || u.focusSince === undefined || tick<u.focusSince || !target || (u.fogUntil??0)>tick) return;
   const k=Math.min(sx,sy), pulse=u.beam && u.beam.tick>=u.focusSince && tick>=u.beam.tick && tick-u.beam.tick<9 ? u.beam : undefined;
-  const lensScale=k*TOWER_ART_SCALE*UNIT_DEFINITIONS.sunlens.radius/11;
+  const lensScale=bodyScale*TOWER_ART_SCALE*UNIT_DEFINITIONS.sunlens.radius/11;
   const fromX=u.x*sx+(u.aimX<0?-1:1)*.9*lensScale, fromY=u.y*sy-11.6*lensScale;
-  const end=pulse ?? target, x=end.x*sx, y=end.y*sy-7*k*unitArtScale(target.kind);
-  c.save();c.lineCap="round";
+  const end=pulse ?? target, x=end.x*sx, y=end.y*sy-7*bodyScale*unitArtScale(target.kind);
+  c.save();
   if(pulse) {
-    const strength=1-(tick-pulse.tick)/9; c.globalAlpha=strength;
-    line(c,fromX,fromY,x,y,"#eb934b9c",(2.8+pulse.level*1.25)*k);
-    line(c,fromX,fromY,x,y,"#fff3ae",(1+.49*pulse.level)*k);
-    oval(c,x,y,(2+pulse.level)*k,(2+pulse.level)*k,"#fff9ce");
+    const age=tick-pulse.tick;
+    c.globalAlpha=Math.min(1,(9-age)/4);
+    drawBeam(c,"solarRay",fromX,fromY,x,y,age/9,(.44+.18*pulse.level)*bodyScale);
   } else {
-    c.setLineDash([2*k,5*k]);c.globalAlpha=.52;
-    line(c,fromX,fromY,x,y,"#c78843",1.25*k);
+    // A slow train of amber sighting dots ends as soon as the damaging pulse fires.
+    const dx=x-fromX,dy=y-fromY,distance=Math.hypot(dx,dy),step=9*k;
+    const square=Math.max(1,Math.round(1.7*bodyScale));
+    c.fillStyle="#b78347";
+    for (let d=(tick-u.focusSince)%9*k+step*.45;d<distance;d+=step) {
+      c.fillRect(Math.round(fromX+dx*d/distance),Math.round(fromY+dy*d/distance),square,square);
+    }
   }
   c.restore();
 }

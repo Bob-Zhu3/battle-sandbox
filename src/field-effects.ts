@@ -1,26 +1,12 @@
 import { ARMIES } from "./battlefield.ts";
-import type { GroundEffect } from "./conditions.ts";
 import type { Unit } from "./simulation.ts";
 import { TRAILS, TRAIL_TICKS } from "./trails.ts";
 import { cut, line, oval, type Pens } from "./ink.ts";
-import { UNIT_DEFINITIONS } from "./units.ts";
 import { drawEffect } from "./pixel-art/effect-player.ts";
 
 export function drawTrail(c: Pens,u: Unit,tick: number,sx: number,sy: number) {
   if (!u.trail || !(u.kind in TRAILS)) return;
   const kind=TRAILS[u.kind as keyof typeof TRAILS].kind, scale=Math.min(sx,sy);
-  // The Queen leaves a broken sheet of ice between crystals. The newest
-  // section is bright enough to read against grass even at phone size.
-  if(kind==="frost") {
-    for(let i=1;i<u.trail.length;i++){
-      const left=u.trail[i-1], right=u.trail[i], age=tick-left.tick;
-      if(age<0 || age>=TRAIL_TICKS || Math.hypot(left.x-right.x,left.y-right.y)>24)continue;
-      c.save();c.globalAlpha=.72*(1-age/TRAIL_TICKS);c.lineCap="round";
-      const ax=left.x*sx,ay=left.y*sy+5*scale,bx=right.x*sx,by=right.y*sy+5*scale;
-      line(c,ax,ay,bx,by,"#569bb0",4.25*scale);
-      line(c,ax,ay-.55*scale,bx,by-.55*scale,"#bceef2",2.55*scale);c.restore();
-    }
-  }
   for(const mark of u.trail) {
     const age=tick-mark.tick;
     if(age<0 || age>=TRAIL_TICKS) continue;
@@ -28,15 +14,11 @@ export function drawTrail(c: Pens,u: Unit,tick: number,sx: number,sy: number) {
     c.save(); c.translate(mark.x*sx,mark.y*sy+4*scale); c.scale(scale,scale);
     c.globalAlpha=Math.min(.97,fade*1.42);
     if(kind==="frost") {
-      c.translate(0,2.3*side);
-      cut(c,"M-6 0 L-2 -2 L3 -1 L7 1 L2 3 L-3 2Z","#68a7bc",0);
-      line(c,-4,.3,4,.8,"#e6fcfa",1.25);
-      c.translate(-3,0);c.scale(.68+fade*.57,.75+fade*.6);
-      cut(c,"M-3 0 L-4 -4 L-1 -2 L1 -7 L2 -1 L4 -2 L3 1Z","#c7f3ff",.75);
+      // Each cluster sprouts at a sampled footfall and crumbles there as the Queen moves on.
+      drawEffect(c,"rime",0,side*2,age,TRAIL_TICKS,15,side);
     } else if(kind==="fire") {
-      c.translate(side*2,-5-age*.2);c.rotate(.28*side);c.scale(.67+.52*fade,.7+.52*fade);
-      cut(c,"M-3 1 Q-4 -1 -2 -4 L-1 -2 L2 -9 Q5 -5 3 -2 Q5 -2 4 0 Q2 3 -3 1Z","#ed7438",.75);
-      cut(c,"M-1 1 L0 -2 L2 -4 L2 0Z","#fff09a",0);oval(c,4,-6-age*.055,1.25,.95,"#eba136");
+      const lift=age*.16;
+      drawEffect(c,"cinder",side*2,-3-lift,(age+mark.tick%19)%40,40,4+12*fade,side);
     } else if(kind==="spark") {
       drawEffect(c,"zap",0,side*3,age,TRAIL_TICKS,15,side);
     } else if(kind==="dust") {
@@ -53,9 +35,7 @@ export function drawTrail(c: Pens,u: Unit,tick: number,sx: number,sy: number) {
       oval(c,0,1,kind==="track"?5.2:3.2,kind==="track"?2.15:1.35,kind==="track"?"#aa9270":"#899967");
       if(kind==="track")for(const i of [-1,0,1])oval(c,2+i*2,-1,1.15,1,"#aa9270");
     } else if(kind==="wisp") {
-      c.translate(Math.sin(age*.12+side)*2,-age*.19);
-      cut(c,"M-2 2 Q-4 0 -1 -3 L1 -7 Q0 -4 2 -2 Q4 1 1 2Z","#6ba995",.55);
-      oval(c,0,0,.95,1.2,"#ceefd5");
+      drawEffect(c,"wisp",side*1.4,-age*.18,(age+mark.tick%17)%40,40,4+6*fade,side);
     } else {
       c.translate(0,-age*.11+side*2);c.rotate(side*.3);
       cut(c,"M0 -3 L1 -1 L3 0 L1 1 L0 3 L-1 1 L-3 0 L-1 -1Z","#c28cbe",.55);
@@ -90,18 +70,11 @@ export function drawChange(c: Pens,u: Unit,x: number,y: number,k: number,tick: n
   const hexStart=u.hex?.since ?? -Infinity, bite=u.zombified?.tick ?? -Infinity;
   const stamp=Math.max(hexStart,bite), age=tick-stamp;
   if(age<0 || age>24) return;
-  const infection=stamp===bite;
-  c.save();c.translate(x,y-6*k);c.scale(k,k);c.globalAlpha=1-age/25;
-  const radius=5+age*.68;
-  c.strokeStyle=infection?"#65964e":"#aa6ba2";c.lineWidth=1.65;
-  c.beginPath();c.ellipse(0,3,radius,radius*.46,-.22,Math.PI*.1,Math.PI*1.8);c.stroke();
-  for(const sign of [-1,1]){
-    c.save();c.translate(sign*(5+age*.37),-3-age*.24);c.rotate(sign*age*.045);
-    if(infection)cut(c,"M-2 -2 L1 -3 L1 1 L-1 3Z","#bada80",.6);
-    else cut(c,"M0 -3 L1 -1 L3 0 L1 1 L0 3 L-1 1 L-3 0 L-1 -1Z","#f1acd4",.6);
-    c.restore();
+  if (stamp===bite) {
+    drawEffect(c,"infection",x,y+2*k,age,25,36*k);
+  } else {
+    drawEffect(c,"hexSeal",x,y-8*k,age,25,32*k,u.id%2 ? 1 : -1);
   }
-  c.restore();
 }
 export function drawSoul(c: Pens,u: Unit,x: number,y: number,tick: number,sx: number,sy: number) {
   if(!u.soul || !u.hp || u.kind!=="reaper")return;
@@ -111,22 +84,5 @@ export function drawSoul(c: Pens,u: Unit,x: number,y: number,tick: number,sx: nu
   const ex=x-(u.aimX<0?-1:1)*9*k,ey=y-3*k;
   const ox=u.soul.x*sx,oy=u.soul.y*sy;
   const px=ox+(ex-ox)*t,py=oy+(ey-oy)*t-(6+13*Math.sin(Math.PI*t))*k;
-  c.save();c.globalAlpha=.9;c.translate(px,py);c.scale(k,k);
-  cut(c,"M-3 2 Q-4 -2 0 -4 L1 -8 Q1 -4 3 -3 Q6 1 2 3Z","#81d4be",.7);
-  oval(c,0,0,1.4,1.7,"#edffda");c.restore();
-}
-export function drawMiasma(c: Pens,e: GroundEffect,tick: number,sx: number,sy: number) {
-  const age=tick-e.tick, life=UNIT_DEFINITIONS.clown.cloudTicks;
-  if(age<0 || age>=life)return;
-  const size=Math.min(1,(age+5)/14), fade=Math.min(1,(life-age)/16);
-  c.save();c.translate(e.x*sx,e.y*sy);c.scale(sx*size,sy*size);
-  c.globalAlpha=fade*.16;oval(c,0,0,e.radius,e.radius,"#996b9f");
-  c.globalAlpha=fade*.43;
-  for(let i=0;i<7;i++){
-    const a=i*2.39996, p=((age+i*12)%41)/41, r=e.radius*(i%3===0?.65:.43);
-    const x=Math.cos(a)*r+Math.sin(age*.04+i)*2, y=Math.sin(a)*r-6*p;
-    oval(c,x,y,5+3*p,4+3*p,"#b184b2");
-    if(i%2===0){c.strokeStyle="#795783";c.lineWidth=1;c.beginPath();c.arc(x,y,4+p,2.7,4.7);c.stroke();}
-  }
-  c.restore();
+  drawEffect(c,"wisp",px,py,age,33,(13+4*Math.sin(Math.PI*t))*k);
 }

@@ -2,7 +2,7 @@ import { ARENA, boundCenter, type Team } from "./simulation.ts";
 import type { World } from "./room-protocol.ts";
 import { type ArenaPoint } from "./deployment.ts";
 import { footprint, UNIT_DEFINITIONS, type UnitKind } from "./units.ts";
-import { drawFieldSpell } from "./magic-art.ts";
+import { drawFieldSpell, healCross } from "./magic-art.ts";
 import { iceShell, rageRibbons } from "./weather-art.ts";
 import { drawSpellMark } from "./pixel-art/spell-floor.ts";
 import { drawLightning } from "./weather-art.ts";
@@ -97,7 +97,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   const crowd = prepareCrowd(visible, tick, ctx.canvas.width / w, hasStatues);
   for (const unit of current.units) {
     drawTrail(ctx,unit,tick,sx,sy);
-    if (unit.kind === "windmill") drawFanWind(ctx,unit,tick,sx,sy);
+    if (unit.kind === "windmill") drawFanWind(ctx,unit,tick,sx,sy,bodyScale);
   }
   for (const effect of current.effects ?? []) if (!isAttackTrace(effect)) drawGroundEffect(ctx, effect, tick, sx, sy);
   const spells = [...(current.spells ?? [])];
@@ -117,7 +117,8 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
   const keepScale = bodyScale * TOWER_ART_SCALE;
   for (const base of current.bases ?? []) {
     drawKeep(ctx, base, base.x*sx, base.y*sy, keepScale, tick);
-    if (base.hp && (base.frozenUntil ?? 0)>tick) iceShell(ctx,base.x*sx,base.y*sy,25*keepScale,base.frozenUntil!-tick);
+    const iceLeft=(base.frozenUntil ?? 0)-tick;
+    if (base.hp && iceLeft>0 && iceLeft<=SPELLS.freeze.baseHold) iceShell(ctx,base.x*sx,base.y*sy,25*keepScale,SPELLS.freeze.baseHold-iceLeft,iceLeft);
     if (base.hp && (base.stunnedUntil ?? 0)>tick) drawStun(ctx,base.x*sx,base.y*sy-24*keepScale,scale,tick,base.id);
   }
   const prior = new Map(previous.units.map(unit => [unit.id, unit]));
@@ -211,20 +212,24 @@ export function drawArena(ctx: CanvasRenderingContext2D, previous: World, curren
       ctx.strokeStyle="#71696b";ctx.lineWidth=1.15;ctx.beginPath();
       ctx.moveTo(-3.5,-5.5);ctx.lineTo(-1.8,-2);ctx.lineTo(-3.5,-.6);ctx.lineTo(-1.6,2);ctx.stroke();ctx.restore();
     }
-    if (frozen) iceShell(ctx,x,y,r,unit.frozenUntil!-tick);
+    if (frozen) iceShell(ctx,x,y,r,tick-unit.frozenAt!,unit.frozenUntil!-tick);
     if (unit.groundedUntil !== undefined) groundingLine(ctx,unit,x,y,r,tick);
-    if (unit.hex || unit.zombified) drawChange(ctx,unit,x,y,scale,tick);
+    if (unit.hex || unit.zombified) drawChange(ctx,unit,x,y,bodyScale,tick);
     if (unit.soul) drawSoul(ctx,unit,x,y,tick,sx,sy);
-    if (unit.burn || unit.poison || (unit.rootedUntil ?? 0)>tick || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) drawConditions(ctx,unit,x,y,r,scale,tick);
-    if (unit.lastTreatedTick !== undefined && tick - unit.lastTreatedTick < 16) {
-      ctx.save();ctx.globalAlpha=1-(tick-unit.lastTreatedTick)/16;ctx.strokeStyle="#fff7cc";ctx.lineWidth=2*scale;
-      ctx.beginPath();ctx.arc(x,y-r*.4,r*.85,0,Math.PI*1.5);ctx.stroke();ctx.restore();
+    if (unit.burn || from.burn || unit.poison || from.poison || (unit.rootedUntil ?? 0)>tick || (unit.stunnedUntil ?? 0)>tick || (unit.slowUntil ?? 0)>tick) {
+      drawConditions(ctx,unit,tick<current.tick ? from : unit,x,y,r,bodyScale,tick);
+    }
+    const healed=tick-(unit.lastTreatedTick ?? -Infinity);
+    if (healed>=0 && healed<16) {
+      ctx.save(); ctx.translate(x+r*.64,y-r*(.76+healed/21));
+      ctx.scale(bodyScale*.86,bodyScale*.86); ctx.globalAlpha*=Math.min(1,(16-healed)/5);
+      healCross(ctx,ARMIES[unit.team]); ctx.restore();
     }
   }
   for (const u of current.units) if (u.arc) drawChain(ctx,u.arc,tick,sx,sy,bodyScale,ARMIES[u.team].facing);
   let hasPrism=false;
   for (const u of current.units) {
-    if (u.kind==="sunlens" && u.targetId!==null) sunbeam(ctx,u,byId.get(u.targetId),tick,sx,sy);
+    if (u.kind==="sunlens" && u.targetId!==null) sunbeam(ctx,u,byId.get(u.targetId),tick,sx,sy,bodyScale);
     else if (u.kind==="prism") hasPrism=true;
   }
   if (hasPrism) drawPrismLocks(ctx,bodies,current.bases,tick,current.tick,sx,sy,bodyScale);

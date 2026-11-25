@@ -104,11 +104,15 @@ async function pixelPreview(url) {
   try {
     await page.addInitScript(()=>{
       const draw=CanvasRenderingContext2D.prototype.drawImage;
-      const rows=new Set();
+      const rows=new Set(), stripOrigins=new WeakMap();
       window.pixelEffectRows=rows;
       CanvasRenderingContext2D.prototype.drawImage=function(image,...args) {
-        if (this.canvas.id==="arena" && image instanceof HTMLImageElement && /\/effects(?:-[\w-]+)?\.png/.test(image.src) && args.length===8) {
-          rows.add(args[1]);
+        if (args.length===8) {
+          const atlas=image instanceof HTMLImageElement && /\/effects(?:-[\w-]+)?\.png/.test(image.src);
+          if (atlas && this.canvas.id!=="arena") stripOrigins.set(this.canvas,args[1]);
+          if (this.canvas.id==="arena" && (atlas || stripOrigins.has(image))) {
+            rows.add((atlas ? 0 : stripOrigins.get(image))+args[1]);
+          }
         }
         return draw.call(this,image,...args);
       };
@@ -123,6 +127,22 @@ async function pixelPreview(url) {
     assert.notEqual(await capture(),frame);
     await page.reload(); await ready(); assert.equal(await capture(),frame);
     console.log("Pixel preview: multiple atlas effects paint while paused, resume with the fight, and reproduce the opening frame on reload.");
+    const troopCues=["solarRay","bellWave","stoneGaze","cinder","venom","rime","daze","bottleShards"];
+    for (const width of [1280,390]) {
+      await page.setViewportSize({width,height:width===1280 ? 720 : 760});
+      await page.goto(new URL("?demo=effects",url).href); await ready();
+      const rows=await page.evaluate(()=>[...window.pixelEffectRows]);
+      for (const name of troopCues) {
+        const row=effects[name];
+        assert.ok(rows.some(y=>y>=row.y && y<row.y+row.h*Math.ceil(row.frames/row.columns)),
+          name+" missing from the live fight at "+width+"px");
+      }
+      const frozenFrame=await capture();
+      await page.waitForTimeout(110);
+      assert.ok((await capture())===frozenFrame,"The effects moved while paused at "+width+"px");
+      await page.reload(); await ready();
+      assert.ok((await capture())===frozenFrame,"The same tick produced a different picture at "+width+"px");
+    }
     const play=new Playground(); kirinShowcase(play);
     const path=play.world.units.find(u=>u.kind==="kirin").arc.path;
     assert.equal(path.length,5);

@@ -6,7 +6,8 @@ import { SPELLS, type FieldSpell } from "./spells.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { TOWER_ART_SCALE } from "./tower-art.ts";
 import { segment } from "./pixel-art/stamps.ts";
-import { drawEffect } from "./pixel-art/effect-player.ts";
+import { drawBeam, drawEffect } from "./pixel-art/effect-player.ts";
+import { effects } from "./pixel-art/effects.ts";
 
 const circle = 2 * Math.PI;
 
@@ -126,37 +127,6 @@ function rope(c: Pens, length: number, sag: number) {
   c.strokeStyle = "#e7c67d"; c.lineWidth = .9; c.stroke();
 }
 
-function fireBreath(c: Pens, length: number, radius: number, age: number) {
-  const progress = Math.min(1, (age + 3) / 7);
-  const broad = Math.max(5, radius * progress * (.80 + .18 * Math.sin(age * .4)));
-  const tail = Math.max(0, (age - 10) / 12) * length;
-  if (tail >= length) return;
-  const span = length - tail;
-  c.translate(tail, 0);
-  // Lobes roll down the outside of the plume. The bright inner jet stops sooner.
-  for (let i = 0; i < 3; i++) {
-    const width = broad * (1 - i * .28), tip = span * (1 - i * .16);
-    const flicker = Math.sin(age * .53 + i * 2.4);
-    c.beginPath(); c.moveTo(0, -1);
-    c.bezierCurveTo(tip*.36, -width*.12, tip*.29, -width*.71, tip*.55, -width*.52);
-    c.bezierCurveTo(tip*.69, -width*.90, tip*.79, -width*.48, tip*.90, -width*(.90+.13*flicker));
-    c.quadraticCurveTo(tip*.88,-width*.57,tip, -width*(.32+.10*flicker));
-    c.quadraticCurveTo(tip*.89, -width*.12, tip*1.03, width*.08);
-    c.quadraticCurveTo(tip*.91, width*.20, tip*.96, width*(.57-.13*flicker));
-    c.quadraticCurveTo(tip*.83, width*.39, tip*.76, width*.60);
-    c.quadraticCurveTo(tip*.61, width*.87, tip*.45, width*.29);
-    c.quadraticCurveTo(tip*.28, width*.24, 0, 1); c.closePath();
-    c.fillStyle = ["#d76a45b5", "#f49b44e0", "#ffe58b"][i]; c.fill();
-  }
-  if (age > 2) {
-    for (let i = 0; i < 5; i++) {
-      const p = ((age * .068 + i * .227) % 1), side = i % 2 ? -1 : 1;
-      c.globalAlpha *= .94;
-      oval(c, span * (.52 + .50*p), side*broad*(.67+.45*p) - 3*p, 1.8 - p*.7, 1.2 - p*.45, "#e38a47");
-    }
-  }
-}
-
 export function drawAttackTrace(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
   const age = tick - e.tick;
   const life = e.kind === "breath" ? 22 : e.kind === "gaze" ? 17 : e.kind === "harpoon" ? 10 : 12;
@@ -181,52 +151,22 @@ export function drawAttackTrace(c: Pens, e: GroundEffect, tick: number, sx: numb
   }
   c.globalAlpha = Math.min(1, (life - age) / (life * .55)); c.lineJoin = c.lineCap = "round";
   if (e.kind === "prism") {
-    const wobble = Math.sin(age*.68) * .45;
-    c.beginPath(); c.moveTo(0,-1); c.lineTo(length, -3.4+wobble); c.lineTo(length,3.4+wobble); c.lineTo(0,1); c.closePath();
-    c.fillStyle = "#bba3e75c"; c.fill();
-    line(c,0,-.6,length,-1.9+wobble,"#c790b1",1.25);
-    line(c,0,.8,length,1.9+wobble,"#72b5c4",1.25);
-    line(c,0,0,length,wobble,"#fff2ae",2.1);
-    if (age < 7) { c.translate(length,0); c.rotate(age*.16); cut(c,"M0 -4 L1.2 -1.2 L4 0 L1.2 1.2 L0 4 L-1.2 1.2 L-4 0 L-1.2 -1.2Z","#fff4cb",.55); }
+    drawBeam(c,"prismRay",0,0,length,0,age/life,.6);
   } else if (e.kind === "gaze") {
-    const reach = length, width = e.radius;
-    c.beginPath(); c.moveTo(0,0); c.lineTo(reach,-width); c.quadraticCurveTo(reach*1.04,0,reach,width); c.closePath();
-    c.fillStyle = "#97aa8533"; c.fill();
-    for (let i = 0; i < 2; i++) {
-      const p = ((age + 3 - 4*i) / 13);
-      if (p <= 0 || p > 1) continue;
-      const x = length*p, w = e.radius*p*.9;
-      c.beginPath(); c.moveTo(x,-w); c.quadraticCurveTo(x+7,0,x,w);
-      c.strokeStyle = i ? "#d8d7aa" : "#728c77"; c.lineWidth = 1.4; c.stroke();
-    }
+    const row=effects.stoneGaze;
+    c.scale(length/row.span,e.radius/row.halfSpread);
+    drawEffect(c,"stoneGaze",0,0,age,life,row.w);
   } else if (e.kind === "breath") {
     c.save();
     // The origin of the sheet is the dragon's mouth. Expand along the actual attack cone.
     c.scale(1,Math.min(1.8,e.radius*2/(length*.62)));
-    const breath = drawEffect(c,"breath",0,0,age,life,length*(.74+.30*Math.min(1,(age+1)/4)));
+    drawEffect(c,"breath",0,0,age,life,length*(.74+.30*Math.min(1,(age+1)/4)));
     c.restore();
-    if (!breath) fireBreath(c,length,e.radius,age);
   } else {
     const lengthLeft = length * (1 - .38*age/life);
     rope(c, lengthLeft, 2.2*Math.sin(age*.88)*(1-age/life));
     c.translate(lengthLeft,0);
     cut(c,"M-6 -2 L1 -1.6 L3 0 L-1 2.5 L-4.6 3.4 L-2.4 1 L-6 1Z","#b7c6c0",.75);
-  }
-  c.restore();
-}
-
-export function drawBreach(c: Pens, e: GroundEffect, tick: number, sx: number, sy: number) {
-  const age = tick - e.tick;
-  if (age < 0 || age > 28) return;
-  const t = age/28, r = e.radius*Math.min(1,(age+3)/12);
-  c.save(); c.translate(e.x*sx,e.y*sy); c.scale(sx,sy); c.globalAlpha = 1-t;
-  c.lineCap = "round";
-  for (let i = 0; i < 6; i++) {
-    const a=i*circle/6+.18;
-    c.beginPath(); c.ellipse(0,0,r,r*.74,0,a,a+.64); c.strokeStyle="#b99d69"; c.lineWidth=2.5-t; c.stroke();
-    const distance = r*(.62 + .21*(i%2)) + t*6;
-    const x=Math.cos(a)*distance, y=Math.sin(a)*distance*.74 - (5+i%3*3)*Math.sin(t*Math.PI);
-    oval(c,x,y,2.9-t*1.4,1.8-t*.65,i%2?"#b68a60":"#d4b27c");
   }
   c.restore();
 }

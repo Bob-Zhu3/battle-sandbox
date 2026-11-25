@@ -2,12 +2,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { bellWave, stoneGaze } from "./troop-cues.mjs";
 
 if (!process.argv[2]) throw new Error("Pass the path to the PixelFX checkout.");
 const upstream = resolve(process.argv[2]);
 const source = file => pathToFileURL(join(upstream, file)).href;
 const { loadEffect, edgeFade } = await import(source("tools/lib/fxlib.mjs"));
-const { createFrame, clearFrame, createFx, composite } = await import(source("src/core/index.js"));
+const { createFrame, clearFrame, createFx, composite, band, hex } = await import(source("src/core/index.js"));
 const { encodePNG } = await import(source("tools/lib/png.mjs"));
 const folder = fileURLToPath(new URL("../src/pixel-art/", import.meta.url));
 
@@ -19,6 +20,7 @@ const boltSequence=(name,seed)=>[name,"lightning/lightning-strike",.76,1.84,27,1
 const kirinSequence=(name,seed)=>[name,"lightning/chain-lightning",.333,1.22,19,248,{seed,light:.25,
   palette:["#172d46","#283957","#344574","#39679b","#2588a7","#73d5df","#b3eee8","#c7f8f0"],
   sparks:["#fff9d7","#c5faf0","#77d8df","#249eb2"]}];
+const original={bellWave:bellWave({band,hex}),stoneGaze:stoneGaze({hex})};
 const sequences = [
   ["slash", "melee/sword-slash", .035, .36, 9],
   ["muzzle", "projectiles/muzzle-pistol", .015, .42, 8],
@@ -56,6 +58,28 @@ const sequences = [
     { palette:["#302949","#57436e","#835894","#b372a0","#e19d9f","#ffcc8d","#fff0bc","#fff7de"] }],
   ["breath", "fire/fire-breath", .03, 1.45, 14],
   kirinSequence("kirinArc",19), kirinSequence("kirinFork",53),
+  ["cinder","fire/campfire",0,2.85,20,84,{height:29,light:.20}],
+  ["wisp","fire/spirit-flame",0,2.85,20,70,{light:.2}],
+  ["venom","nature/toxic-puddle",0,3.8,20,82,{width:9,light:.2,
+    palette:["#261b33","#433048","#604059","#825278","#9d729d","#97a44c","#d4dd73","#f3f5b6"]}],
+  ["daze","status/stunned",0,.95,16,66,{actor:{w:25,y:-16},light:.16}],
+  ["rime","ice/ice-spikes",.08,2.1,18,82,{reach:27,height:25,light:.22}],
+  ["sandBreach","impacts/heavy-landing",.035,1.41,18,105,{light:.3,stone:"#976a4c",
+    palette:["#3f303a","#604848","#82604d","#ac8059","#cea16c","#e8be86","#ffe3ae"]}],
+  ["hexSeal","shadow/hex-sigil",2.34,3.84,17,88,{light:.23,
+    palette:["#34253e","#513454","#81486f","#a15989","#c8759e","#e59aba","#ffd1c7","#fff3d5"]}],
+  ["infection","nature/acid-splash",.31,1.32,14,74,{light:.25}],
+  ["bottleShards","ice/ice-shatter",.76,1.55,13,100,{light:.22,
+    palette:["#392a50","#56426d","#76658e","#9487a6","#aaa3bb","#c4cdd5","#dce8df","#fff6cf"]}],
+  ["solarRay","arcane/arcane-beam",0,1.12,18,168,{light:.32,
+    palette:["#3e2739","#653343","#974746","#c26a3e","#e8953d","#ffd15c","#fff098","#fff7d3"]}],
+  ["prismRay","arcane/arcane-beam",0,1.12,18,168,{seed:91,light:.24,
+    palette:["#312047","#513563","#584989","#5a60a5","#657dc1","#80b3c6","#b4e7d8","#fff1c5"]}],
+  // The ice block is separate from any actor. An empty mask keeps each real troop visible inside it.
+  ["iceShell","ice/freeze",.62,2.67,20,94,{light:.21,
+    actor:{w:1,h:1,x:0,y:0,mask:{data:[0]},pixels:[0]}}],
+  ["bellWave","bellWave",.01,.98,19,96],
+  ["stoneGaze","stoneGaze",.01,.98,17,84],
 ];
 // The stock effect chains through three staged targets. Extract its last hop,
 // (104,-30) to (150,-19), so each copy can end on a real enemy in the game.
@@ -81,7 +105,8 @@ const thunderTimes=[.7667,.7833,.7833,.80,.83,.86,.89,.93,.99,1.04,1.06,1.08,1.1
 // These effects were authored over dark scenes. Put one native shadow pixel on their
 // brightly lit edges so the same silhouettes survive on the game's white arena.
 const edgeColors = { shower:[62,113,139], glass:[68,121,149], icewall:[47,85,146],
-  fury:[153,63,84], outlet:[117,73,112], kirinArc:[50,66,110], kirinFork:[50,66,110] };
+  fury:[153,63,84], outlet:[117,73,112], kirinArc:[50,66,110], kirinFork:[50,66,110],
+  rime:[57,109,147], wisp:[44,114,111], cinder:[151,66,53], venom:[100,71,108], daze:[111,72,67] };
 function shadeEdges(tile,width,height,tint) {
   if (!tint) return;
   const mask=new Uint8Array(width*height);
@@ -108,11 +133,13 @@ const rows = [];
 const metadata = {};
 let atlasHeight = 0;
 for (const [name, id, beginning, end, count, nativeLimit = 78, options = {}] of sequences) {
-  const { mod, meta } = await loadEffect(id);
+  const mod = original[id] ?? (await loadEffect(id)).mod, {meta}=mod;
   const [sourceW, sourceH] = meta.size, [sourceX, sourceY] = meta.origin;
   const kirin = id === "lightning/chain-lightning";
   const [w,h] = kirin ? [kirinHop.width,kirinHop.height] : meta.size;
-  const [ox,oy] = kirin ? [kirinHop.ox,kirinHop.oy] : meta.origin;
+  // Use the flame base, star orbit, ice cluster, seal center or lens aperture as the game anchor.
+  const anchorOffset={cinder:[0,-12],daze:[0,-16],rime:[12,0],hexSeal:[0,-50],solarRay:[15,-24],prismRay:[15,-24]}[name] ?? [0,0];
+  const [ox,oy] = kirin ? [kirinHop.ox,kirinHop.oy] : [sourceX+anchorOffset[0],sourceY+anchorOffset[1]];
   const shrink = Math.max(1, Math.ceil(Math.max(w, h) / nativeLimit));
   // Preserve authored vertical bolt detail when the sky is much taller than the target sprite.
   const isBolt = name.startsWith("thunder");
@@ -130,13 +157,16 @@ for (const [name, id, beginning, end, count, nativeLimit = 78, options = {}] of 
     while (step < sample) { effect.update(1 / 60); step++; }
     clearFrame(frame);
     // Only the falling drops and crowns belong on the field. The source back layer is a solid pond.
-    effect.draw(frame, name === "shower" || kirin ? "front" : undefined);
+    effect.draw(frame, name === "shower" || name === "venom" || kirin ? "front" : undefined);
     edgeFade(frame);
     composite(frame, rgba, null);
     const pixels=kirin ? isolateKirinHop(rgba,sourceW,sourceX,sourceY) : rgba;
     const tile = new Uint8Array(sw * sh * 4);
     for (let y = 0; y < h; y++) {
+      if (name==="cinder" && y>oy) break; // Only the flame and rising sparks, above the logs.
       for (let x = 0; x < w; x++) {
+        // Keep distant campfire smoke from shrinking the flames to a dot on a troop.
+        if (name==="cinder" && (Math.abs(x-ox)>18 || y<oy-46)) continue;
         const p = (y * w + x) * 4, alpha = pixels[p + 3];
         if (alpha < (nativeLimit > 78 ? 52 : 36)) continue;
         const tx = Math.floor(x / shrink), ty = Math.floor((y+pad+(offsets?.[x] ?? 0))/verticalStep), q = (ty * sw + tx) * 4;
@@ -159,6 +189,10 @@ for (const [name, id, beginning, end, count, nativeLimit = 78, options = {}] of 
   const columns = Math.min(count, Math.floor(atlasWidth / width));
   metadata[name] = { y: atlasHeight, w: width, h: height, ox: Math.round(ox / shrink) - left,
     oy: Math.round((oy+pad) / verticalStep) - top, frames: count, columns, ...(kirin ? {span:kirinHop.span} : {}),
+    ...(id==="arcane/arcane-beam" ? {span:Math.round(168/shrink)} : {}),
+    ...(name==="iceShell" ? {shellWidth:34/shrink} : {}),
+    ...(name==="bellWave" ? {radius:mod.radius} : {}),
+    ...(name==="stoneGaze" ? {span:mod.span,halfSpread:mod.halfSpread} : {}),
     ...(verticalStep === shrink ? {} : { pixelAspect:verticalStep/shrink }) };
   for (const [i, tile] of tiles.entries()) {
     rows.push({ tile, sw, left, top, width, height, x: i % columns * width, y: atlasHeight + Math.floor(i / columns) * height });

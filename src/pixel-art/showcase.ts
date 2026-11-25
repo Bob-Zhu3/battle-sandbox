@@ -37,6 +37,25 @@ export function kirinShowcase(play: Playground) {
   play.paused=true;
 }
 
+export function troopEffectsShowcase(play: Playground) {
+  const field: [Team,RecruitKind,number,number][] = [
+    ["red","sunlens",222,123], ["blue","irongolem",341,128],
+    ["red","phoenix",196,242], ["blue","shieldbearer",277,239],
+    ["red","clown",407,234], ["blue","warrior",481,236],
+    ["red","frostqueen",641,238], ["blue","monk",735,241],
+  ];
+  for (const [team,kind,x,y] of field) play.place(team,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
+  for (let i=0;i<8;i++) play.advance();
+  play.place("red",{type:UNIT_DEFINITIONS.medusa.command,positions:[{x:611,y:117}]});
+  play.place("blue",{type:UNIT_DEFINITIONS.warrior.command,positions:[{x:698,y:107}]});
+  play.place("blue",{type:UNIT_DEFINITIONS.archer.command,positions:[{x:713,y:125}]});
+  for (let i=0;i<15;i++) play.advance();
+  play.place("red",{type:UNIT_DEFINITIONS.belltower.command,positions:[{x:431,y:118}]});
+  play.place("blue",{type:UNIT_DEFINITIONS.lancer.command,positions:[{x:473,y:128}]});
+  for (let i=0;i<13;i++) play.advance();
+  play.paused=true;
+}
+
 // Open on the return stroke while the meteor is still in flight. All targets
 // and hit locations come from a normal playground battle.
 export function spellShowcase(play: Playground) {
