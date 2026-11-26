@@ -1,6 +1,6 @@
 import { ARMIES, type Team } from "./battlefield.ts";
-import { unitArtScale } from "./tower-art.ts";
-import { drawUnitToken } from "./characters.ts";
+import { restingPose } from "./character-pose.ts";
+import { drawBody } from "./characters.ts";
 import { drawSpellIcon } from "./magic-art.ts";
 import { SPELLS, type SpellKind } from "./spells.ts";
 import { isBuilding, UNIT_DEFINITIONS, type RecruitKind } from "./units.ts";
@@ -15,17 +15,6 @@ const shelves: {name: string; items: Brush[]}[] = [
 ];
 const catalog = { ...UNIT_DEFINITIONS, ...SPELLS };
 function isSpell(key: Brush): key is SpellKind { return Object.hasOwn(SPELLS,key); }
-
-// Frame the taller and wider silhouettes in the same 72-unit portrait as the other towers.
-const towerPortraits: Partial<Record<RecruitKind, { radius: number; y: number }>> = {
-  post:      { radius: 19,    y: 41 },
-  prism:     { radius: 17.7,  y: 47 },
-  workshop:  { radius: 18.25, y: 46 },
-  lobber:    { radius: 17.5,  y: 45 },
-  sunlens:   { radius: 16.25, y: 46 },
-  belltower: { radius: 17.5,  y: 45 },
-};
-const standardTowerPortrait = { radius: 16.32, y: 47 };
 
 export function createRoster(strip: HTMLElement, priced: boolean) {
   const storageKey = "battle.palette." + (location.pathname.replace(/\/$/, "") || "/");
@@ -79,31 +68,54 @@ export function createRoster(strip: HTMLElement, priced: boolean) {
     scrollTo((continuing ? destination : current)+delta);
   }
 
+  const portraits = new Map<string,HTMLCanvasElement>();
+  const source = document.createElement("canvas");
+  source.width = source.height = 128;
+  const pen = source.getContext("2d",{willReadFrequently:true})!;
+
   function icon(key: Brush) {
-    const art = document.createElement("canvas");art.width=art.height=53;art.className="brush-icon";art.setAttribute("aria-hidden","true");
-    const c=art.getContext("2d")!;
-    c.imageSmoothingEnabled=false;
-    c.scale(art.width/72,art.height/72);
-    if(isSpell(key)){c.translate(36,36);c.scale(1.95,1.95);drawSpellIcon(c,key);}
-    else if (isBuilding(key)) {
-      const { radius, y } = towerPortraits[key] ?? standardTowerPortrait;
-      const x = key === "harpoon" ? 36 - 3 * ARMIES[team].facing : 36;
-      drawUnitToken(c, x, y, radius, team, key);
-    } else if (key === "phoenix") {
-      drawUnitToken(c, 36 + ARMIES[team].facing * 9.5, 49, 13.5, team, key);
-    } else if (["hydra","medusa","vampire","sandworm","slime","horseman","werewolf","cerberus","kraken","firedragon","irongolem",
-      "monk","liondancers","rhinorider","trojanhorse"].includes(key)) {
-      const shift=key==="firedragon" ? 2.5 : 0;
-      const size=key==="slime" ? 18.5 : key==="vampire" || key==="irongolem" ? 16.5 : key==="firedragon" ? 13 : 13.6;
-      const y=key==="slime" ? 43 : 47;
-      drawUnitToken(c,36+shift*ARMIES[team].facing,y,size*(key==="monk" ? unitArtScale(key) : 1),team,key);
+    const spell = isSpell(key);
+    const cacheKey = spell ? key : team + "/" + key;
+    const cached = portraits.get(cacheKey);
+    if (cached) return cached;
+
+    pen.clearRect(0,0,source.width,source.height);
+    if (spell) {
+      pen.save(); pen.translate(64,64); drawSpellIcon(pen,key); pen.restore();
     } else {
-      const myth = key === "cyclops" || key === "frostqueen" || key === "kirin" || key === "reaper" || key === "witch";
-      const longWeapon = key === "musketeer" || key === "lancer" || key === "miner";
-      const size = key === "reaper" ? 13.5 : myth ? (key === "cyclops" ? 15.5 : 14.5) : longWeapon || key === "mouse" ? 17 : 19;
-      const shift = key === "lancer" || key === "reaper" ? -8 : key === "miner" ? -7 : longWeapon || key === "cyclops" ? -4 : 0;
-      drawUnitToken(c,36 + ARMIES[team].facing * shift,myth ? 49 : 44,size*(key==="bomber" ? unitArtScale(key) : 1),team,key);
+      const pose=restingPose(ARMIES[team].facing);
+      pen.save(); pen.translate(64,72); pen.scale(pose.side,1);
+      drawBody(pen,team,key,pose,undefined,0); pen.restore();
     }
+    // Frame the actual pixels, including weapons and hats, once per portrait and team.
+    const pixels = pen.getImageData(0,0,source.width,source.height).data;
+    let left=source.width, right=-1, top=source.height, bottom=-1;
+    for (let y=0;y<source.height;y++) for (let x=0;x<source.width;x++) {
+      if (pixels[(y*source.width+x)*4+3] < 32) continue;
+      left=Math.min(left,x); right=Math.max(right,x); top=Math.min(top,y); bottom=Math.max(bottom,y);
+    }
+    const art = document.createElement("canvas");
+    art.width=68; art.height=46; art.className="brush-icon"; art.setAttribute("aria-hidden","true");
+    if (right>=left) {
+      const w=right-left+1, h=bottom-top+1;
+      const maxWidth=spell || isBuilding(key) ? 40 : 62;
+      const scale=Math.min(maxWidth/w,38/h);
+      const width=Math.round(w*scale), height=Math.round(h*scale);
+      const x=Math.round((art.width-width)/2);
+      const y=spell ? Math.round((art.height-height)/2) : art.height-5-height;
+      const c=art.getContext("2d")!;
+      c.imageSmoothingEnabled=false;
+      if (!spell) {
+        // A flying pose can sit far above its field shadow. Ground the card at its own baseline.
+        const shadowWidth=Math.min(24,Math.round(scale*14));
+        const shadowX=Math.round(x+(64-left)*width/w-shadowWidth/2);
+        c.fillStyle="#39364328";
+        c.fillRect(shadowX,art.height-6,shadowWidth,2);
+        c.fillRect(shadowX+2,art.height-4,shadowWidth-4,1);
+      }
+      c.drawImage(source,left,top,w,h,x,y,width,height);
+    }
+    portraits.set(cacheKey,art);
     return art;
   }
   function remember() {

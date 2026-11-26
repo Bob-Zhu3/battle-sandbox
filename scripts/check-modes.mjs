@@ -212,15 +212,26 @@ async function spellGround(url) {
     for (const [kind,rule] of Object.entries(SPELLS)) {
       const card=page.getByRole("button",{name:rule.name,exact:true});
       await card.click({force:true});
-      if (kind==="wormhole") await page.mouse.click(...point(320,141));
+      if (kind==="wormhole") {
+        await page.mouse.click(...point(320,141));
+        assert.ok(await sample(366,154,4,4)>1,"The pending entrance shows the 48-unit rim");
+      }
       await page.mouse.click(...point(485,169));
+      if (kind==="wormhole") {
+        await page.clock.runFor(100);
+        assert.ok(await sample(366,154,4,4)>1,"The open entrance matches the placement preview");
+        assert.ok(await sample(525,175,7,6)>2,"The exit is visible beyond the old portal diameter");
+      }
       if (kind==="lightning") {
         await page.clock.runFor(335);
         assert.ok(await sample(485,7,70,6)>0,"Lightning connects the sky to the contact point");
       }
       await page.clock.runFor(Math.ceil((rule.duration+9)*1000/60));
-      assert.ok(await sample(485,169,67,35)>8,rule.name+" leaves visible ground pixels after its active spell ends");
-      if (kind==="wormhole") assert.ok(await sample(320,141,42,25)>8,"The entrance leaves its own mark");
+      if (["meteor","fault","lightning"].includes(kind)) {
+        assert.ok(await sample(485,169,67,35)>8,rule.name+" leaves visible ground pixels after its active spell ends");
+      } else {
+        assert.equal(await sample(480,180,479,179),0,rule.name+" clears the field when it ends");
+      }
       if (kind==="meteor") {
         await page.getByRole("button",{name:"Pause playground"}).click({force:true});
         const still=await arena.evaluate(c=>c.toDataURL());
@@ -232,7 +243,7 @@ async function spellGround(url) {
       assert.equal(await sample(485,169,70,38),0);
     }
   } finally { await page.context().close(); }
-  console.log("All ten spells leave visible ground marks. Lightning reaches the sky, both portals leave a mark, and Pause and Clear work on the residue.");
+  console.log("Only Meteor, Fault Line, and Lightning leave ground marks. Both enlarged Wormhole portals close cleanly.");
 }
 
 async function pausePlayground(url) {
@@ -594,9 +605,15 @@ async function browseRoster(url) {
             left=Math.min(left,x); right=Math.max(right,x);
             top=Math.min(top,y); bottom=Math.max(bottom,y);
           }
-          return {name:canvas.parentElement.getAttribute("aria-label"),clipped,span:Math.max(right-left,bottom-top)+1};
+          return {name:canvas.parentElement.getAttribute("aria-label"),clipped,span:Math.max(right-left,bottom-top)+1,height:bottom-top+1,bottom};
         }));
         assert.deepEqual(frames.filter(f=>f.clipped).map(f=>f.name),[],team+" portraits need space around each silhouette");
+        if (shelf==="People") {
+          for (const f of frames) {
+            assert.ok(f.height>=36 && f.height<=38,team+" "+f.name+" portrait height: "+f.height);
+            assert.ok(f.bottom>=39 && f.bottom<=40,team+" "+f.name+" portrait baseline: "+f.bottom);
+          }
+        }
         if(shelf==="Towers") {
           // Compare the longest edge so a horizontal harpoon and a tall spire fit the same space.
           const spans=frames.map(f=>f.span);

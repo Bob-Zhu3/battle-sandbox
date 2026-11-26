@@ -119,7 +119,8 @@ try{
     const passenger=roster.find(u=>u.kind==="prism").id;
     await Promise.all(group.map(ready));
     await wait(()=>group.every(p=>p.frames.some(f=>f.phase==="running" && f.world.bases.length===3)),"free-for-all countdown completed");
-    await brush(group[0],"Spells","Wormhole");await draw(group[0],695,109);
+    // The tower is 48 units east of the entrance, within the enlarged rim.
+    await brush(group[0],"Spells","Wormhole");await draw(group[0],647,109);
     assert.equal(await group[0].page.locator("#deploy-hint").textContent(),"Tap the exit to open both portals for 5 seconds.");
     assert.ok(group.every(p=>!p.frames.some(f=>f.world.spells?.some(s=>s.kind==="wormhole"))));
     await draw(group[0],533,155);
@@ -130,7 +131,7 @@ try{
     for(const p of group){
       const world=arrival(p).world, tower=world.units.find(u=>u.id===passenger), trap=world.spells.find(s=>s.kind==="wormhole");
       assert.equal(tower.team,"blue");assert.deepEqual([tower.x,tower.y],[trap.x,trap.y]);
-      assert.ok(Math.hypot(trap.entrance.x-695,trap.entrance.y-109)<2);
+      assert.ok(Math.hypot(trap.entrance.x-647,trap.entrance.y-109)<2);
       assert.ok(Math.hypot(trap.x-533,trap.y-155)<2);
       assert.equal(world.units.find(u=>u.kind==="firedragon").warpedTick,undefined);
     }

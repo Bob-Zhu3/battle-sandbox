@@ -24,7 +24,7 @@ export const SPELLS = {
     description: "Calls down a bolt on each of the three healthiest enemies in the circle. Each strike deals damage and stuns." },
   rage: { name: "Rage", command: "cast-rage", cost: 14, radius: 66, delay: 8, duration: 152, speedFactor: 1.4,
     description: "Allied troops inside the ring move 40% faster and recover attacks 50% faster. Late arrivals join the rush." },
-  wormhole: { name: "Wormhole", command: "cast-wormhole", cost: 19, radius: 24, delay: 0, duration: 300,
+  wormhole: { name: "Wormhole", command: "cast-wormhole", cost: 19, radius: 48, delay: 0, duration: 300,
     description: "Place an entrance, then an exit. For five seconds, enemy troops touching the entrance travel to the exit. Works under enemy towers too." },
 } as const;
 export type SpellKind = keyof typeof SPELLS;
@@ -45,20 +45,20 @@ export interface FieldSpell {
 }
 
 // These records describe the floor after a cast. Only active spells participate in combat.
-export type SpellMark = Pick<FieldSpell, "id" | "kind" | "team" | "x" | "y" | "startTick" | "entrance" | "strikes">;
-export const MARK_TICKS: Record<SpellKind, number> = {
-  gust: 105, meteor: 360, rain: 160, fault: 270, briar: 180, mirror: 145,
-  freeze: 210, lightning: 225, rage: 125, wormhole: 150,
-};
+export const MARK_TICKS = { meteor: 360, fault: 270, lightning: 225 } satisfies Partial<Record<SpellKind, number>>;
+type MarkKind = keyof typeof MARK_TICKS;
+export type SpellMark = Pick<FieldSpell, "id" | "team" | "x" | "y" | "startTick" | "strikes"> & { kind: MarkKind };
+export function leavesGroundMark(kind: SpellKind): kind is MarkKind {
+  return Object.hasOwn(MARK_TICKS,kind);
+}
 export const MAX_SPELL_MARKS = 64;
 export function floorAfterCast(old: SpellMark[] | undefined, spells: FieldSpell[] | undefined, tick: number) {
-  const visible=(m: SpellMark)=>tick<m.startTick+SPELLS[m.kind].duration+MARK_TICKS[m.kind];
+  const visible=(m: SpellMark)=>leavesGroundMark(m.kind) && tick<m.startTick+SPELLS[m.kind].duration+MARK_TICKS[m.kind];
   if (!spells?.length && (!old || old.every(visible))) return old;
   const marks = old?.filter(visible) ?? [];
   for (const s of spells ?? []) {
-    if (tick !== s.startTick + SPELLS[s.kind].duration) continue;
+    if (!leavesGroundMark(s.kind) || tick !== s.startTick + SPELLS[s.kind].duration) continue;
     const mark: SpellMark = { id:s.id, kind:s.kind, team:s.team, x:s.x, y:s.y, startTick:s.startTick };
-    if (s.entrance) mark.entrance = s.entrance;
     if (s.strikes) mark.strikes = s.strikes;
     marks.push(mark);
   }

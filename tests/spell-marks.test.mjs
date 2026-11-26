@@ -5,7 +5,7 @@ import { Playground } from "../src/playground.ts";
 import { stepBattle } from "../src/simulation.ts";
 import { MARK_TICKS, MAX_SPELL_MARKS, SPELLS } from "../src/spells.ts";
 
-test("each spell leaves one mark after its final combat tick and cleans it up on an empty field",()=>{
+test("only Meteor, Fault Line and Lightning leave a mark after their final combat tick",()=>{
   for (const [kind,rule] of Object.entries(SPELLS)) {
     const game=new Playground();
     const entrance=kind==="wormhole" ? {x:228,y:125} : undefined;
@@ -16,9 +16,14 @@ test("each spell leaves one mark after its final combat tick and cleans it up on
     game.advance();
     assert.equal(game.world.spells,undefined);
     const marks=game.world.marks;
+    if (!["meteor","fault","lightning"].includes(kind)) {
+      assert.equal(marks,undefined,rule.name);
+      const empty=game.world;
+      game.advance(); assert.equal(game.world,empty);
+      continue;
+    }
     assert.equal(marks.length,1);
     assert.deepEqual([marks[0].kind,marks[0].x,marks[0].y,marks[0].startTick],[kind,540,183,0]);
-    if (entrance) assert.deepEqual(marks[0].entrance,entrance);
     game.paused=true;
     const paused=game.world;
     game.advance(); assert.equal(game.world,paused);
@@ -54,8 +59,8 @@ test("lightning scars remember the struck positions through a server restart and
 
 test("the floor has a bounded history and Undo and Clear also work after a cast ends",()=>{
   const game=new Playground();
-  for (let i=0;i<MAX_SPELL_MARKS+3;i++) game.cast("red","gust",100+i,150);
-  for (let i=0;i<SPELLS.gust.duration;i++) game.advance();
+  for (let i=0;i<MAX_SPELL_MARKS+3;i++) game.cast("red","meteor",100+i,150);
+  for (let i=0;i<SPELLS.meteor.duration;i++) game.advance();
   const marks=game.world.marks;
   assert.equal(marks.length,MAX_SPELL_MARKS);
   assert.equal(marks[0].id,4);
@@ -64,4 +69,14 @@ test("the floor has a bounded history and Undo and Clear also work after a cast 
   game.clear();
   assert.equal(game.world.marks,undefined);
   assert.equal(game.world.tick,0);
+});
+
+test("a room reopened from an older version drops retired ground marks before its first snapshot",()=>{
+  const checkpoint=new Room().checkpoint(1);
+  const world=checkpoint.state.world;
+  world.tick=305;
+  world.marks=["wormhole","meteor","freeze","lightning"].map((kind,id)=>({kind,id,team:"red",x:410,y:160,startTick:100}));
+  world.marks[0].startTick=0;
+  const restored=Room.restore(checkpoint);
+  assert.deepEqual(restored.snapshot(2).world.marks.map(m=>m.kind),["meteor","lightning"]);
 });

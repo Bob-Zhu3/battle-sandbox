@@ -487,6 +487,20 @@ test("a Wormhole catches late walkers and expires after 300 ticks",()=>{
   assert.equal(unit(w,1).warpedTick,crossed);assert.ok(unit(w,1).x<260);
 });
 
+test("the 48-unit Wormhole catches an enemy tower touching the rim and misses one a unit farther away",()=>{
+  const x=300, y=180;
+  assert.equal(SPELLS.wormhole.radius,48);
+  for (const gap of [48,49]) {
+    const world=createBattle([at(1,"prism","blue",x,y)]);
+    const tower=unit(world,1);
+    tower.x=x+footprint(tower)+gap;
+    world.spells=[portal(90,x,y,700,y)];
+    const after=unit(step(world),1);
+    assert.equal(after.x,gap===48 ? 700 : tower.x);
+    assert.equal(after.warpedTick,gap===48 ? 1 : undefined);
+  }
+});
+
 test("a fast crossing chooses the first entrance and an overlapping exit waits for a genuine re-entry",()=>{
   let w=createBattle([warrior(1,260)]);
   w.spells=[portal(93,390,180,610,180),portal(92,350,180,630,180),portal(91,350,180,550,180),portal(94,550,180,760,180)];

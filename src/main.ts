@@ -226,7 +226,8 @@ function frame(time: number) {
   }
   if (before !== play.world.tick) field.hear(startWorld,play.world);
   if (beforeCount !== play.world.units.length || beforeSpells !== (play.world.spells?.length ?? 0) + (play.world.effects?.length ?? 0) + (play.world.marks?.length ?? 0) || Math.floor(before / 6) !== Math.floor(play.world.tick / 6)) update();
-  if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || play.world.marks?.length || beforeSpells || beforeCount) paint(remainder / tickMs);
+  if (play.world.units.length || play.world.arrows.length || play.world.spells?.length || play.world.effects?.length || play.world.marks?.length) paint(remainder / tickMs);
+  else if (beforeSpells || beforeCount || startWorld.arrows.length) paint(1); // Clear the final frame before the empty field rests.
   animation = requestAnimationFrame(frame);
 }
 syncClockButton();

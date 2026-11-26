@@ -1,4 +1,4 @@
-import { makeFieldSpell, SPELLS, spellKind } from "../src/spells.ts";
+import { floorAfterCast, makeFieldSpell, SPELLS, spellKind } from "../src/spells.ts";
 import { BRUSH_SPACING, type ArenaPoint } from "../src/deployment.ts";
 import { Battle, battleOutcome, createBattle, stepBattle, TICKS_PER_SECOND, ARENA, type Outcome, type Placement, type Team } from "../src/simulation.ts";
 import { restoreUnitKinds, type Joined, type PlacementAck, type RoomPhase, type Seat, type Snapshot } from "../src/room-protocol.ts";
@@ -268,7 +268,8 @@ export class Room {
     restoreUnitKinds(world);
     Object.assign(room.seats,state.seats);
     Object.assign(room.gold,state.gold);
-    room.world = new Battle(world.tick,world.units,world.arrows,world.bases,world.spells,world.effects,world.marks);
+    room.world = new Battle(world.tick,world.units,world.arrows,world.bases,world.spells,world.effects,
+      floorAfterCast(world.marks,undefined,world.tick));
     for (const player of saved.players) room.players[player.team] = {token:player.token,receipts:new Map(player.receipts)};
     return room;
   }

@@ -75,8 +75,12 @@ function inletRing(c: Pens, x: number, y: number, team: Team, sx: number, sy: nu
   c.lineWidth=Math.max(1,(pending?1.4:1.15)*Math.min(sx,sy)); c.lineCap="round"; c.stroke();
 }
 
+function portalMouthSize(sx: number, sy: number) {
+  return Math.max(23, SPELLS.wormhole.radius * Math.min(sx,sy) * 11 / 15);
+}
+
 export function drawWormholeEntrance(c: Pens, point: {x:number; y:number}, team: Team, tick: number, sx: number, sy: number) {
-  const x=point.x*sx, y=point.y*sy, size=Math.max(11.5,17.6*Math.min(sx,sy));
+  const x=point.x*sx, y=point.y*sy, size=portalMouthSize(sx,sy);
   c.save();
   inletRing(c,x,y,team,sx,sy,true);
   mouth(c,x,y,size,-tick*.052,team,true,0);
@@ -86,7 +90,7 @@ export function drawWormholeEntrance(c: Pens, point: {x:number; y:number}, team:
 export function drawWormhole(c: Pens, spell: FieldSpell, tick: number, sx: number, sy: number) {
   const age=tick-spell.startTick, duration=SPELLS.wormhole.duration;
   if (!spell.entrance || age<0 || age>=duration) return;
-  const k=Math.min(sx,sy), size=Math.max(11.5,17.6*k);
+  const k=Math.min(sx,sy), size=portalMouthSize(sx,sy);
   const phase=age*.064+spell.id, passage=tick-(spell.lastPassageTick ?? -Infinity);
   const kick=passage>=0 ? Math.max(0,1-passage/13) : 0;
   const x=spell.x*sx, y=spell.y*sy;
