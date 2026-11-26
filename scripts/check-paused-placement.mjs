@@ -10,7 +10,7 @@ export async function checkPausedPlacement(browser, url) {
         window.brushSamples = [];
         const start = AudioBufferSourceNode.prototype.start;
         AudioBufferSourceNode.prototype.start = function (...args) {
-          if(this.buffer?.sampleRate===24000)window.brushSamples.push(this.buffer);
+          if(this.buffer)window.brushSamples.push({seconds:this.buffer.duration,offset:args[1]??0});
           return start.apply(this,args);
         };
         const connect = AudioNode.prototype.connect;
@@ -94,12 +94,13 @@ export async function checkPausedPlacement(browser, url) {
         if(touch){await tab.tap();await button.tap();}else{await tab.click();await button.click();}
         assert.ok(await place()>.002,card+" can be heard while paused");
       }
-      const samples=await page.evaluate(n=>{
-        const voices=window.brushSamples.slice(n);
-        return {count:voices.length,distinct:new Set(voices).size};
-      },first);
-      assert.deepEqual(samples,{count:4,distinct:4});
+      const samples=await page.evaluate(n=>window.brushSamples.slice(n),first);
+      assert.equal(samples.length,4);
+      assert.deepEqual(samples[0],{seconds:1,offset:.5*(1-.045)});
+      assert.deepEqual(samples[1],samples[0],"Troop and tower share the original brush tap");
+      assert.ok(samples[2].seconds>20 && samples[3].seconds===samples[2].seconds);
+      assert.notEqual(samples[2].offset,samples[3].offset,"Freeze and Lightning use different recorded cuts");
     } finally { await page.context().close(); }
   }
-  console.log("Paused troops, towers and spells have distinct audible samples on desktop and touch. Mute and the frozen battle clock hold.");
+  console.log("Desktop and touch use one paused troop and tower tap, with separate spell sounds. Mute and the frozen battle clock hold.");
 }

@@ -12,6 +12,7 @@ import { UNIT_DEFINITIONS as defs } from "../src/units.ts";
 import { SPELLS } from "../src/spells.ts";
 import { FACE, INK } from "../src/ink.ts";
 import { checkPausedPlacement } from "./check-paused-placement.mjs";
+import { fieldTakes } from "../src/audio/field-takes.ts";
 import { effects } from "../src/pixel-art/effects.ts";
 import { kirinShowcase } from "../src/pixel-art/showcase.ts";
 import { Playground } from "../src/playground.ts";
@@ -463,20 +464,22 @@ async function touchAndSound(url) {
 async function fieldVoices(url) {
   const page=await browser.newPage({viewport:{width:960,height:540}});
   try {
-    await page.addInitScript(()=>{
+    await page.addInitScript(takes=>{
+      const names=new Map(Object.entries(takes).map(([name,[offset]])=>[offset,name]));
       window.playedCuts=[];
       const start=AudioBufferSourceNode.prototype.start;
       AudioBufferSourceNode.prototype.start=function(...args){
         if(this.buffer?.duration>20){
-          const slot=Math.round(args[1]/1.25), samples=this.buffer.getChannelData(0), rate=this.buffer.sampleRate;
+          window.fieldBank=this.buffer;
+          const name=names.get(Math.round(args[1]*1000)), samples=this.buffer.getChannelData(0), rate=this.buffer.sampleRate;
           const first=Math.round(args[1]*rate), end=first+Math.floor(args[2]*rate);
           let energy=0;
           for(let i=first;i<end;i+=8)energy+=samples[i]*samples[i];
-          window.playedCuts.push({slot,energy});
+          window.playedCuts.push({name,energy});
         }
         return start.apply(this,args);
       };
-    });
+    },fieldTakes);
     await page.goto(url+"/?demo=sound");
     const cyclops=page.getByRole("button",{name:"Cyclops",exact:true});
     assert.equal(await cyclops.getAttribute("aria-pressed"),"true");
@@ -485,10 +488,21 @@ async function fieldVoices(url) {
     const box=await page.locator("#arena").boundingBox();
     await page.mouse.click(box.x+box.width*548/960,box.y+box.height*.5);
     await page.waitForFunction(()=>{
-      const slots=new Set(window.playedCuts.filter(c=>c.energy>1).map(c=>c.slot));
-      return slots.has(0) && slots.has(1) && (slots.has(5)||slots.has(6)) &&
-        (slots.has(7)||slots.has(8)) && slots.has(10) && (slots.has(12)||slots.has(18));
+      const heard=new Set(window.playedCuts.filter(c=>c.energy>1).map(c=>c.name));
+      return heard.has("draw") && heard.has("loose") && (heard.has("shoutA")||heard.has("shoutB")) &&
+        (heard.has("glassA")||heard.has("glassB")) && heard.has("roar") && (heard.has("growl")||heard.has("whine"));
     },null,{timeout:8500});
+    const missing=await page.evaluate(takes=>{
+      const bank=window.fieldBank, data=bank.getChannelData(0), rate=bank.sampleRate;
+      return Object.entries(takes).filter(([, [offset,length]])=>{
+        const first=Math.round(offset*rate/1000), end=first+Math.floor(length*rate/1000);
+        if(first<0 || end>data.length)return true;
+        let energy=0;
+        for(let i=first;i<end;i++)energy+=data[i]*data[i];
+        return Math.sqrt(energy/(end-first))<.009;
+      }).map(([name])=>name);
+    },fieldTakes);
+    assert.deepEqual(missing,[],"Every named recording must contain playable sound in the shipped bank");
     console.log("Live sound: the Archer drew and loosed, the Lancer shouted, the bottle broke, and the Cyclops roared and reacted to damage.");
   } finally {await page.close();}
 }

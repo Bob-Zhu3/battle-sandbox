@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import test from "node:test";
 import { createBattle, stepBattle } from "../src/simulation.ts";
 import { Playground } from "../src/playground.ts";
 import { battleCues, createCueMixer, pausedPlacementCues, matchCues } from "../src/sound-events.ts";
 import { SPELLS } from "../src/spells.ts";
 import { RECRUIT_KINDS, UNIT_DEFINITIONS } from "../src/units.ts";
-import { scoreForCue } from "../src/audio/scorebook.ts";
-import { renderScore, FOLEY_RATE } from "../src/audio/foley.ts";
+import { soundFor } from "../src/audio/sound-design.ts";
+import { fieldTakes } from "../src/audio/field-takes.ts";
 
 test("room signals follow confirmed transitions and joining a finished round stays quiet",()=>{
   const lobby={round:1,phase:"deploy",world:createBattle([]),seats:{red:{ready:false}}};
@@ -24,43 +23,43 @@ test("room signals follow confirmed transitions and joining a finished round sta
   assert.deepEqual(matchCues(end,end,"red"),[]);
 });
 
-test("every selectable troop, tower and spell produces its own audible paused placement", () => {
-  const attacks=new Set(), transients=new Set();
-  function check(game,before,card){
-    const [cue,...more]=pausedPlacementCues(before,game.world);
-    assert.deepEqual(more,[]);
-    assert.equal(cue.unit??cue.spell,card);
-    assert.deepEqual(pausedPlacementCues(game.world,game.world),[]);
-    const score=scoreForCue(cue), pcm=renderScore(score);
-    assert.ok(pcm.length>=FOLEY_RATE*.09,card);
-    assert.ok(pcm.reduce((sum,v)=>sum+v*v,0)/pcm.length>.001,card+" has audible energy");
-    assert.ok(pcm.every(v=>Number.isFinite(v) && Math.abs(v)<=.821),card+" has headroom");
-    // Compare equal-length onsets as well as complete sample data.
-    transients.add(createHash("sha256").update(pcm.subarray(0,2048)).digest("hex"));
-    attacks.add(createHash("sha256").update(pcm).digest("hex"));
-  }
+test("all 44 troops and buildings use the same brush tap while running or paused",()=>{
   for(const card of RECRUIT_KINDS){
     const game=new Playground(),before=game.world;
     game.place("blue",{type:UNIT_DEFINITIONS[card].command,positions:[{x:300,y:170}]});
-    check(game,before,card);
+    const cues=battleCues(before,game.world);
+    assert.equal(cues.length,1,card);
+    assert.equal(cues[0].kind,"place"); assert.equal(cues[0].unit,undefined);
+    assert.equal(soundFor(cues[0]),undefined,"the placement tap is independent of the recording download");
+    assert.deepEqual(pausedPlacementCues(before,game.world),cues);
+    assert.deepEqual(pausedPlacementCues(game.world,game.world),[]);
   }
-  for(const card of Object.keys(SPELLS)){
-    const game=new Playground(),before=game.world;
-    game.cast("red",card,510,170,{x:330,y:170}); check(game,before,card);
-  }
-  const count=RECRUIT_KINDS.length+Object.keys(SPELLS).length;
-  assert.equal(attacks.size,count); assert.equal(transients.size,count);
 });
 
-test("a mixed snapshot preserves different card voices and groups a mass deployment by kind",()=>{
-  const game=new Playground(), before=game.world;
+test("each spell has a short recorded preparation, separate from its battlefield sound",()=>{
+  const preparations=new Set();
+  for(const spell of Object.keys(SPELLS)){
+    const game=new Playground(),before=game.world;
+    game.cast("red",spell,510,170,{x:330,y:170});
+    const [cue,...rest]=pausedPlacementCues(before,game.world);
+    assert.deepEqual(rest,[]);assert.equal(cue.spell,spell);
+    const [layer]=soundFor(cue);
+    const [,length]=fieldTakes[layer.take];
+    assert.ok(Math.min(layer.limit??Infinity,length/1000)/layer.speed<.23,spell);
+    preparations.add(layer.take);
+  }
+  assert.equal(preparations.size,Object.keys(SPELLS).length);
+});
+
+test("simultaneous placements of different classes coalesce at the center of the stroke",()=>{
+  const game=new Playground(),before=game.world;
   game.place("red",{type:"place-warriors",positions:[{x:210,y:160},{x:258,y:160}]});
   game.place("red",{type:UNIT_DEFINITIONS.monk.command,positions:[{x:580,y:160}]});
   const cues=battleCues(before,game.world);
-  assert.deepEqual(cues.map(c=>[c.unit,c.x]),[["warrior",234],["monk",580]]);
+  assert.equal(cues.length,1); assert.equal(cues[0].kind,"place"); assert.equal(cues[0].x,(210+258+580)/3);
   const mix=createCueMixer();
-  assert.equal(mix(cues,1)[0].unit,"warrior"); assert.deepEqual(mix(cues,1.03),[]);
-  assert.equal(mix(cues,1.12)[0].unit,"monk");
+  assert.deepEqual(mix(cues,1),cues);assert.deepEqual(mix(cues,1.03),[]);
+  assert.deepEqual(mix(cues,1.12),cues);
   assert.deepEqual(battleCues(undefined,game.world),[]);
 });
 
@@ -76,6 +75,18 @@ test("a bandage finishes on healing and stays silent when the wrapping is interr
   const interrupted=structuredClone(world);
   interrupted.arrows.push({team:"blue",x:world.units[0].x,y:world.units[0].y,vx:-5,vy:0,damage:8,releasedTick:0});
   assert.ok(!battleCues(interrupted,stepBattle(interrupted)).some(c=>c.kind==="bandage"));
+});
+
+test("each actual punch gets its own contact in the Monk's four-hit flurry",()=>{
+  let world=createBattle([{id:1,kind:"monk",team:"red",x:400,y:170},{id:2,kind:"post",team:"blue",x:430,y:170}]);
+  world.units[1].nextAttackTick=1000;
+  const beats=[];
+  for(let i=0;i<30;i++){
+    const next=stepBattle(world);
+    for(const cue of battleCues(world,next))if(cue.kind==="punch")beats.push([next.tick,soundFor(cue)[0].take]);
+    world=next;
+  }
+  assert.deepEqual(beats,[[1,"knuckles"],[9,"palm"],[17,"bodyHit"],[25,"shoulder"]]);
 });
 
 test("the field and room hear the Miner emerge and all three Drone releases even at point blank range",()=>{

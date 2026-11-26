@@ -31,17 +31,17 @@ const mix = {
   sling:["weapon",.17], thunder:["spell",.19], smash:["material",.18], shot:["weapon",.12],
   bowDraw:["draw",.15], bow:["weapon",.095], bolt:["weapon",.11], toss:["weapon",.23], fuse:["weapon",.22],
   shard:["weapon",.16], dart:["weapon",.15], hex:["weapon",.25], wood:["material",.16], metal:["material",.15],
-  beastHurt:["hurt",.26], birdHurt:["hurt",.29], hit:["hurt",.20], rain:["spell",.21], gust:["spell",.21],
+  beastHurt:["hurt",.34], birdHurt:["hurt",.36], hit:["hurt",.31], rain:["spell",.21], gust:["spell",.21],
   kindle:["material",.27], venom:["material",.31],
   backKick:["weapon",.16], drain:["spell",.24], regrow:["voice",.36], fuseSlime:["material",.28],
   rivet:["material",.25], packSnow:["material",.28],
 } as const;
 export type CueKind = keyof typeof mix;
 type Lane = (typeof mix)[CueKind][0];
-export interface Cue { kind: CueKind; x: number; seed: number; unit?: UnitKind; spell?: SpellKind; level?: number; chain?: readonly number[] }
+export interface Cue { kind: CueKind; x: number; seed: number; unit?: UnitKind; spell?: SpellKind; level?: number; chain?: readonly number[]; beat?: number }
 const priority = new Map(Object.keys(mix).map((kind,i) => [kind,i]));
 const identity=(c: Cue) => c.kind+"."+(c.unit ?? c.spell ?? "");
-const laneGap: Record<Lane,number> = {spell:.075,material:.066,weapon:.068,voice:.28,hurt:.18,draw:.13,brush:.085,signal:.10};
+const laneGap: Record<Lane,number> = {spell:.085,material:.085,weapon:.075,voice:.35,hurt:.26,draw:.14,brush:.085,signal:.10};
 export function createCueMixer() {
   const lastKind=new Map<string,number>(), lastLane=new Map<Lane,number>();
   return (cues: readonly Cue[], now: number) => {
@@ -100,7 +100,7 @@ function hurtVoice(u: Unit): CueKind {
 export function battleCues(before: World | undefined, world: World): Cue[] {
   if (!before || world === before || world.tick < before.tick || world.tick-before.tick>12) return [];
   const groups = new Map<string,{cue:Cue;sum:number;count:number}>();
-  function add(kind: CueKind,x: number,id: number,tick=world.tick,detail: Pick<Cue,"unit"|"level"|"spell"|"chain">={}) {
+  function add(kind: CueKind,x: number,id: number,tick=world.tick,detail: Pick<Cue,"unit"|"level"|"spell"|"chain"|"beat">={}) {
     const variation=(Math.imul(id,31)+tick*13)>>>0;
     // Each human keeps their voice across hits, with two takes from the same performer.
     const seed=kind==="hit" ? ((variation & ~1) | (id & 1))>>>0 : variation;
@@ -126,7 +126,7 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
     const previous=new Map(before.units.map(u=>[u.id,u]));
     for (const u of world.units) {
       const old=previous.get(u.id);
-      if(!old && u.makerId===undefined)add("place",u.x,u.id,world.tick,{unit:u.kind});
+      if(!old && u.makerId===undefined)add("place",u.x,u.id);
       if(fresh(u.warpedTick))add("wormhole",u.x,u.id,u.warpedTick);
       if(fresh(u.lastBlockTick))add(u.kind==="windmill"?"fan":"block",u.x,u.id,u.lastBlockTick);
       else if(fresh(u.lastHitTick) && (!world.bases || u.hp || u.killedBy!==undefined)){
@@ -184,7 +184,10 @@ export function battleCues(before: World | undefined, world: World): Cue[] {
       if(u.kind==="rhinorider" && u.lastChargeTick===u.lastAttackTick)sound="hornCrash";
       if(u.kind==="werewolf" && (u.wolfUntil??0)>u.lastAttackTick)sound="wolfClaw";
       if(u.kind==="liondancers" && u.lastKickTick===u.lastAttackTick)sound="backKick";
-      if(sound)add(sound,u.x,u.id,u.lastAttackTick);
+      if(sound==="punch" && u.flurryStartedTick!==undefined){
+        const beat=Math.floor((u.lastAttackTick-u.flurryStartedTick)/UNIT_DEFINITIONS.monk.punchGap);
+        add(sound,u.x,u.id,u.lastAttackTick,{beat});
+      } else if(sound)add(sound,u.x,u.id,u.lastAttackTick);
     }
   }
   for(const b of world.bases??[]){

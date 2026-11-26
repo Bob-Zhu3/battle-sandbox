@@ -77,13 +77,13 @@ game.addEventListener("brushchange",()=>{
 });
 if (demo === "foley") {
   const cast: [Team,RecruitKind,number,number][]=[
-    ["red","workshop",185,110], ["blue","miner",276,109],
-    ["red","harpoon",418,235], ["blue","kraken",523,235],
-    ["red","clown",662,124], ["blue","cerberus",764,124],
+    ["red","monk",135,130], ["blue","snowman",166,130],
+    ["red","clown",326,277], ["blue","irongolem",423,277],
+    ["red","kirin",619,66], ["blue","warrior",886,77], ["blue","warrior",916,91], ["blue","warrior",943,83],
   ];
   for(const [side,kind,x,y] of cast)play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
   previous=play.world; play.paused=true;
-  field.armBrush("drone");
+  field.armBrush("monk");
 } else if (demo === "effects") {
   troopEffectsShowcase(play);
   previous=play.world;
