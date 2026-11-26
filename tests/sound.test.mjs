@@ -1,9 +1,109 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { createBattle, stepBattle } from "../src/simulation.ts";
 import { Playground } from "../src/playground.ts";
-import { battleCues, createCueMixer } from "../src/sound-events.ts";
+import { battleCues, createCueMixer, pausedPlacementCues, matchCues } from "../src/sound-events.ts";
 import { SPELLS } from "../src/spells.ts";
+import { RECRUIT_KINDS, UNIT_DEFINITIONS } from "../src/units.ts";
+import { scoreForCue } from "../src/audio/scorebook.ts";
+import { renderScore, FOLEY_RATE } from "../src/audio/foley.ts";
+
+test("room signals follow confirmed transitions and joining a finished round stays quiet",()=>{
+  const lobby={round:1,phase:"deploy",world:createBattle([]),seats:{red:{ready:false}}};
+  const ready={...lobby,seats:{red:{ready:true}}}, three={...ready,phase:"countdown",countdown:3};
+  const two={...three,countdown:2}, live={...two,phase:"running"}, end={...live,phase:"finished",outcome:"red"};
+  assert.equal(matchCues(lobby,ready,"red")[0].kind,"ready");
+  assert.deepEqual([matchCues(ready,three,"red")[0].level,matchCues(three,two,"red")[0].level],[1,2]);
+  assert.deepEqual(matchCues(two,two,"red"),[]);
+  assert.equal(matchCues(two,live,"red")[0].kind,"march");
+  assert.equal(matchCues(live,end,"red")[0].kind,"victory");
+  assert.equal(matchCues(live,end,"blue")[0].kind,"defeat");
+  assert.equal(matchCues(live,{...end,outcome:"draw"},"blue")[0].kind,"stalemate");
+  assert.deepEqual(matchCues(undefined,end,"red"),[]);
+  assert.deepEqual(matchCues(end,end,"red"),[]);
+});
+
+test("every selectable troop, tower and spell produces its own audible paused placement", () => {
+  const attacks=new Set(), transients=new Set();
+  function check(game,before,card){
+    const [cue,...more]=pausedPlacementCues(before,game.world);
+    assert.deepEqual(more,[]);
+    assert.equal(cue.unit??cue.spell,card);
+    assert.deepEqual(pausedPlacementCues(game.world,game.world),[]);
+    const score=scoreForCue(cue), pcm=renderScore(score);
+    assert.ok(pcm.length>=FOLEY_RATE*.09,card);
+    assert.ok(pcm.reduce((sum,v)=>sum+v*v,0)/pcm.length>.001,card+" has audible energy");
+    assert.ok(pcm.every(v=>Number.isFinite(v) && Math.abs(v)<=.821),card+" has headroom");
+    // Compare equal-length onsets as well as complete sample data.
+    transients.add(createHash("sha256").update(pcm.subarray(0,2048)).digest("hex"));
+    attacks.add(createHash("sha256").update(pcm).digest("hex"));
+  }
+  for(const card of RECRUIT_KINDS){
+    const game=new Playground(),before=game.world;
+    game.place("blue",{type:UNIT_DEFINITIONS[card].command,positions:[{x:300,y:170}]});
+    check(game,before,card);
+  }
+  for(const card of Object.keys(SPELLS)){
+    const game=new Playground(),before=game.world;
+    game.cast("red",card,510,170,{x:330,y:170}); check(game,before,card);
+  }
+  const count=RECRUIT_KINDS.length+Object.keys(SPELLS).length;
+  assert.equal(attacks.size,count); assert.equal(transients.size,count);
+});
+
+test("a mixed snapshot preserves different card voices and groups a mass deployment by kind",()=>{
+  const game=new Playground(), before=game.world;
+  game.place("red",{type:"place-warriors",positions:[{x:210,y:160},{x:258,y:160}]});
+  game.place("red",{type:UNIT_DEFINITIONS.monk.command,positions:[{x:580,y:160}]});
+  const cues=battleCues(before,game.world);
+  assert.deepEqual(cues.map(c=>[c.unit,c.x]),[["warrior",234],["monk",580]]);
+  const mix=createCueMixer();
+  assert.equal(mix(cues,1)[0].unit,"warrior"); assert.deepEqual(mix(cues,1.03),[]);
+  assert.equal(mix(cues,1.12)[0].unit,"monk");
+  assert.deepEqual(battleCues(undefined,game.world),[]);
+});
+
+test("a bandage finishes on healing and stays silent when the wrapping is interrupted",()=>{
+  let world=createBattle([{id:1,team:"red",kind:"medic",x:380,y:180},{id:2,team:"red",kind:"warrior",x:405,y:180}]);
+  world.units[1].hp=18;
+  for(let i=0;i<24;i++){
+    const next=stepBattle(world); assert.ok(!battleCues(world,next).some(c=>c.kind==="bandage")); world=next;
+  }
+  const finished=stepBattle(world);
+  assert.ok(finished.units[1].hp>world.units[1].hp);
+  assert.equal(battleCues(world,finished).filter(c=>c.kind==="bandage").length,1);
+  const interrupted=structuredClone(world);
+  interrupted.arrows.push({team:"blue",x:world.units[0].x,y:world.units[0].y,vx:-5,vy:0,damage:8,releasedTick:0});
+  assert.ok(!battleCues(interrupted,stepBattle(interrupted)).some(c=>c.kind==="bandage"));
+});
+
+test("the field and room hear the Miner emerge and all three Drone releases even at point blank range",()=>{
+  const game=new Playground();
+  game.place("blue",{type:UNIT_DEFINITIONS.miner.command,positions:[{x:563,y:120}]});
+  const emerge=game.world.units[0].tunnel.end, frames=[game.world];
+  for(let i=0;i<emerge+5;i++){game.advance();frames.push(game.world);}
+  const drone=[createBattle([{id:1,kind:"drone",team:"red",x:220,y:170},{id:2,kind:"post",team:"blue",x:235,y:170}])];
+  for(let i=0;i<18;i++)drone.push(stepBattle(drone.at(-1)));
+  function hear(sequence,stride,kind){
+    const times=[];
+    for(let i=stride;i<sequence.length;i+=stride)
+      if(battleCues(sequence[i-stride],sequence[i]).some(c=>c.kind===kind))times.push(i);
+    return times;
+  }
+  for(const stride of [1,3]){
+    assert.deepEqual(hear(frames,stride,"breakSoil"),[Math.ceil(emerge/stride)*stride]);
+    assert.deepEqual(hear(drone,stride,"droneBolt"),[1,8,15].map(t=>Math.ceil(t/stride)*stride));
+  }
+});
+
+test("a Kirin's discharge follows the enemies it actually chained through",()=>{
+  const world=createBattle([{id:1,kind:"kirin",team:"red",x:200,y:170},
+    ...[275,321,368].map((x,i)=>({id:2+i,kind:"warrior",team:"blue",x,y:170}))]);
+  const next=stepBattle(world);
+  assert.deepEqual(battleCues(world,next).find(c=>c.kind==="thunder").chain,[275,321,368]);
+  assert.ok(!battleCues(next,stepBattle(next)).some(c=>c.kind==="thunder"));
+});
 
 test("a bowstring sounds at release and a stationary target sounds once on impact", () => {
   let world = createBattle([{id:1, team:"red", kind:"archer", x:240, y:150}, {id:2, team:"blue", kind:"archer", x:340, y:150}]);
@@ -99,7 +199,7 @@ test("voices follow the Lancer's running start and the Kirin's discharge", () =>
   assert.ok(charges[0]>1 && world.units[0].lastAttackTick===null);
   world=createBattle([{id:1,team:"red",kind:"kirin",x:380,y:180},{id:2,team:"blue",kind:"warrior",x:466,y:180}]);
   const strike=stepBattle(world);
-  assert.deepEqual(new Set(battleCues(world,strike).map(c=>c.kind)),new Set(["howl","thunder","hit"]));
+  assert.deepEqual(new Set(battleCues(world,strike).map(c=>c.kind)),new Set(["kirinCall","thunder","hit"]));
   assert.deepEqual(battleCues(strike,stepBattle(strike)),[]);
 });
 

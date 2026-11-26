@@ -103,6 +103,12 @@ async function pixelPreview(url) {
   const page=await browser.newPage({viewport:{width:1280,height:720}});
   try {
     await page.addInitScript(()=>{
+      // Read the field and its sprite canvases through the same rasterizer on
+      // every reload. GPU readback can round a translucent edge differently.
+      const context=HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext=function(type,options){
+        return type==="2d" ? context.call(this,type,{...options,willReadFrequently:true}) : context.apply(this,arguments);
+      };
       const draw=CanvasRenderingContext2D.prototype.drawImage;
       const rows=new Set(), stripOrigins=new WeakMap();
       window.pixelEffectRows=rows;

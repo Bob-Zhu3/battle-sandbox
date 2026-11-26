@@ -6,6 +6,7 @@ import { drawArena } from "./renderer.ts";
 import { castHint, SPELLS } from "./spells.ts";
 import { connectRoom, type ConnectionState } from "./room-connection.ts";
 import type { RoomAction, Snapshot, World } from "./room-protocol.ts";
+import { matchCues } from "./sound-events.ts";
 import { bountyFor } from "./transformations.ts";
 import { UNIT_DEFINITIONS, placementKind, type RecruitKind } from "./units.ts";
 import { matchLink, matchMode } from "./match-link.ts";
@@ -183,7 +184,7 @@ const connection = connectRoom(mode, {
         fromFrame=previous.world; frameStart=performance.now(); frameDuration=Math.min(165,gap*1000/60);
       }
     }
-    if (heardSnapshot && previous?.round === event.round) field.hear(previous.world,event.world);
+    if (heardSnapshot && previous?.round === event.round) field.hear(previous.world,event.world,matchCues(previous,event,team));
     heardSnapshot = true;
     if (!canDraw() || (previous && previous.round !== event.round)) { spellBrush.cancel(); cancelStroke(); }
     if (previous?.round !== event.round || previous.phase !== event.phase) { notice = ""; bounty = undefined; }

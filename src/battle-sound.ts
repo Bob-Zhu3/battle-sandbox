@@ -1,9 +1,14 @@
 import { ARENA } from "./battlefield.ts";
-import { battleCues, createCueMixer, type Cue } from "./sound-events.ts";
+import { battleCues, pausedPlacementCues, spellOpening, createCueMixer, type Cue } from "./sound-events.ts";
+import type { FieldSpell } from "./spells.ts";
+import { FOLEY_RATE, renderScore, type Score } from "./audio/foley.ts";
+import { scoreForCue } from "./audio/scorebook.ts";
 import { prepareRecordings } from "./recordings.ts";
 import type { World } from "./room-protocol.ts";
 
-function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType<typeof prepareRecordings>) {
+const stereoPosition=(x: number)=>Math.max(-.72,Math.min(.72,(x/ARENA.width-.5)*1.44));
+
+function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType<typeof prepareRecordings>, sounds: Map<Score,AudioBuffer>) {
   const buffer = ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
   const samples = buffer.getChannelData(0);
   let bits = 731027;
@@ -13,11 +18,35 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
   }
   return function play(cue: Cue) {
     const pan = ctx.createStereoPanner();
-    pan.pan.value = Math.max(-.72,Math.min(.72,(cue.x/ARENA.width-.5)*1.44));
+    pan.pan.value = stereoPosition(cue.x);
     pan.connect(output);
     const now = ctx.currentTime+.004;
     const variation = ((Math.imul(cue.seed,2654435761) >>> 0)%101)/100;
     const pitch = .93+.14*variation;
+    const score=scoreForCue(cue);
+    if(score){
+      let sample=sounds.get(score);
+      if(!sample){
+        const pcm=renderScore(score);
+        sample=ctx.createBuffer(1,pcm.length,FOLEY_RATE);
+        sample.getChannelData(0).set(pcm); sounds.set(score,sample);
+      }
+      const level=cue.kind==="place" ? .64 : cue.kind==="spellSet" ? .56 : cue.unit ? .54 : .77;
+      const steps=cue.chain?.length || 1;
+      for(let i=0;i<steps;i++){
+        const at=now+i*.055, src=ctx.createBufferSource(), gain=ctx.createGain();
+        const position=i===0 ? pan : ctx.createStereoPanner();
+        if(i>0)position.connect(output);
+        if(cue.chain?.length)position.pan.value=stereoPosition(cue.chain[i]);
+        src.buffer=sample;
+        src.playbackRate.value=pitch*2**(((cue.level??1)-1+i)*2/12);
+        gain.gain.value=level/(1+i*.26);
+        src.connect(gain); gain.connect(position);
+        src.onended=()=>{src.disconnect();gain.disconnect();position.disconnect();};
+        src.start(at);
+      }
+      return;
+    }
     if(recordings.play(cue,ctx,pan,pitch))return;
     let layers = 0;
     function envelope(node: AudioScheduledSourceNode, source: AudioNode, at: number, duration: number, peak: number, attack: number) {
@@ -51,11 +80,6 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
         noise(2900,970,.21,.24,.064);tone(760,307,.19,.10,"triangle",.035,.032);noise(1370,850,.10,.19,.004,.16);break;
       case "fireBreath":
         noise(410,1200,.38,.43,.058);noise(2800,760,.31,.35,.042,.08);tone(109,62,.34,.12,"triangle",.02,.065);break;
-      case "winch":
-        noise(1200,3110,.12,.23,.024);tone(485,710,.11,.11,"triangle");
-        for(let i=0;i<3;i++) noise(2300,1500,.023,.16,.003,.10+i*.031);break;
-      case "hook":
-        tone(990,652,.135,.14,"triangle");tone(1810,1460,.09,.08);noise(3400,1620,.038,.21);break;
       case "breach":
         noise(350,160,.32,.38,.038);noise(1370,485,.22,.26,.021,.045);
         for(let i=0;i<3;i++) noise(1100+i*260,460,.052,.13,.005,.13+i*.055);break;
@@ -65,23 +89,6 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
         tone(170,459,.079,.17,"sine",0,.016);tone(427,95,.12,.19,"triangle",.052);noise(920,340,.085,.12,.009,.057);break;
       case "cymbals":
         noise(6100,3350,.27,.31);tone(1920,1850,.18,.07,"triangle");tone(2961,2870,.13,.065);break;
-      case "punch":
-        noise(780,2380,.062,.27,.014); noise(1950,710,.038,.20,.005,.023);
-        tone(172,76,.063,.14,"triangle",.029); break;
-      case "snort":
-        noise(490,1060,.13,.28,.026);noise(960,330,.22,.34,.018,.09);tone(125,73,.20,.11,"sawtooth",.10,.023);break;
-      case "hiss":
-        noise(4100,6400,.16,.27,.058);noise(5900,2600,.18,.22,.018,.11);break;
-      case "bark":
-        for(const [i,hz] of [248,205,323].entries()) {
-          const offset=i*.051;
-          tone(hz,hz*.48,.115,.086,"sawtooth",offset,.009);
-          noise(1350-i*150,460,.115,.14,.008,offset);
-        }
-        break;
-      case "splash":
-        noise(1740,740,.18,.25,.021);tone(360,635,.125,.135,"sine",.040);
-        tone(610,940,.10,.075,"sine",.13);break;
       case "flutter":
         for(let i=0;i<3;i++) noise(1520,620,.058,.15-i*.018,.019,i*.055);
         break;
@@ -101,11 +108,6 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
       case "wood": noise(850,430,.085,.33);tone(210,165,.10,.13,"triangle");break;
       case "metal": tone(712,682,.24,.18);tone(1593,1570,.15,.13);noise(3200,1580,.043,.24);break;
       case "bolt": noise(3000,1350,.06,.32);tone(540,360,.045,.10,"square");break;
-      case "toss": noise(540,1500,.12,.13,.055);break;
-      case "fuse": noise(3800,6200,.17,.21,.028);noise(4900,2200,.05,.15,.003,.07);break;
-      case "dart": noise(1300,3500,.11,.24,.025);break;
-      case "shard": tone(1430,2050,.15,.11);tone(2050,2310,.095,.08);break;
-      case "hex": tone(480,250,.22,.13,"triangle");tone(610,375,.19,.09,"sine",.055);break;
       case "glass":
         noise(7000,3100,.065,.38);for(const [i,hz] of [1640,2460,3210,1970,4700].entries())tone(hz,hz*.985,.19-i*.014,.155/(1+i*.16),"sine",i*i*.007);break;
       case "charge": case "roar": case "groan":
@@ -118,25 +120,11 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
         tone(1320,2380,.115,.17,"triangle",0,.021);tone(2110,1240,long?.25:.115,.17,"sine",.068);
         noise(4300,2500,long?.24:.14,.24,.031);if(long)tone(1700,2260,.075,.10,"sine",.24);break;
       }
-      case "freeze":
-        noise(5600,2400,.37,.24,.07);for(const [i,hz] of [1850,2480,3350,2780].entries())tone(hz,hz*1.016,.24,.14-i*.013,"sine",i*.032,.007);break;
       case "lightning":
         noise(8600,700,.09,.83);noise(5300,300,.19,.74,.004,.043);noise(630,120,.49,.64,.045,.08);
         tone(105,42,.46,.35,"triangle",.065,.028);break;
-      case "rage":
-        tone(221,290,.21,.22,"sawtooth",0,.047);tone(332,428,.31,.14,"triangle",.095,.046);
-        noise(590,2000,.34,.22,.085);break;
-      case "thunder": noise(4900,960,.12,.24); noise(3100,480,.085,.17,.004,.047); break;
       case "smash": tone(153,59,.22,.26); noise(800,230,.16,.22); break;
-      case "toll": tone(325,307,.48,.17); tone(823,787,.28,.083); tone(1214,1184,.14,.04); break;
-      case "lens": tone(520,760,.12,.065,"triangle"); tone(1030,1460,.085,.03); break;
-      case "sling": noise(800,2200,.10,.15); tone(244,125,.12,.085,"triangle"); break;
-      case "fault": noise(760,160,.31,.24,.02); tone(110,45,.29,.21); break;
-      case "briar": noise(1900,960,.12,.13); tone(305,540,.10,.075,"triangle"); break;
-      case "mirror": tone(750,980,.22,.065); tone(1100,1440,.18,.04,"sine",.04); break;
       case "reflect": tone(1440,980,.19,.105); tone(870,1290,.095,.07,"triangle"); break;
-      case "rain": tone(870,690,.15,.072); tone(1190,960,.13,.056,"sine",.075); break;
-      case "gust": noise(530,2450,.25,.19,.076); break;
       case "fall":
         noise(650,2900,.72,.24,.40);
         tone(700,247,.64,.041,"sine",.02,.28); break;
@@ -149,9 +137,11 @@ function instrument(ctx: AudioContext, output: AudioNode, recordings: ReturnType
 
 export function createBattleSound(button: HTMLButtonElement) {
   const recordings = prepareRecordings();
+  const sounds = new Map<Score,AudioBuffer>();
   const storage = "battle.sound.muted";
   let muted = false;
   let paused = false;
+  const heldSpells = new WeakSet<FieldSpell>();
   try { muted = localStorage.getItem(storage) === "true"; } catch { /* Optional preference. */ }
   function createOutput() {
     const ctx = new AudioContext({latencyHint:"interactive"});
@@ -161,7 +151,7 @@ export function createBattleSound(button: HTMLButtonElement) {
     compressor.threshold.value = -11; compressor.ratio.value = 5;
     master.connect(compressor); compressor.connect(ctx.destination);
     recordings.unlock(ctx);
-    const play = instrument(ctx,master,recordings), mix = createCueMixer();
+    const play = instrument(ctx,master,recordings,sounds), mix = createCueMixer();
     function hear(cues: readonly Cue[]) {
       for (const cue of mix(cues,ctx.currentTime)) play(cue);
     }
@@ -203,25 +193,35 @@ export function createBattleSound(button: HTMLButtonElement) {
     if (e.key.toLowerCase() === "m" && !e.repeat) { e.preventDefault(); toggle(); }
     else unlock();
   });
-  function hear(before: World | undefined, world: World) {
+  function hear(before: World | undefined, world: World, signals: readonly Cue[]=[]) {
     if (muted || document.hidden) return;
     if (paused) {
-      const cues = battleCues(before,world).filter(cue => cue.kind === "place");
+      const cues = pausedPlacementCues(before,world);
       if (!cues.length || typeof AudioContext === "undefined") return;
+      for(const spell of world.spells??[])
+        if(before?.tick===world.tick && !before.spells?.some(s=>s.id===spell.id))heldSpells.add(spell);
       // A separate audio clock lets the brush play while a roar or spell is held mid-sound.
       pausedBrush ??= createOutput();
       wake(pausedBrush.ctx);
       pausedBrush.hear(cues);
-    } else if (battle?.ctx.state === "running") {
-      battle.hear(battleCues(before,world));
+    } else if (battle) {
+      const battleEvents=battleCues(before,world);
+      const cues=signals.length ? [...signals,...battleEvents] : battleEvents;
+      if(battle.ctx.state==="running")battle.hear(cues);
+      else if(navigator.userActivation?.isActive)battle.hear(cues.filter(c=>c.kind==="place" || before?.tick===world.tick));
     }
   }
-  function pauseSound(hold: boolean) {
+  function pauseSound(hold: boolean, world: World) {
     if (hold === paused) return;
     paused = hold;
-    if (hold) void battle?.ctx.suspend().catch(() => {});
-    else if (battle && !muted) void battle.ctx.resume().catch(() => {});
-    else unlock();
+    if (hold) { void battle?.ctx.suspend().catch(() => {}); return; }
+    unlock();
+    const launches: Cue[]=[];
+    for(const spell of world.spells??[]) if(heldSpells.delete(spell)){
+      const opening=spellOpening(spell);
+      if(opening.kind!=="spellSet")launches.push(opening);
+    }
+    if(!muted && !document.hidden)battle?.hear(launches);
   }
   return {hear, pauseSound};
 }

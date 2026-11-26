@@ -128,7 +128,7 @@ test("a Rhino gallops after a straight approach, hits the front rank once at hor
     w=step(w);
     if (unit(w,1).lastChargeTick) {
       assert.ok(unit(previous,2).x-unit(previous,1).x<=spec.radius+defs.warrior.radius+spec.hornReach);
-      assert.ok(battleCues(previous,w).some(c=>c.kind==="smash"));
+  assert.ok(battleCues(previous,w).some(c=>c.kind==="hornCrash"));
     }
   }
   assert.equal(unit(w,1).lastChargeTick,w.tick);

@@ -32,7 +32,8 @@ let soundHint=demo==="sound";
 const spellBrush=attachSpellBrush(field.canvas,field.selectedSpell,(spell,point,entrance)=>{
   const before=play.world;
   play.cast(team,spell,point.x,point.y,entrance);
-  if (!play.paused) { field.hear(before,play.world); previous=play.world; }
+  field.hear(before,play.world);
+  if (!play.paused) previous=play.world;
   update(); paint();
 },()=>{updateBrushHint(); update(); paint();});
 
@@ -74,7 +75,16 @@ game.addEventListener("brushchange",()=>{
   if (field.selectedSpell()!=="wormhole") spellBrush.cancel();
   updateBrushHint();
 });
-if (demo === "effects") {
+if (demo === "foley") {
+  const cast: [Team,RecruitKind,number,number][]=[
+    ["red","workshop",185,110], ["blue","miner",276,109],
+    ["red","harpoon",418,235], ["blue","kraken",523,235],
+    ["red","clown",662,124], ["blue","cerberus",764,124],
+  ];
+  for(const [side,kind,x,y] of cast)play.place(side,{type:UNIT_DEFINITIONS[kind].command,positions:[{x,y}]});
+  previous=play.world; play.paused=true;
+  field.armBrush("drone");
+} else if (demo === "effects") {
   troopEffectsShowcase(play);
   previous=play.world;
   field.armBrush("medusa");
@@ -153,7 +163,7 @@ function paint(blend = play.paused ? lastBlend : 1) {
   drawArena(field.ctx, previous, play.world, blend,false,[],field.selectedKind(),{ownTeam:team,portalEntrance:spellBrush.entrance});
 }
 function syncClockButton() {
-  field.pauseSound(play.paused);
+  field.pauseSound(play.paused,play.world);
   const label = play.paused ? "Resume playground" : "Pause playground";
   clockButton.setAttribute("aria-label", label);
   clockButton.setAttribute("aria-description",label+" (Space)");
