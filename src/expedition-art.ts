@@ -2,7 +2,7 @@ import { eventFade, type CharacterPose } from "./character-pose.ts";
 import { cut, eye, FACE, INK, IRON, limb, line, oval, type Dye, type Pens } from "./ink.ts";
 import { crystalFocus, crystalLift } from "./prism-art.ts";
 import type { Unit } from "./simulation.ts";
-import { rhinoCharging, UNIT_DEFINITIONS } from "./units.ts";
+import { activeCharge, UNIT_DEFINITIONS } from "./units.ts";
 import { FAN_HUB_HEIGHT, FAN_HUB_OFFSET, fanGustProgress, MILL_MODEL_SCALE } from "./fan-wind.ts";
 
 export type ExpeditionKind = "monk" | "liondancers" | "rhinorider" | "trojanhorse" |
@@ -166,7 +166,7 @@ function rhinoLeg(c: Pens, hip: number, stride: number, color: string) {
 
 function rhinoRider(c: Pens, d: Dye, p: CharacterPose, u: Unit | undefined, tick: number) {
   const rush = Math.min(1, (u?.runUp ?? 0) / UNIT_DEFINITIONS.rhinorider.runUp);
-  const galloping = u && rhinoCharging(u) && tick >= (u.lastChargeReadyTick ?? 0);
+  const galloping = u && activeCharge(u) && tick >= (u.lastChargeReadyTick ?? 0);
   const stride = p.step * (galloping ? 1.95 : 1);
   const impact = eventFade(tick, u?.lastChargeTick, 12);
   const jab = eventFade(tick, u?.lastAttackTick, 16);

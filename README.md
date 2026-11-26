@@ -6,7 +6,7 @@ Paint troops onto a shared field and watch them fight, alone in the playground o
 
 Run `npm run demo:spells` for a paused volley of lightning, a falling meteor, and a fault opening beneath the front line. Press Space to see the impacts and their fading marks, then choose a spell to cast it yourself.
 
-Run `npm run demo:pixels` to open a 32-troop skirmish just before a meteor lands. The pixel artwork runs in the playground, duels and free-for-all matches. To watch a Rhino Rider build up speed and scatter a front rank, open the [charge demo](https://bob-zhu3.github.io/battle-sandbox/?demo=rhino) and press Play.
+Run `npm run demo:pixels` to open a 32-troop skirmish just before a meteor lands. The pixel artwork runs in the playground, duels and free-for-all matches. Press Play to see what happens when a Lancer meets a Warrior and a raised shield, or when a Rhino Rider charges a front rank. [Lancer demo](https://bob-zhu3.github.io/battle-sandbox/?demo=lancer) · [Rhino Rider demo](https://bob-zhu3.github.io/battle-sandbox/?demo=rhino)
 
 ![A flaming Meteor drops toward a Cyclops as lightning strikes the towers. The selected Meteor card shows the same cracked stone.](media/spell-volley.png)
 

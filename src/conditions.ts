@@ -1,6 +1,6 @@
 import { ARENA, TEAMS, type Team } from "./battlefield.ts";
 import type { Target, Unit } from "./simulation.ts";
-import { footprint, isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { canCharge, footprint, isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export interface Affliction { team: Team; until: number; next: number; applied: number }
 export interface GroundEffect {
@@ -44,7 +44,7 @@ export function disabledUntil(target: Target) {
 }
 
 export function interrupt(unit: Unit) {
-  if (unit.kind === "lancer" || unit.kind === "rhinorider") unit.runUp = 0;
+  if (canCharge(unit.kind)) unit.runUp = 0;
   delete unit.drawingBow;
   delete unit.windup;
   delete unit.wrappingSince;

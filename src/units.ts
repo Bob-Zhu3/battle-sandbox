@@ -23,8 +23,8 @@ const recruits = {
     sight: 140, aidReach: 32, aidAmount: 8, wrapTicks: 24, recoveryTicks: 60, flinchTicks: 24, escortGap: 32,
   },
   lancer: {
-    name: "Lancer", command: "place-lancers", description: "Gets a running start for a heavy thrust. A squarely facing shield stops the charge.",
-    cost: 14, bounty: 7, attack: "melee", radius: 11.5, maxHp: troopHealth(26), speed: 102, reach: 50, damage: 7, cooldownTicks: 42, runUp: 52, bonus: 9,
+    name: "Lancer", command: "place-lancers", description: "After 52 units of straight running, lowers the lance and sprints at double speed. The first thrust hits for 16. A facing Shieldbearer stops it cold.",
+    cost: 14, bounty: 7, attack: "melee", radius: 11.5, maxHp: troopHealth(26), speed: 102, reach: 50, damage: 7, cooldownTicks: 42, runUp: 52, chargeSpeed: 204, bonus: 9,
   },
   bomber: {
     name: "Bomber", command: "place-bombers", description: "Lobs a sparking bomb at a patch of ground. Enemies still inside the circle take the blast together.",
@@ -198,8 +198,12 @@ export const UNIT_DEFINITIONS = { ...recruits, pig: {
 } } as const;
 export type RecruitKind = keyof typeof recruits;
 export type UnitKind = keyof typeof UNIT_DEFINITIONS;
-export const rhinoCharging = (unit: {kind: UnitKind; runUp?: number}) =>
-  unit.kind === "rhinorider" && (unit.runUp ?? 0) >= recruits.rhinorider.runUp;
+export const canCharge = (kind: UnitKind) => kind === "lancer" || kind === "rhinorider";
+export function activeCharge(unit: {kind: UnitKind; runUp?: number}) {
+  if (!canCharge(unit.kind)) return;
+  const spec = recruits[unit.kind];
+  if ((unit.runUp ?? 0) >= spec.runUp) return spec;
+}
 export const RECRUIT_KINDS = Object.keys(recruits) as RecruitKind[];
 export const UNIT_KINDS = Object.keys(UNIT_DEFINITIONS) as UnitKind[];
 export const isBuilding = (kind: UnitKind) => UNIT_DEFINITIONS[kind].speed === 0;

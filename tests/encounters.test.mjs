@@ -77,6 +77,53 @@ test("a lowered lance charges a Warrior; a head-on Shieldbearer checks the Lance
   }
 });
 
+test("a Lancer doubles speed after 52 units, spends the charge on one thrust, and resumes from mid-sprint",()=>{
+  const spec=defs.lancer;
+  let world=createBattle([at(1,"lancer","red",240),at(2,"post","blue",650)]);
+  find(world,2).nextAttackTick=10000;
+  const step=spec.speed/60, warmup=Math.ceil(spec.runUp/step);
+  world=advance(world,warmup-1);
+  assert.ok(Math.abs(find(world,1).x-240-(warmup-1)*step)<1e-8);
+  assert.equal(find(world,1).lastChargeReadyTick,undefined);
+  assert.equal(find(world,1).trail,undefined);
+  world=stepBattle(world);
+  assert.equal(find(world,1).lastChargeReadyTick,warmup);
+  const before=find(world,1).x;
+  world=stepBattle(world);
+  assert.ok(Math.abs(find(world,1).x-before-2*step)<1e-8);
+  assert.ok(find(world,1).trail.length);
+  const room=new Room(); room.world=world;
+  const saved=Room.restore(JSON.parse(JSON.stringify(room.checkpoint(1)))).world;
+  const hit=until(world,w=>find(w,1).lastChargeTick!==undefined);
+  assert.equal(find(hit,2).hp,defs.post.maxHp-spec.damage-spec.bonus);
+  assert.equal(find(hit,1).runUp,0);
+  const nextJab=advance(hit,spec.cooldownTicks);
+  assert.equal(find(nextJab,1).lastChargeTick,hit.tick);
+  assert.equal(find(nextJab,2).hp,find(hit,2).hp-spec.damage);
+  assert.deepEqual(advance(saved,nextJab.tick-saved.tick),nextJab);
+});
+
+test("a Lancer turning into a nearby enemy jabs at normal speed, and a Gust cannot supply the run-up",()=>{
+  const spec=defs.lancer;
+  const world=createBattle([at(1,"lancer","red",260),at(2,"post","blue",710)]);
+  const ready=until(world,w=>find(w,1).runUp>=spec.runUp);
+  const x=find(ready,1).x;
+  ready.units.push(...createBattle([at(3,"post","blue",x-46)]).units);
+  const turned=stepBattle(ready);
+  assert.ok(Math.abs(find(turned,1).x-x+spec.speed/60)<1e-8);
+  assert.equal(find(turned,3).hp,defs.post.maxHp-spec.damage);
+  assert.equal(find(turned,1).lastChargeTick,undefined);
+  assert.equal(find(turned,1).runUp,0);
+
+  const alone=createBattle([at(1,"lancer","red",300)]);
+  find(alone,1).runUp=spec.runUp-1;
+  alone.spells=[{id:5,kind:"gust",team:"blue",x:280,y:180,startTick:-7}];
+  const blown=find(stepBattle(alone),1);
+  assert.ok(blown.x>320);
+  assert.equal(blown.runUp,0);
+  assert.equal(blown.lastChargeReadyTick,undefined);
+});
+
 test("a Medic wraps a wounded person, never a machine; a hit on the final wrap tick interrupts it",()=>{
   let w=quiet(createBattle([at(1,"medic","red",380),at(2,"warrior","red",405),at(3,"drone","red",370,192)]));
   find(w,2).hp=18;find(w,3).hp=8;

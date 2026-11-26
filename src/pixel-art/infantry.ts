@@ -57,11 +57,20 @@ export function infantry(c: Pens, team: Team, kind: keyof typeof head, p: Charac
   const age = tick-(u?.lastAttackTick ?? -Infinity);
   const jab = eventFade(tick,u?.lastAttackTick,12);
   const brace = kind === "shieldbearer" ? Math.max(eventFade(tick,u?.lastBraceTick,16),eventFade(tick,u?.lastBlockTick,12)) : 0;
-  const charge = kind === "lancer" && tick >= (u?.stunnedUntil ?? 0) ? Math.min(1,(u?.runUp??0)/UNIT_DEFINITIONS.lancer.runUp) : 0;
+  let charge=0;
+  if (kind==="lancer" && u) {
+    // A room snapshot can already contain the hit while the screen is drawing the last stride.
+    if (tick >= (u.lastChargeReadyTick ?? Infinity) && tick < (u.lastChargeTick ?? -Infinity)) charge=1;
+    else if (tick >= (u.stunnedUntil ?? 0)) charge=Math.min(1,(u.runUp ?? 0)/UNIT_DEFINITIONS.lancer.runUp);
+  }
+  const sprint = charge >= 1 && tick >= (u?.lastChargeReadyTick ?? 0);
+  const impact = kind === "lancer" ? eventFade(tick,u?.lastChargeTick,10) : 0;
+  const checked = tick < (u?.stunnedUntil ?? 0) ? impact : 0;
+  const thrust = impact-checked;
   const wrap = kind === "medic" && u?.wrappingSince !== undefined ? 1 : 0;
-  const dye = ARMIES[team], stride = Math.round(p.step*3);
-  const crouch = Math.round(p.duck*3+brace*2+wrap*2-p.peek*2);
-  const lean = Math.round(p.strike*3+charge*2-p.hurt*2-p.loose*2+wrap*2);
+  const dye = ARMIES[team], stride = Math.round(p.step*(sprint ? 5 : 3));
+  const crouch = Math.round(p.duck*3+brace*2+wrap*2-p.peek*2+(sprint ? 2 : 0));
+  const lean = Math.round(p.strike*3+charge*2-p.hurt*2-p.loose*2+wrap*2+(sprint ? 2 : 0)+thrust*4-checked*3);
   stamp(c,team,boot,-6+stride,5-Math.max(0,Math.sign(stride)));
   stamp(c,team,boot,2-stride,5-Math.max(0,-Math.sign(stride)));
   c.save();
@@ -102,10 +111,18 @@ export function infantry(c: Pens, team: Team, kind: keyof typeof head, p: Charac
   } else if (kind==="shieldbearer") {
     stamp(c,team,wall,-2+Math.round(brace*3),-6-Math.round(brace*3));
   } else if (kind==="lancer") {
-    const forward=Math.max(charge,jab), y=Math.round(-15+forward*13+p.pitch*5);
-    segment(c,-9,3,20,y,ink,2); segment(c,-8,3,19,y,dye.light);
-    segment(c,16,y+1,22,y-1,ink,2); segment(c,17,y+1,22,y-1,"#d4edef");
-    segment(c,11,y+3,10,y+6,dye.coat,2); stamp(c,team,glove,0,-1);
+    const forward=Math.max(charge,jab), y=Math.round(-15+forward*15+p.pitch*5-checked*17);
+    const tip=22+(sprint ? 3 : 0)+Math.round(thrust*6);
+    segment(c,-9,3,tip-2,y,ink,2); segment(c,-8,3,tip-3,y,dye.light);
+    segment(c,tip-6,y+1,tip,y-1,ink,2); segment(c,tip-5,y+1,tip,y-1,"#d4edef");
+    if (sprint || thrust>.1) {
+      const flutter=Math.floor(tick/3)%2;
+      segment(c,tip-9,y+2,tip-16,y+1-flutter*2,dye.coat,2);
+      stamp(c,team,glove,6,0);
+    } else {
+      segment(c,11,y+3,10,y+6,dye.coat,2);
+    }
+    stamp(c,team,glove,0,-1);
   } else if (kind==="musketeer") {
     const reload=age>8 && age<43 ? Math.sin(Math.PI*(age-8)/35) : 0;
     const y=Math.round(-4+p.pitch*7-4*p.loose+reload*7);

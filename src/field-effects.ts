@@ -22,9 +22,11 @@ export function drawTrail(c: Pens,u: Unit,tick: number,sx: number,sy: number) {
     } else if(kind==="spark") {
       drawEffect(c,"zap",0,side*3,age,TRAIL_TICKS,15,side);
     } else if(kind==="dust") {
-      // A hoof print stays on the ground while three pieces of turf lift off it.
-      const p = Math.min(1,age/23);
+      // The Lancer kicks up less turf than the Rhino on each stride.
+      const boot = u.kind === "lancer";
+      const p = Math.min(1,age/(boot ? 17 : 23));
       c.globalAlpha = (1-p)*.85;
+      if (boot) c.scale(.65,.65);
       c.translate(side*3,2);
       c.fillStyle="#a68c70"; c.fillRect(-3,0,5,2);
       const lift=Math.round(8*Math.sin(Math.PI*p)), spread=Math.round(p*6);

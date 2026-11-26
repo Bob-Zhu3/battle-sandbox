@@ -2,7 +2,7 @@ import { ARENA, BASE_RADIUS, type Team } from "./battlefield.ts";
 import type { Arrow } from "./arrows.ts";
 import type { Target, Unit } from "./simulation.ts";
 import type { ArenaPoint } from "./deployment.ts";
-import { airborne, footprint, isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
+import { airborne, canCharge, footprint, isBuilding, isMachine, UNIT_DEFINITIONS } from "./units.ts";
 
 export const SPELLS = {
   gust: { name: "Gust", command: "cast-gust", cost: 10, radius: 70, delay: 8, duration: 32,
@@ -96,7 +96,7 @@ export function prepareFieldMagic(unit: Unit, pulses: readonly FieldSpell[], tic
   }
   if (!unit.tunnel && !airborne(unit) && !isBuilding(unit.kind) && unit.emberUntil === undefined && !unit.burn && affected("briar")) {
     unit.rootedUntil = Math.max(unit.rootedUntil ?? 0,tick+SPELLS.briar.holdTicks);
-    if (unit.kind === "lancer" || unit.kind === "rhinorider") unit.runUp = 0;
+    if (canCharge(unit.kind)) unit.runUp = 0;
   }
   if (unit.kind === "sunlens" && affected("rain")) {
     delete unit.focusSince; unit.targetId = null; unit.fogUntil = tick+UNIT_DEFINITIONS.sunlens.fogTicks;

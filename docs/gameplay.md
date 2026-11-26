@@ -73,7 +73,7 @@ The Kirin folds its front legs as lightning fires. The Cyclops lifts its club ab
 | Archer | 8 | 4 | Stops at bow range and peeks over a friendly shield or sword when shooting. |
 | Shieldbearer | 16 | 8 | Lifts the shield when a shot approaches. Stops a piercing bullet and takes one quarter of direct frontal shot damage, rounded up. A ground blast can reach behind the shield. |
 | Field Medic | 10 | 5 | Crouches and unrolls a bandage toward a wounded ally. Finishing a wrap removes poison. A hit interrupts treatment. |
-| Lancer | 14 | 7 | Lowers the lance after a straight run. Facing shields check the thrust. Any stun erases the run-up, including a stun on the contact tick. |
+| Lancer | 14 | 7 | Runs 52 units straight, lowers the lance and doubles speed from 102 to 204. The first thrust deals 16 damage. Close-range jabs deal 7. A facing Shieldbearer takes 7 and stuns the Lancer. A sharp turn or stun breaks the charge. |
 | Bomber | 16 | 8 | Lobs a sparking bomb at a fixed spot. When it lands it deals 13 damage to each enemy troop within 43 arena units. |
 | Musketeer | 17 | 8 | One bullet deals 11 damage to its first enemy and 6 to the next. A front-facing shield or a base ends the shot. |
 | Venom Scout | 13 | 6 | The dart deals 3 immediately, then venom deals 3 every half second for three pulses. Machines and Zombies resist venom. |

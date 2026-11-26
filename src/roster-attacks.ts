@@ -3,7 +3,7 @@ import { disabledUntil, type GroundEffect, type Hit } from "./conditions.ts";
 import type { Target, Unit } from "./simulation.ts";
 import { exposed, nearestEnemy } from "./targeting.ts";
 import { hasSoul } from "./transformations.ts";
-import { footprint, isBuilding, rhinoCharging, UNIT_DEFINITIONS as defs } from "./units.ts";
+import { activeCharge, footprint, isBuilding, UNIT_DEFINITIONS as defs } from "./units.ts";
 
 export interface Impulse { id: number; dx: number; dy: number }
 type Point = {x: number; y: number};
@@ -162,7 +162,7 @@ export function rosterStrike(u: Unit, primary: Target, targets: readonly Target[
       break;
     }
     case "rhinorider": {
-      const charged=rhinoCharging(u);
+      const charged=activeCharge(u);
       damage(primary,spec.damage+(charged ? defs.rhinorider.bonus : 0));
       if (charged) {
         u.runUp=0; u.lastChargeTick=tick;

@@ -132,6 +132,13 @@ if (demo === "foley") {
   previous=play.world;
   play.paused=true;
   field.armBrush("rhinorider");
+} else if (demo === "lancer") {
+  play.place("red",{type:"place-lancers",positions:[{x:312,y:118},{x:290,y:237}]});
+  play.place("blue",{type:"place-warriors",positions:[{x:619,y:118}]});
+  play.place("blue",{type:UNIT_DEFINITIONS.shieldbearer.command,positions:[{x:619,y:237}]});
+  previous=play.world;
+  play.paused=true;
+  field.armBrush("lancer");
 } else if (demo === "monk") {
   play.place("red",{type:"place-monks",positions:[{x:424,y:180}]});
   play.place("blue",{type:"place-archers",positions:[{x:451,y:180},{x:471,y:183}]});
